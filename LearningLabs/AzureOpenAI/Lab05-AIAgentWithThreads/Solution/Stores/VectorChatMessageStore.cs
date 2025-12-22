@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.InMemory;
 
-namespace AIAgentWithThreads;
+namespace AIAgentWithThreads.Stores;
 internal sealed class VectorChatMessageStore : ChatMessageStore
 {
     private readonly VectorStore _vectorStore;

@@ -1,10 +1,17 @@
 using Azure.Identity;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.OpenAI;
 using OpenAI;
 using OpenAI.Chat;
+using Microsoft.SemanticKernel.Connectors.InMemory;
+using Microsoft.SemanticKernel.Connectors.MongoDB;
+using Microsoft.Extensions.VectorData;
+using Microsoft.Extensions.AI;
+
 using CommonUtilities;
 using AIAgentWithThreads;
+using AIAgentWithThreads.Stores;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -35,6 +42,8 @@ ColoredConsole.WriteDividerLine();
 # region Scenario 1: Create an AI Agent with Threads using the InMemory vector store
 if (ShouldRunScenario(1))
 {
+    VectorStore vectorStore = new InMemoryVectorStore();
+
     var agent = chatClient.CreateAIAgent();
     var response = await agent.RunAsync("Hello, what is the capital of France?");
     Console.WriteLine(response);
@@ -45,7 +54,21 @@ if (ShouldRunScenario(1))
 
 if (ShouldRunScenario(2))
 {
-    var agent = chatClient.CreateAIAgent();
+    VectorStore vectorStore = new MongoVectorStore(ConfigurationHelper.GetMongoDatabase());
+    var agentSettings = ConfigurationHelper.GetAgent("GlobalAgent");
+     var orchestratorOptions = new Microsoft.Agents.AI.ChatClientAgentOptions
+        {
+            Instructions = agentSettings.Instructions,
+            Name = agentSettings.Name,
+            ChatMessageStoreFactory = ctx =>
+            {
+                return new VectorChatMessageStore(
+                    vectorStore,
+                    ctx.SerializedState,
+                    ctx.JsonSerializerOptions);
+            }
+        };
+    var agent = chatClient.CreateAIAgent(orchestratorOptions);
     var response = await agent.RunAsync("Hello, what is the capital of France?");
     Console.WriteLine(response);
 }

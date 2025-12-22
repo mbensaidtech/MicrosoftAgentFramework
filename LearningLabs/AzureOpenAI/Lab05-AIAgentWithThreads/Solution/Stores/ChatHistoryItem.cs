@@ -1,6 +1,6 @@
 using Microsoft.Extensions.VectorData;
 
-namespace AIAgentWithThreads;
+namespace AIAgentWithThreads.Stores;
 
 /// <summary>
 /// Represents a chat history item for the vector store.
