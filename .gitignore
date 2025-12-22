@@ -27,7 +27,6 @@ bld/
 msbuild.log
 msbuild.err
 msbuild.wrn
-
 .vs/
 
 # AgentsThreads - exclude all files and folders 1
