@@ -11,11 +11,11 @@ using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.InMemory;
 
 namespace AIAgentWithThreads.Stores;
-internal sealed class VectorChatMessageStore : ChatMessageStore
+internal sealed class InMemoryVectorChatMessageStore : ChatMessageStore
 {
     private readonly VectorStore _vectorStore;
 
-        public VectorChatMessageStore(VectorStore vectorStore, JsonElement serializedStoreState, JsonSerializerOptions? jsonSerializerOptions = null)
+        public InMemoryVectorChatMessageStore(VectorStore vectorStore, JsonElement serializedStoreState, JsonSerializerOptions? jsonSerializerOptions = null)
         {
             this._vectorStore = vectorStore ?? throw new ArgumentNullException(nameof(vectorStore));
 
@@ -32,7 +32,7 @@ internal sealed class VectorChatMessageStore : ChatMessageStore
         {
             this.ThreadDbKey ??= Guid.NewGuid().ToString("N");
 
-            var collection = this._vectorStore.GetCollection<string, ChatHistoryItem>("ChatHistory");
+            var collection = this._vectorStore.GetCollection<string, ChatHistoryItem>("chat_history");
             await collection.EnsureCollectionExistsAsync(cancellationToken);
 
             await collection.UpsertAsync(messages.Select(x => new ChatHistoryItem()
@@ -47,7 +47,7 @@ internal sealed class VectorChatMessageStore : ChatMessageStore
 
         public override async Task<IEnumerable<ChatMessage>> GetMessagesAsync(CancellationToken cancellationToken = default)
         {
-            var collection = this._vectorStore.GetCollection<string, ChatHistoryItem>("ChatHistory");
+            var collection = this._vectorStore.GetCollection<string, ChatHistoryItem>("chat_history");
             await collection.EnsureCollectionExistsAsync(cancellationToken);
 
             var records = await collection

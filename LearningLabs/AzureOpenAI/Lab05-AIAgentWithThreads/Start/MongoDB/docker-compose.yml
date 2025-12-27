@@ -36,3 +36,4 @@ volumes:
 networks:
   mongodb_network:
     driver: bridge
+
