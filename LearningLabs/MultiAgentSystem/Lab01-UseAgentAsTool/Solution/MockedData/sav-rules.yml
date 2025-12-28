@@ -1,0 +1,82 @@
+# SAV (After-Sales Service) Rules for E-Commerce
+# These rules define policies for returns, refunds, exchanges, and warranty
+
+return_policy:
+  standard_return_period_days: 30
+  extended_return_period_days: 60  # For premium members
+  conditions:
+    - Product must be unused and in original packaging
+    - Original receipt or proof of purchase required
+    - Tags must be attached for clothing items
+    - Electronics must include all original accessories
+  non_returnable_items:
+    - Underwear and swimwear (hygiene reasons)
+    - Customized or personalized products
+    - Digital downloads and software licenses
+    - Perishable goods
+    - Items marked as "final sale"
+
+refund_policy:
+  processing_time_days: 5-10
+  refund_methods:
+    - original_payment_method: "Refund to original payment method (credit card, PayPal, etc.)"
+    - store_credit: "Instant store credit with 10% bonus"
+  partial_refund_conditions:
+    - Missing original packaging: "10% deduction"
+    - Missing accessories: "Deduction based on accessory value"
+    - Signs of use: "Up to 30% deduction based on condition"
+
+exchange_policy:
+  allowed_within_days: 30
+  conditions:
+    - Same product category only
+    - Price difference must be paid if new item costs more
+    - Refund issued for price difference if new item costs less
+  express_exchange:
+    available: true
+    description: "Ship replacement before receiving return (requires credit card hold)"
+
+warranty_policy:
+  manufacturer_warranty:
+    electronics: "1 year from purchase date"
+    appliances: "2 years from purchase date"
+    furniture: "5 years structural warranty"
+  extended_warranty:
+    available: true
+    cost: "10-15% of product price"
+    coverage: "Additional 1-3 years"
+  warranty_exclusions:
+    - Physical damage or misuse
+    - Water damage (unless waterproof rating claimed)
+    - Unauthorized repairs or modifications
+    - Normal wear and tear
+    - Cosmetic damage
+
+delivery_issues:
+  damaged_in_transit:
+    action: "Full refund or free replacement"
+    report_within_days: 48
+    documentation_required: "Photos of damage and packaging"
+  missing_items:
+    action: "Ship missing items or partial refund"
+    report_within_days: 7
+  wrong_item_received:
+    action: "Free return shipping and correct item sent"
+    report_within_days: 14
+  delayed_delivery:
+    compensation: "10% store credit if delay exceeds 5 business days"
+    full_refund_eligible: true
+    full_refund_delay_days: 15
+
+contact_information:
+  customer_service_hours: "Monday-Friday 9AM-6PM, Saturday 10AM-4PM"
+  response_time_hours: 24
+  phone: "1-800-SAV-HELP"
+  email: "sav@ecommerce-example.com"
+  live_chat: "Available during business hours"
+
+escalation_process:
+  level_1: "Customer Service Agent"
+  level_2: "Team Supervisor (if unresolved within 48h)"
+  level_3: "Customer Relations Manager (complex cases)"
+  ombudsman: "Independent mediator for disputes"
