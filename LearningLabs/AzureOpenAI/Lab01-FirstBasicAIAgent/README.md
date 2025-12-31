@@ -1,194 +1,155 @@
 # Lab 01 - First Basic AI Agent
 
-## 🎯 Objective
+## Objective
 
-In this lab, you will learn how to create your first AI Agent using the **Microsoft Agents Framework** with **Azure OpenAI**.
+In this lab, you will create your first AI Agent using the **Microsoft Agents Framework** with **Azure OpenAI**.
 
-By the end of this lab, you will be able to:
-- Configure an Azure OpenAI client with managed identity authentication
-- Create a ChatClient and wrap it as an AI Agent
-- Send a prompt and receive a response from the agent
-- Create agents with custom instructions and names
-- Use ChatMessages for fine-grained control over conversations
-- Monitor token usage from agent responses
+You will learn how to configure a client, create agents with different configurations, and monitor token usage from responses.
 
-## 📋 Prerequisites
+## What You Will Learn
+
+- How to configure an Azure OpenAI client with managed identity authentication
+- How to create a ChatClient and wrap it as an AI Agent
+- How to send a prompt and receive a response from the agent
+- How to create agents with custom instructions and names
+- How to use ChatMessages for fine-grained control over conversations
+- How to monitor token usage from agent responses
+
+## Prerequisites
 
 - .NET 10 SDK installed
 - Azure OpenAI resource deployed
 - Azure CLI logged in (`az login`) for DefaultAzureCredential
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Lab01-FirstBasicAIAgent/
-├── README.md          # This file
-├── Start/             # 👈 Your working folder (incomplete)
-└── Solution/          # ✅ Reference solution
+├── README.md
+├── Start/                      <-- Your working folder
+│   ├── Program.cs              <-- Complete the TODOs here
+│   ├── ConfigurationHelper.cs
+│   ├── AzureOpenAISettings.cs
+│   ├── appsettings.json
+│   └── FirstBasicAIAgent.csproj
+└── Solution/                   <-- Reference solution
+    └── ...
 ```
 
-## 🚀 Scenarios Overview
+## Instructions
 
-| Scenario | Description |
-|----------|-------------|
-| **Setup** | Configuration and Client Initialization |
-| **Scenario 1** | Basic Agent - Simple prompt with default settings |
-| **Scenario 2** | Agent with Instructions - Custom behavior and identity |
-| **Scenario 3** | Using ChatMessages - Fine-grained control with message roles |
-| **Scenario 4** | Get consumed tokens from the agent run response |
+### Step 1: Configure your settings
 
----
-
-## 🔧 Setup: Configuration and Client Initialization
-
-### Step 1: Configure your Azure OpenAI settings
-
-Open `Start/appsettings.json` and update the values with your Azure OpenAI resource:
+Open `Start/appsettings.json` and update the values:
 
 ```json
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "DeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
   }
 }
 ```
 
-### Step 2: Complete the Setup TODOs in Program.cs
+### Step 2: Complete the Program.cs
 
-| TODO | Description |
-|------|-------------|
-| **TODO 1** | Create an `AzureOpenAIClient` using the endpoint and `DefaultAzureCredential` |
-| **TODO 2** | Get a `ChatClient` from the AzureOpenAIClient using the deployment name |
+Open `Start/Program.cs` and complete the TODOs:
 
 ---
 
-## 📝 Scenario 1: Basic Agent
+#### Setup: Configuration and Client Initialization
 
-Create a simple agent with no custom instructions.
-
-| TODO | Description |
-|------|-------------|
-| **TODO 3** | Create a basic AI Agent using `CreateAIAgent()` |
-| **TODO 4** | Run the agent with `RunAsync("Hello, what is the capital of France?")` |
-| **TODO 5** | Display the response |
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 1** | Create `AzureOpenAIClient` with managed identity authentication | • Constructor: `new AzureOpenAIClient(Uri endpoint, TokenCredential credential)` <br> • Use `new Uri(settings.Endpoint)` for the endpoint <br> • Use `new DefaultAzureCredential()` for authentication |
+| **TODO 2** | Get a `ChatClient` for the deployment | • Method: `client.GetChatClient(string deploymentName)` <br> • Use `settings.ChatDeploymentName` |
 
 ---
 
-## 📝 Scenario 2: Agent with Instructions
+#### Scenario 1: Basic Agent - Simple prompt with default settings
 
-Create an agent with custom instructions and a name.
-
-| TODO | Description |
-|------|-------------|
-| **TODO 6** | Create an agent with `CreateAIAgent(instructions: "...", name: "GeographyAgent")` |
-| **TODO 7** | Run the agent with a geography question |
-| **TODO 8** | Display the response |
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 3** | Create a basic AI Agent from the ChatClient | • Extension method: `chatClient.CreateAIAgent()` <br> • No parameters needed for a basic agent <br> • Returns: `ChatClientAgent` |
+| **TODO 4** | Run the agent with a simple string prompt | • Method: `await agent.RunAsync(string prompt)` <br> • Example prompt: "Hello, what is the capital of France?" <br> • Returns: `AgentRunResponse` |
+| **TODO 5** | Display the response | • Use `ColoredConsole.WritePrimaryLogLine(response.ToString())` |
 
 ---
 
-## 📝 Scenario 3: Using ChatMessages
+#### Scenario 2: Agent with Instructions - Custom behavior and identity
 
-Use `ChatMessage` objects for fine-grained control over the conversation.
-
-| TODO | Description |
-|------|-------------|
-| **TODO 9** | Create a system message with `AIExtensions.ChatMessage` and `ChatRole.System` |
-| **TODO 10** | Create a user message with `AIExtensions.ChatMessage` and `ChatRole.User` |
-| **TODO 11** | Run the agent with `RunAsync([systemMessage, userMessage])` |
-| **TODO 12** | Display the response |
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 6** | Create an agent with instructions and a name | • Extension method: `chatClient.CreateAIAgent(instructions: "...", name: "...")` <br> • `instructions`: Define the agent's behavior (e.g., "You are a helpful geography assistant...") <br> • `name`: Give it a meaningful name (e.g., "GeographyAgent") |
+| **TODO 7** | Run the agent with a geography question | • Method: `await agent.RunAsync(string prompt)` <br> • Ask a geography-related question (e.g., "What is the surface area of France?") |
+| **TODO 8** | Display the response | • Use `ColoredConsole.WritePrimaryLogLine(response.ToString())` |
 
 ---
 
-## 📝 Scenario 4: Token Usage Monitoring
+#### Scenario 3: Using ChatMessages - Fine-grained control with message roles
 
-Monitor the token consumption from agent responses.
-
-| TODO | Description |
-|------|-------------|
-| **TODO 13** | Create a new agent (e.g., ColorDecoratorAgent) |
-| **TODO 14** | Run the agent with a question |
-| **TODO 15** | Display the response |
-| **TODO 16** | Display token usage: `InputTokenCount`, `OutputTokenCount`, `TotalTokenCount` |
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 9** | Create an AI Agent | • Same as TODO 6: `chatClient.CreateAIAgent(instructions: "...", name: "...")` |
+| **TODO 10** | Create a system message | • Constructor: `new AIExtensions.ChatMessage(AIExtensions.ChatRole.System, "content")` <br> • System messages define the agent's persona/behavior <br> • Example: "You are a geography expert. Provide detailed and accurate information." |
+| **TODO 11** | Create a user message | • Constructor: `new AIExtensions.ChatMessage(AIExtensions.ChatRole.User, "content")` <br> • User messages contain the question/request <br> • Example: "What are the neighboring countries of France?" |
+| **TODO 12** | Run the agent with an array of messages | • Method: `await agent.RunAsync([systemMessage, userMessage])` <br> • Pass messages as an array `[msg1, msg2]` |
+| **TODO 13** | Display the response | • Use `ColoredConsole.WritePrimaryLogLine(response.ToString())` |
 
 ---
 
-## ▶️ Run and Test
+#### Scenario 4: Token Usage Monitoring
 
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 14** | Create an AI Agent | • Same pattern: `chatClient.CreateAIAgent(instructions: "...", name: "...")` <br> • Example: Create a "ColorDecoratorAgent" |
+| **TODO 15** | Run the agent with a question | • Method: `await agent.RunAsync(string prompt)` <br> • Example: "What colors match with blue?" |
+| **TODO 16** | Display the response | • Use `ColoredConsole.WritePrimaryLogLine(response.ToString())` |
+| **TODO 17** | Display token usage | • Access via `response.Usage` property <br> • Properties: `InputTokenCount`, `OutputTokenCount`, `TotalTokenCount` <br> • Use null-conditional: `response.Usage?.InputTokenCount` <br> • Display with `ColoredConsole.WriteSecondaryLogLine(...)` |
+
+---
+
+### Step 3: Run and Test
+
+**Run the Start project (your implementation):**
 ```bash
 cd Start
 dotnet run
 ```
 
----
-
-## 💡 Hints
-
-<details>
-<summary>Hint: Setup - Creating AzureOpenAIClient and ChatClient</summary>
-
-```csharp
-AzureOpenAIClient client = new AzureOpenAIClient(
-    new Uri(settings.Endpoint), 
-    new DefaultAzureCredential()
-);
-ChatClient chatClient = client.GetChatClient(settings.DeploymentName);
+**Run the Solution (reference):**
+```bash
+cd Solution
+dotnet run
 ```
-</details>
 
-<details>
-<summary>Hint: Scenario 1 - Basic Agent</summary>
+## Key Concepts
 
-```csharp
-ChatClientAgent basicAgent = chatClient.CreateAIAgent();
-AgentRunResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?");
-Console.WriteLine(basicResponse);
-```
-</details>
+| Concept | Description |
+|---------|-------------|
+| `AzureOpenAIClient` | Client to connect to Azure OpenAI service |
+| `DefaultAzureCredential` | Managed identity authentication (no API keys!) |
+| `ChatClient` | Client for chat completions with a specific deployment |
+| `ChatClientAgent` | Microsoft Agents wrapper around ChatClient |
+| `AgentRunResponse` | Response object containing the agent's reply |
+| `CreateAIAgent()` | Extension method to create an agent from ChatClient |
+| `RunAsync()` | Execute the agent with a prompt or messages |
+| `ChatMessage` | Message object with role (System/User/Assistant) and content |
+| `Usage` | Token consumption metrics (Input/Output/Total) |
 
-<details>
-<summary>Hint: Scenario 2 - Agent with Instructions</summary>
+## Namespaces Reference
 
-```csharp
-ChatClientAgent geographyAgent = chatClient.CreateAIAgent(
-    instructions: "You are a helpful geography assistant.",
-    name: "GeographyAgent");
-AgentRunResponse geographyResponse = await geographyAgent.RunAsync("What is the surface area of France?");
-Console.WriteLine(geographyResponse);
-```
-</details>
+| Namespace | Purpose |
+|-----------|---------|
+| `Azure.Identity` | Provides `DefaultAzureCredential` for Azure authentication |
+| `Azure.AI.OpenAI` | Provides `AzureOpenAIClient` to connect to Azure OpenAI |
+| `OpenAI` | Core SDK - extension methods like `CreateAIAgent` |
+| `OpenAI.Chat` | Provides `ChatClient` for chat completions |
+| `Microsoft.Agents.AI` | Provides `ChatClientAgent` and `AgentRunResponse` |
+| `Microsoft.Extensions.AI` | Provides `ChatMessage` and `ChatRole` (aliased as `AIExtensions`) |
+| `CommonUtilities` | Provides `ColoredConsole` for formatted output |
 
-<details>
-<summary>Hint: Scenario 3 - Using ChatMessages</summary>
-
-```csharp
-AIExtensions.ChatMessage systemMessage = new(
-    AIExtensions.ChatRole.System,
-    "You are a geography expert.");
-
-AIExtensions.ChatMessage userMessage = new(
-    AIExtensions.ChatRole.User,
-    "What are the neighboring countries of France?");
-
-AgentRunResponse chatMessageResponse = await geographyAgent.RunAsync([systemMessage, userMessage]);
-Console.WriteLine(chatMessageResponse);
-```
-</details>
-
-<details>
-<summary>Hint: Scenario 4 - Token Usage</summary>
-
-```csharp
-ColoredConsole.WritePrimaryLogLine("Token Usage: ");
-ColoredConsole.WriteSecondaryLogLine($"Input tokens: {colorResponse.Usage?.InputTokenCount}");
-ColoredConsole.WriteSecondaryLogLine($"Output tokens: {colorResponse.Usage?.OutputTokenCount}");
-ColoredConsole.WriteSecondaryLogLine($"Total tokens: {colorResponse.Usage?.TotalTokenCount}");
-```
-</details>
-
----
-
-## ✅ Expected Output
+## Expected Output
 
 ```
 Endpoint: https://your-resource.openai.azure.com/
@@ -218,30 +179,30 @@ The surface area of France is approximately 643,801 square kilometers.
 - Silver
 ----------------------------------------
 Token Usage: 
-Consumed tokens: 45
-Output tokens: 25
-Total tokens: 70
+  Input tokens: 45
+  Output tokens: 25
+  Total tokens: 70
 ```
 
----
+## Provided Files
 
-## 📚 Key Concepts
+The following files are provided and should not be modified:
 
-| Concept | Description |
-|---------|-------------|
-| `AzureOpenAIClient` | Client to connect to Azure OpenAI service |
-| `DefaultAzureCredential` | Managed identity authentication (no API keys!) |
-| `ChatClient` | Client for chat completions with a specific deployment |
-| `ChatClientAgent` | Microsoft Agents wrapper around ChatClient |
-| `AgentRunResponse` | Response object containing the agent's reply |
-| `CreateAIAgent()` | Extension method to create an agent from ChatClient |
-| `ChatMessage` | Message object with role (System/User/Assistant) and content |
-| `Usage` | Token consumption metrics (Input/Output/Total) |
+- `FirstBasicAIAgent.csproj` - Project file with all required dependencies
+- `ConfigurationHelper.cs` - Helper to read configuration
+- `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
 
----
+The following files should be modified:
 
-## 🔗 Resources
+- `appsettings.json` - Update with your Azure OpenAI settings
+- `Program.cs` - Complete the TODOs
 
-- [Microsoft Agents Framework Documentation](https://github.com/microsoft/agents)
+## Useful Links
+
+- [Microsoft Agents Framework](https://github.com/microsoft/agents)
 - [Azure OpenAI Documentation](https://learn.microsoft.com/azure/ai-services/openai/)
 - [Azure.Identity Documentation](https://learn.microsoft.com/dotnet/api/azure.identity)
+
+## Solution
+
+If you get stuck, check the complete solution in the `Solution/` folder.
