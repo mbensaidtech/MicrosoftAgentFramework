@@ -16,13 +16,13 @@ using AIAgentWithSO.Models;
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
-Console.WriteLine($"Deployment: {settings.DeploymentName}");
+Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
 // Step 2: Create AzureOpenAIClient with managed identity authentication
 AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
-ChatClient chatClient = client.GetChatClient(settings.DeploymentName);
+ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 

@@ -1,7 +1,11 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace AIAgentWithSO;
 
+/// <summary>
+/// Helper class for loading configuration.
+/// </summary>
 public static class ConfigurationHelper
 {
     private static IConfiguration? _configuration;
@@ -10,10 +14,8 @@ public static class ConfigurationHelper
 
     private static IConfiguration BuildConfiguration()
     {
-        return new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+        var builder = Host.CreateApplicationBuilder();
+        return builder.Configuration;
     }
 
     public static AzureOpenAISettings GetAzureOpenAISettings()

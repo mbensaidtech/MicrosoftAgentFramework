@@ -13,5 +13,5 @@ public class AzureOpenAISettings
     /// <summary>
     /// Gets or sets the Azure OpenAI deployment name.
     /// </summary>
-    public string DeploymentName { get; set; } = string.Empty;
+    public string ChatDeploymentName { get; set; } = string.Empty;
 }

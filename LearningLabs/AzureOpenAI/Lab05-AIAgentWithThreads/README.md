@@ -83,7 +83,7 @@ Open `Start/appsettings.json` and update the Azure OpenAI values:
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "DeploymentName": "YOUR-DEPLOYMENT-NAME",
+    "ChatChatDeploymentName": "YOUR-DEPLOYMENT-NAME",
     "Agents": {
       "GlobalAgent": {
         "Name": "GlobalAgent",
@@ -269,7 +269,7 @@ The following file **should be modified** with your values:
 
 | File | What to modify |
 |------|----------------|
-| `appsettings.json` | Update `Endpoint` and `DeploymentName` |
+| `appsettings.json` | Update `Endpoint` and `ChatDeploymentName` |
 
 ## Troubleshooting
 

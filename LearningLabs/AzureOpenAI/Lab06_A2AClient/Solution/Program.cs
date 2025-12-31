@@ -31,7 +31,7 @@ Console.WriteLine($"Remote Auth Agent URL: {remoteAuthAgentSettings.Url}");
 AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
-ChatClient chatClient = client.GetChatClient(settings.DeploymentName);
+ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 

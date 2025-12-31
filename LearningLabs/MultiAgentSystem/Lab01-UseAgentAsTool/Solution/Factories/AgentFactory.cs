@@ -30,7 +30,7 @@ public class AgentFactory
 
     private static string LoadSavRules()
     {
-        var path = Path.Combine(Directory.GetCurrentDirectory(), "MockedData", "sav-rules.yml");
+        var path = Path.Combine(AppContext.BaseDirectory, "MockedData", "sav-rules.yml");
         return File.ReadAllText(path);
     }
 

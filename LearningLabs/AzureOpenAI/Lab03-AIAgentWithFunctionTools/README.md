@@ -48,7 +48,7 @@ Open `Start/appsettings.json` and update the values with your Azure OpenAI resou
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "DeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
   }
 }
 ```
@@ -81,7 +81,7 @@ AzureOpenAIClient client = new AzureOpenAIClient(
     new Uri(settings.Endpoint), 
     new DefaultAzureCredential()
 );
-ChatClient chatClient = client.GetChatClient(settings.DeploymentName);
+ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 ```
 </details>
 

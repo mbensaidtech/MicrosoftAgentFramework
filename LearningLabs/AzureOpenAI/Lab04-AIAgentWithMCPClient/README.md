@@ -46,7 +46,7 @@ Open `Start/appsettings.json` and update the values:
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "DeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
   },
   "MCPServers": {
     "HuggingFace": {

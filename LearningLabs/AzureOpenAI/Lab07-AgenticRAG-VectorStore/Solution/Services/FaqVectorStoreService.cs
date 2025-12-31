@@ -84,7 +84,7 @@ public class FaqVectorStoreService
     /// </summary>
     private async Task<List<FaqRecord>> LoadFaqDataAsync()
     {
-        var faqJsonPath = Path.Combine(Directory.GetCurrentDirectory(), FaqDataPath);
+        var faqJsonPath = Path.Combine(AppContext.BaseDirectory, FaqDataPath);
         var faqJson = await File.ReadAllTextAsync(faqJsonPath);
         
         return JsonSerializer.Deserialize<List<FaqRecord>>(faqJson, new JsonSerializerOptions

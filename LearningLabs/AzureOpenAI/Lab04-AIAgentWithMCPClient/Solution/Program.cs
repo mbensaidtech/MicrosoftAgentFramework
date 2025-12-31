@@ -23,7 +23,7 @@ bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosTo
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
-Console.WriteLine($"Deployment: {settings.DeploymentName}");
+Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
 // Step 2: Load MCP Server settings from configuration
 var huggingFaceMcpSettings = ConfigurationHelper.GetMCPServerSettings("HuggingFace");
@@ -33,7 +33,7 @@ Console.WriteLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
 AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
-ChatClient chatClient = client.GetChatClient(settings.DeploymentName);
+ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 
