@@ -17,7 +17,7 @@ You will learn how to configure a client, create agents with different configura
 
 ## Prerequisites
 
-- .NET 10 SDK installed
+- .NET 8 SDK or later installed
 - Azure OpenAI resource deployed
 - Azure CLI logged in (`az login`) for DefaultAzureCredential
 

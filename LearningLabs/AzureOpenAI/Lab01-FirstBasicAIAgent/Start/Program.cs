@@ -113,11 +113,7 @@ if (ShouldRunScenario(4))
     // ColoredConsole.WritePrimaryLogLine(colorResponse.ToString());
 
     // TODO 17: Display the consumed tokens
-    // ColoredConsole.WriteDividerLine();
-    // ColoredConsole.WritePrimaryLogLine("Token Usage: ");
-    // ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {colorResponse.Usage?.InputTokenCount}");
-    // ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {colorResponse.Usage?.OutputTokenCount}");
-    // ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {colorResponse.Usage?.TotalTokenCount}");
+    // Hint: Use response.Usage property (InputTokenCount, OutputTokenCount, TotalTokenCount)
 }
 
 #endregion
