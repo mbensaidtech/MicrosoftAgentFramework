@@ -56,10 +56,10 @@ if (ShouldRunScenario(1))
             Only respond with the JSON, no other text.",
         name: "RestaurantInfoAgent");
 
-    // Step 2: Run the agent with a restaurant question
+    // Step 2: Run the agent with a restaurant question (with spinner to show loading)
     ColoredConsole.WriteInfoLine("=== Scenario 1: Manually defined structured output - Restaurant Information ===");
     AgentRunResponse restaurantResponse = await restaurantAgent.RunAsync(
-        "Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.");
+        "Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.").WithSpinner("Running agent");
 
     // Step 3: Parse and display the structured response
     try
@@ -110,10 +110,10 @@ if (ShouldRunScenario(2))
         instructions: "You are a helpful assistant that can answer questions about restaurants.",
         name: "RestaurantInfoAgent");
 
-    // Step 2: Run the agent with a restaurant question
+    // Step 2: Run the agent with a restaurant question (with spinner to show loading)
     ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output - Restaurant Information ===");
     AgentRunResponse<Restaurant> structuredRestaurantResponse = await restaurantAgentWithStructuredOutput.RunAsync<Restaurant>(
-        "Tell me about the restaurant 'Le Bernardin' in New York.");
+        "Tell me about the restaurant 'Le Bernardin' in New York.").WithSpinner("Running agent");
 
     // Step 3: Display the structured response
     ColoredConsole.WritePrimaryLogLine("Structured response: ");
@@ -161,8 +161,8 @@ if (ShouldRunScenario(3))
         ChatOptions = chatOptions
     });
 
-    // Step 4: Run the agent with a restaurant question
-    var response = await restaurantAgentWithStructuredOutput.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.");
+    // Step 4: Run the agent with a restaurant question (with spinner to show loading)
+    var response = await restaurantAgentWithStructuredOutput.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.").WithSpinner("Running agent");
     var restaurantInfo = response.Deserialize<Restaurant>(JsonSerializerOptions.WebDefaults);
 
     // Step 5: Display the structured response
