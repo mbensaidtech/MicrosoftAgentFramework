@@ -137,6 +137,26 @@ dotnet run
 | `ChatMessage` | Message object with role (System/User/Assistant) and content |
 | `Usage` | Token consumption metrics (Input/Output/Total) |
 
+## Optional: Using the Console Spinner
+
+The `CommonUtilities` library provides a `ConsoleSpinner` that shows a loading animation while the agent is processing. This is **optional** but improves the user experience.
+
+**Usage with extension method:**
+```csharp
+// Simply chain .WithSpinner() to any async Task
+AgentRunResponse response = await agent.RunAsync("your prompt")
+    .WithSpinner("Running agent");
+```
+
+**Usage with using statement:**
+```csharp
+using var spinner = new ConsoleSpinner("Processing request");
+AgentRunResponse response = await agent.RunAsync("your prompt");
+// Spinner automatically stops when disposed
+```
+
+The spinner displays an animated indicator with elapsed time: `⠋ Running agent... [00:03]`
+
 ## Namespaces Reference
 
 | Namespace | Purpose |

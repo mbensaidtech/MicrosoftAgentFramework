@@ -41,8 +41,8 @@ if (ShouldRunScenario(1))
     // Step 1: Create a basic AI Agent from the ChatClient (no instructions, no name)
     ChatClientAgent basicAgent = chatClient.CreateAIAgent();
 
-    // Step 2: Run the agent with a simple string prompt
-    AgentRunResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?");
+    // Step 2: Run the agent with a simple string prompt (with spinner to show loading)
+    AgentRunResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?").WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 1: Basic Agent ===");
@@ -61,8 +61,8 @@ if (ShouldRunScenario(2))
         instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
         name: "GeographyAgent");
 
-    // Step 2: Run the agent with a geography-related question
-    AgentRunResponse geographyResponse = await geographyAgent.RunAsync("Hello, what is the surface area of France?");
+    // Step 2: Run the agent with a geography-related question (with spinner to show loading)
+    AgentRunResponse geographyResponse = await geographyAgent.RunAsync("Hello, what is the surface area of France?").WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 2: Agent with Instructions ===");
@@ -91,8 +91,8 @@ if (ShouldRunScenario(3))
         AIExtensions.ChatRole.User,
         "What are the neighboring countries of France? give me the countries in a list without any other text.");
 
-    // Step 4: Run the agent with an array of ChatMessages
-    AgentRunResponse chatMessageResponse = await geographyAgent.RunAsync([systemMessage, userMessage]);
+    // Step 4: Run the agent with an array of ChatMessages (with spinner to show loading)
+    AgentRunResponse chatMessageResponse = await geographyAgent.RunAsync([systemMessage, userMessage]).WithSpinner("Running agent");
 
     // Step 5: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 3: Using ChatMessages ===");
@@ -112,8 +112,8 @@ if (ShouldRunScenario(4))
         instructions: "You are a helpful color decorator assistant. You are able to answer questions about the color of the world.",
         name: "ColorDecoratorAgent");
 
-    // Step 2: Run the agent with a color-related question
-    AgentRunResponse colorResponse = await colorDecoAgent.RunAsync("Hello, what are colors that match with the color blue? give me the colors in a list without any other text.");
+    // Step 2: Run the agent with a color-related question (with spinner to show loading)
+    AgentRunResponse colorResponse = await colorDecoAgent.RunAsync("Hello, what are colors that match with the color blue? give me the colors in a list without any other text.").WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 4: Get consumed tokens from the agent run response ===");
