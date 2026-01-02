@@ -116,4 +116,24 @@ public static class ColoredConsole
         Console.ResetColor();
         Console.WriteLine();
     }
+
+    /// <summary>
+    /// Writes a transparent section separator (empty lines only) to separate subsections within a scenario.
+    /// </summary>
+    public static void WriteSectionSeparator()
+    {
+        Console.WriteLine();
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Writes a message followed by a line terminator in Burgundy (dark red/wine) color.
+    /// Useful for highlighting important metrics like token usage.
+    /// </summary>
+    public static void WriteBurgundyLine(string? value)
+    {
+        Console.ForegroundColor = ConsoleColor.DarkRed;
+        Console.WriteLine(value);
+        Console.ResetColor();
+    }
 }
