@@ -22,12 +22,14 @@ bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosTo
 
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
-Console.WriteLine($"Endpoint: {settings.Endpoint}");
-Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
+ColoredConsole.WriteEmptyLine();
+ColoredConsole.WritePrimaryLogLine("Azure OpenAI Settings: ");
+ColoredConsole.WriteSecondaryLogLine($"Endpoint: {settings.Endpoint}");
+ColoredConsole.WriteSecondaryLogLine($"Deployment: {settings.ChatDeploymentName}");
 
 // Step 2: Load MCP Server settings from configuration
 var huggingFaceMcpSettings = ConfigurationHelper.GetMCPServerSettings("HuggingFace");
-Console.WriteLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
+ColoredConsole.WriteSecondaryLogLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
 
 // Step 2: Create AzureOpenAIClient with managed identity authentication
 AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
@@ -37,12 +39,11 @@ ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 
-ColoredConsole.WriteDividerLine();
-
 #region Scenario 1: Connect to MCP Server and use available tools.
 
 if (ShouldRunScenario(1))
 {   
+    ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: Connect to MCP Server and use available tools ===");
 
     // Step 1: Create MCP Client
@@ -56,10 +57,11 @@ if (ShouldRunScenario(1))
         }
     }));
 
+    // Step 2: List available tools from the MCP server
     IList<McpClientTool> toolsInHuggingFaceMcp = await huggingFaceMcpClient.ListToolsAsync();
 
-    // Step 2: Create Agent with MCP tools and configure the chat client options.
-   ChatClientAgent huggingFaceMcpAgent = chatClient.CreateAIAgent(
+    // Step 3: Create Agent with MCP tools and configure the chat client options.
+   ChatClientAgent agent = chatClient.CreateAIAgent(
     instructions: "You are a helpful assistant that can use the tools provided by the Hugging Face MCP Server.",
     tools: toolsInHuggingFaceMcp.Cast<AITool>().ToList(),
     clientFactory: chatClient=>{
@@ -71,26 +73,27 @@ if (ShouldRunScenario(1))
     }
    );
 
-    // Step 3: Run the agent with a prompt that requires MCP tools.
-    AgentRunResponse<HuggingFaceSearchResult> huggingFaceMcpAgentResponse = await huggingFaceMcpAgent.RunAsync<HuggingFaceSearchResult>(
-        "Search 4 Hugging Face models for text embedding.");
+    // Step 4: Run the agent with a prompt that requires MCP tools (with spinner to show loading).
+    AgentRunResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(
+        "Search 4 Hugging Face models for text embedding.").WithSpinner("Running agent with MCP tools");
 
-    // Step 4: Display structured results
-    ColoredConsole.WritePrimaryLogLine($"Found {huggingFaceMcpAgentResponse.Result.Models.Count} models:");
-    foreach (var model in huggingFaceMcpAgentResponse.Result.Models)
+    // Step 5: Display structured results
+    ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models:");
+    foreach (var model in response.Result.Models)
     {
         ColoredConsole.WriteSecondaryLogLine($"  Name: {model.Name}");
         ColoredConsole.WriteSecondaryLogLine($"  Task: {model.Task}");
         ColoredConsole.WriteSecondaryLogLine($"  Library: {model.Library}");
         ColoredConsole.WriteSecondaryLogLine($"  Link: {model.Link}");
-        ColoredConsole.WriteDividerLine();
+        ColoredConsole.WriteEmptyLine();
     }
 
     // Step 5: Display token usage
-    ColoredConsole.WritePrimaryLogLine("Token Usage: ");
-    ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {huggingFaceMcpAgentResponse.Usage?.InputTokenCount}");
-    ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {huggingFaceMcpAgentResponse.Usage?.OutputTokenCount}");
-    ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {huggingFaceMcpAgentResponse.Usage?.TotalTokenCount}");
+    ColoredConsole.WriteEmptyLine();
+    ColoredConsole.WriteBurgundyLine("Token Usage: ");
+    ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {response.Usage?.InputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {response.Usage?.OutputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {response.Usage?.TotalTokenCount}");
 
 }
 

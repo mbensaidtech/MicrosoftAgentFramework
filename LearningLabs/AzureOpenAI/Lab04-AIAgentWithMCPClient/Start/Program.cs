@@ -22,12 +22,14 @@ bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosTo
 
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
-Console.WriteLine($"Endpoint: {settings.Endpoint}");
-Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
+ColoredConsole.WriteEmptyLine();
+ColoredConsole.WritePrimaryLogLine("Azure OpenAI Settings: ");
+ColoredConsole.WriteSecondaryLogLine($"Endpoint: {settings.Endpoint}");
+ColoredConsole.WriteSecondaryLogLine($"Deployment: {settings.ChatDeploymentName}");
 
 // Step 2: Load MCP Server settings from configuration
 var huggingFaceMcpSettings = ConfigurationHelper.GetMCPServerSettings("HuggingFace");
-Console.WriteLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
+ColoredConsole.WriteSecondaryLogLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
 
 // Step 3: Create AzureOpenAIClient with managed identity authentication
 AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
@@ -37,12 +39,11 @@ ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 
-ColoredConsole.WriteDividerLine();
-
 #region Scenario 1: Connect to MCP Server and use available tools.
 
 if (ShouldRunScenario(1))
 {   
+    ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: Connect to MCP Server and use available tools ===");
 
     // TODO 1: Create MCP Client
@@ -65,10 +66,10 @@ if (ShouldRunScenario(1))
     // AgentRunResponse<HuggingFaceSearchResult> response = ...
 
     // TODO 5: Display structured results
-    // Access the models via response.Result.Models
+    // Hint: Access the models via response.Result.Models and loop through them
 
     // TODO 6: Display token usage
-    // Access token counts via response.Usage
+    // Hint: Use ColoredConsole.WriteBurgundyLine("Token Usage: ") and response.Usage properties
 }
 
 #endregion
