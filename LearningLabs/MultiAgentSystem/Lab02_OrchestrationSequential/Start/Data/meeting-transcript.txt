@@ -1,0 +1,41 @@
+Meeting Transcript - Project Alpha Weekly Sync
+Date: January 8, 2026
+Attendees: Sarah (Project Manager), Mohammed (Developer), Emma (Designer), Michael (QA Lead)
+
+---
+
+Sarah: Good morning everyone. Let's start with the status updates. Mohammed, can you go first?
+
+Mohammed: Sure. I finished the authentication module yesterday. It's working well but I still need to write unit tests. I should have those done by Friday. Also, I noticed some performance issues with the database queries that Emma mentioned last week. I'll look into optimizing those next week.
+
+Sarah: Great progress. Emma, how's the design work going?
+
+Emma: The new dashboard mockups are ready for review. I've uploaded them to Figma. I need feedback from the team by Wednesday so I can finalize the designs before the sprint ends. Also, I've been working on the mobile responsive layouts, but I'm blocked because I need the API specifications from Mohammed.
+
+Mohammed: Oh right, I'll send you the API docs by end of day today.
+
+Sarah: Perfect. Michael, what about testing?
+
+Michael: We found three critical bugs in the payment module during regression testing. I've logged them in Jira - tickets PAY-201, PAY-202, and PAY-203. Mohammed, can you prioritize PAY-201? It's a security issue with the session handling. The other two can wait until next sprint.
+
+Mohammed: I'll take a look at PAY-201 this afternoon.
+
+Sarah: Good. Now, about the client demo scheduled for next Friday - we need to prepare the presentation. Emma, can you create some slides showcasing the new UI? And Michael, please prepare a test report summary.
+
+Emma: Yes, I'll have the slides ready by Wednesday.
+
+Michael: I'll prepare the test report by Thursday.
+
+Sarah: One more thing - the budget review meeting with management is next Monday. I need everyone to submit their time sheets by Friday. Also, we're moving to the new office building starting February 1st, so start packing your things gradually.
+
+Mohammed: Quick question - are we still planning to release version 2.0 by end of January?
+
+Sarah: That's a good point. Based on the current progress, I think we should push it to February 15th to ensure quality. I'll discuss with the stakeholders and confirm by tomorrow.
+
+Emma: That makes sense. Better to delay than release something buggy.
+
+Sarah: Agreed. Alright, any other topics? No? Great, let's wrap up. Next meeting same time next week.
+
+---
+End of Meeting
+
