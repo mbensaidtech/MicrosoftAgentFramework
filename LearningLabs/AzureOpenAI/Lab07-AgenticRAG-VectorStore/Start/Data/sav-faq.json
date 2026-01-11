@@ -1,0 +1,102 @@
+[
+  {
+    "id": "faq-001",
+    "question": "How can I return a product?",
+    "answer": "To return a product, go to 'My Orders' in your account, select the order containing the item you wish to return, and click 'Request Return'. You have 30 days from the delivery date to initiate a return. The product must be unused and in its original packaging."
+  },
+  {
+    "id": "faq-002",
+    "question": "What is the refund policy?",
+    "answer": "Refunds are processed within 5-7 business days after we receive and inspect the returned item. The refund will be credited to your original payment method. Shipping costs are non-refundable unless the return is due to our error or a defective product."
+  },
+  {
+    "id": "faq-003",
+    "question": "How do I track my order?",
+    "answer": "You can track your order by logging into your account and visiting 'My Orders'. Click on the specific order to view tracking information. You will also receive email updates with tracking links when your order ships."
+  },
+  {
+    "id": "faq-004",
+    "question": "Can I change or cancel my order after placing it?",
+    "answer": "You can modify or cancel your order within 1 hour of placing it by contacting our customer service. After this window, or once the order has been shipped, changes or cancellations are no longer possible. You may return the item after delivery instead."
+  },
+  {
+    "id": "faq-005",
+    "question": "What should I do if I receive a damaged product?",
+    "answer": "If you receive a damaged product, please contact our customer service within 48 hours of delivery with photos of the damage. We will arrange a free return pickup and send you a replacement or process a full refund, including shipping costs."
+  },
+  {
+    "id": "faq-006",
+    "question": "How long does delivery take?",
+    "answer": "Standard delivery takes 3-5 business days. Express delivery is available for 1-2 business days at an additional cost. Delivery times may vary during peak seasons or for remote locations. You will receive an estimated delivery date at checkout."
+  },
+  {
+    "id": "faq-007",
+    "question": "What payment methods do you accept?",
+    "answer": "We accept Visa, MasterCard, American Express, PayPal, Apple Pay, Google Pay, and bank transfers. All payments are secured with SSL encryption. For orders over €500, we also offer installment payment options."
+  },
+  {
+    "id": "faq-008",
+    "question": "How do I exchange a product for a different size or color?",
+    "answer": "To exchange a product, initiate a return through 'My Orders' and select 'Exchange' as the reason. Choose the new size or color you want. Once we receive your return, we will ship the replacement. If the new item costs more, you will be charged the difference."
+  },
+  {
+    "id": "faq-009",
+    "question": "What is covered under the warranty?",
+    "answer": "Our standard warranty covers manufacturing defects for 2 years from the purchase date. It does not cover damage from misuse, accidents, or normal wear and tear. Electronics have a 1-year warranty. Keep your receipt as proof of purchase for warranty claims."
+  },
+  {
+    "id": "faq-010",
+    "question": "How do I contact customer support?",
+    "answer": "You can reach our customer support via email at support@example.com, by phone at +33 1 23 45 67 89 (Mon-Fri 9am-6pm), or through live chat on our website. Average response time is under 2 hours during business hours."
+  },
+  {
+    "id": "faq-011",
+    "question": "Can I get a refund if the price drops after my purchase?",
+    "answer": "Yes, we offer price protection within 14 days of your purchase. If the price drops during this period, contact customer service with your order number and we will refund the difference to your original payment method."
+  },
+  {
+    "id": "faq-012",
+    "question": "What if my package is lost or stolen?",
+    "answer": "If your tracking shows delivered but you have not received your package, first check with neighbors and your building reception. If still not found, report it to us within 7 days. We will investigate with the carrier and either resend the order or issue a refund."
+  },
+  {
+    "id": "faq-013",
+    "question": "Do you ship internationally?",
+    "answer": "Yes, we ship to over 50 countries worldwide. International shipping costs and delivery times vary by destination. Import duties and taxes may apply and are the responsibility of the customer. Check our shipping page for specific country information."
+  },
+  {
+    "id": "faq-014",
+    "question": "How do I use a promo code?",
+    "answer": "Enter your promo code in the 'Discount Code' field at checkout and click 'Apply'. The discount will be reflected in your order total. Only one promo code can be used per order. Some codes may have minimum purchase requirements or exclusions."
+  },
+  {
+    "id": "faq-015",
+    "question": "Can I return a product without the original packaging?",
+    "answer": "Products should ideally be returned in their original packaging. However, if the original packaging is not available, ensure the item is securely packaged to prevent damage during shipping. Returns without original packaging may be subject to a 15% restocking fee."
+  },
+  {
+    "id": "faq-016",
+    "question": "What is your policy on defective products?",
+    "answer": "Defective products can be returned at any time within the warranty period for a full refund or replacement. We cover all return shipping costs for defective items. Please provide photos or a description of the defect when contacting support."
+  },
+  {
+    "id": "faq-017",
+    "question": "How do I create an account?",
+    "answer": "Click 'Sign Up' at the top of our website. Enter your email address and create a password. You can also sign up using your Google or Facebook account for faster registration. An account lets you track orders, save addresses, and access exclusive offers."
+  },
+  {
+    "id": "faq-018",
+    "question": "Why was my order cancelled?",
+    "answer": "Orders may be cancelled due to payment issues, out-of-stock items, or suspected fraudulent activity. If your order was cancelled, you will receive an email explaining the reason. Any charges will be refunded within 3-5 business days."
+  },
+  {
+    "id": "faq-019",
+    "question": "Can I schedule a specific delivery date?",
+    "answer": "Yes, during checkout you can select a preferred delivery date from available options. This service is available for an additional €5. You can also choose to have your package delivered to a pickup point if you are not available at home."
+  },
+  {
+    "id": "faq-020",
+    "question": "How do I leave a product review?",
+    "answer": "After receiving your order, you will receive an email invitation to review your purchase. You can also go to the product page and click 'Write a Review'. Reviews help other customers and you may receive loyalty points for each verified review you submit."
+  }
+]

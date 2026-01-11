@@ -52,6 +52,7 @@ ColoredConsole.WriteDividerLine();
 
 if (ShouldRunScenario(1))
 {
+    ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: Initialize Vector Store with FAQ Data ===");
     await faqService.InitializeAsync();
 }
@@ -62,13 +63,14 @@ if (ShouldRunScenario(1))
 
 if (ShouldRunScenario(2))
 {
+    ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Search Vector Store for FAQ Data ===");
     var results = await searchTools.SearchFaqAsync("How can I contact support?", topK: 3)
         .WithSpinner("Searching FAQ");
     foreach (var result in results)
     {
-        Console.WriteLine(result);
-        ColoredConsole.WriteDividerLine();
+        ColoredConsole.WritePrimaryLogLine(result);
+      
     }
 }
 
@@ -78,6 +80,7 @@ if (ShouldRunScenario(2))
 
 if (ShouldRunScenario(3))
 {
+    ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Search Vector Store for FAQ Data Using Agent ===");
 
     //Step 1: Create a new agent
@@ -98,6 +101,6 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {response.Usage?.InputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {response.Usage?.OutputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {response.Usage?.TotalTokenCount}");
-    ColoredConsole.WriteDividerLine();
+
 }
 #endregion
