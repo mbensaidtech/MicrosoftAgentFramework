@@ -130,7 +130,9 @@ Build an agent that consumes remote agent services.
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Build a RAG pipeline with vector search |
+| Scenario 1 | Initialize vector store with FAQ data |
+| Scenario 2 | Direct vector search without agent |
+| Scenario 3 | Agentic RAG with search tool |
 
 ---
 
@@ -164,6 +166,26 @@ Build an agent that consumes remote agent services.
 
 ---
 
+### Lab 11 - AI Agent with Custom HTTP Transport
+
+**Learn how to customize HTTP communication for debugging and monitoring**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Intercept and log HTTP requests/responses with custom handler |
+
+---
+
+### Lab 12 - AI Agent with AI Context Provider
+
+**Learn how to inject dynamic context into agent conversations**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | User memory management with AIContextProvider and MongoDB |
+
+---
+
 ### Part 2: MultiAgentSystem - Multi-Agent Solutions
 
 This part focuses on building **multi-agent systems** where multiple agents collaborate to solve complex problems. You will learn how to orchestrate agents, use agents as tools, and build sophisticated AI workflows.
@@ -180,6 +202,16 @@ This part focuses on building **multi-agent systems** where multiple agents coll
 
 ---
 
+### Lab 02 - Orchestration Sequential
+
+**Learn how to orchestrate multiple agents in a sequential pipeline**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Process data through a chain of specialized agents |
+
+---
+
 ## Common Utilities
 
 The `CommonUtilities` project provides shared helper classes used across all labs:
@@ -188,6 +220,7 @@ The `CommonUtilities` project provides shared helper classes used across all lab
 |-------|-------------|
 | `ColoredConsole` | Colored console output methods for better UX |
 | `ConsoleSpinner` | Loading animation for async operations |
+| `MongoDbHealthCheck` | MongoDB connectivity verification |
 
 ---
 
@@ -222,26 +255,26 @@ The `CommonUtilities` project provides shared helper classes used across all lab
 We recommend following the labs in order, starting with the **AzureOpenAI** labs (individual agents) and then moving to the **MultiAgentSystem** labs:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    Part 1: AzureOpenAI (Individual Agents)                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Lab01 → Lab02 → Lab03 → Lab04 → Lab05 → Lab06 → Lab07 → Lab08 → Lab09     │
-│    │       │       │       │       │       │       │       │       │        │
-│    ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼        │
-│  Basic  Struct  Tools    MCP   Threads   A2A    RAG   Format  Human        │
-│  Agent  Output  Calling Client                        Optim  Approval      │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                  Part 2: MultiAgentSystem (Multi-Agent Solutions)           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Lab01 → ...                                                                │
-│    │                                                                        │
-│    ▼                                                                        │
-│  Agent                                                                      │
-│  as Tool                                                                    │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                           Part 1: AzureOpenAI (Individual Agents)                              │
+├────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Lab01 → Lab02 → Lab03 → Lab04 → Lab05 → Lab06 → Lab07 → Lab08 → Lab09 → Lab10 → Lab11 → Lab12│
+│    │       │       │       │       │       │       │       │       │       │       │       │   │
+│    ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼   │
+│  Basic  Struct  Tools    MCP   Threads   A2A    RAG   Format  Human    MCP   Custom  Context  │
+│  Agent  Output  Calling Client                        Optim  Approval Server  HTTP  Provider  │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Part 2: MultiAgentSystem (Multi-Agent Solutions)                        │
+├────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Lab01 → Lab02 → ...                                                                           │
+│    │       │                                                                                   │
+│    ▼       ▼                                                                                   │
+│  Agent  Sequential                                                                             │
+│  as Tool Orchestration                                                                         │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 > **Note:** While we recommend following the labs in order, there are **no strict dependencies** between the different labs. If you already have some knowledge in a specific area, feel free to jump to any lab that interests you.
@@ -260,6 +293,12 @@ We recommend following the labs in order, starting with the **AzureOpenAI** labs
 ## Contributing
 
 If you find issues or have suggestions for improving these labs, please open an issue or submit a pull request.
+
+---
+
+## Author
+
+**Mohammed BEN SAID**
 
 ---
 
