@@ -212,6 +212,16 @@ This part focuses on building **multi-agent systems** where multiple agents coll
 
 ---
 
+### Lab 03 - Orchestration Concurrent
+
+**Learn how to orchestrate multiple agents running in parallel**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Process data with multiple agents concurrently (e-commerce after-sales) |
+
+---
+
 ## Common Utilities
 
 The `CommonUtilities` project provides shared helper classes used across all labs:
@@ -241,12 +251,93 @@ The `CommonUtilities` project provides shared helper classes used across all lab
    cd LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool/Start
    ```
 
-3. **Configure your settings** - Update `appsettings.json` with your Azure OpenAI endpoint and deployment name
+3. **Configure your settings** - See the [Environment Variables Configuration](#environment-variables-configuration) section below
 
 4. **Complete the TODOs** and run your solution
    ```bash
    dotnet run
    ```
+
+---
+
+## Environment Variables Configuration
+
+Instead of editing each `appsettings.json` file in every lab, you can set environment variables once. The .NET configuration system automatically reads environment variables using the pattern `SectionName__PropertyName` (double underscore).
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `AzureOpenAI__Endpoint` | Your Azure OpenAI endpoint URL | `https://my-resource.openai.azure.com/` |
+| `AzureOpenAI__ChatDeploymentName` | Your chat model deployment name | `gpt-4o` |
+| `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-ada-002` |
+| `MongoDB__ConnectionString` | MongoDB connection string (Lab05, Lab12) | `mongodb://localhost:27017` |
+
+### Linux / macOS
+
+Add the following to your `~/.bashrc` or `~/.zshrc` file:
+
+```bash
+# Azure OpenAI Configuration
+export AzureOpenAI__Endpoint="https://YOUR-RESOURCE.openai.azure.com/"
+export AzureOpenAI__ChatDeploymentName="YOUR-DEPLOYMENT-NAME"
+export AzureOpenAI__EmbeddingDeploymentName="YOUR-EMBEDDING-DEPLOYMENT-NAME"
+
+# MongoDB Configuration (for Lab05, Lab12)
+export MongoDB__ConnectionString="mongodb://localhost:27017"
+```
+
+Then reload your shell:
+
+```bash
+source ~/.bashrc
+# or for zsh
+source ~/.zshrc
+```
+
+### Windows (PowerShell - Current Session)
+
+```powershell
+# Azure OpenAI Configuration
+$env:AzureOpenAI__Endpoint = "https://YOUR-RESOURCE.openai.azure.com/"
+$env:AzureOpenAI__ChatDeploymentName = "YOUR-DEPLOYMENT-NAME"
+$env:AzureOpenAI__EmbeddingDeploymentName = "YOUR-EMBEDDING-DEPLOYMENT-NAME"
+
+# MongoDB Configuration (for Lab05, Lab12)
+$env:MongoDB__ConnectionString = "mongodb://localhost:27017"
+```
+
+### Windows (Permanent - System Environment Variables)
+
+1. Open **System Properties** → **Advanced** → **Environment Variables**
+2. Under **User variables**, click **New** for each variable:
+   - Variable name: `AzureOpenAI__Endpoint`
+   - Variable value: `https://YOUR-RESOURCE.openai.azure.com/`
+3. Repeat for other variables
+4. Click **OK** and restart your terminal
+
+**Or using PowerShell (Administrator):**
+
+```powershell
+[Environment]::SetEnvironmentVariable("AzureOpenAI__Endpoint", "https://YOUR-RESOURCE.openai.azure.com/", "User")
+[Environment]::SetEnvironmentVariable("AzureOpenAI__ChatDeploymentName", "YOUR-DEPLOYMENT-NAME", "User")
+[Environment]::SetEnvironmentVariable("AzureOpenAI__EmbeddingDeploymentName", "YOUR-EMBEDDING-DEPLOYMENT-NAME", "User")
+[Environment]::SetEnvironmentVariable("MongoDB__ConnectionString", "mongodb://localhost:27017", "User")
+```
+
+### Verify Your Configuration
+
+Run this command to verify your environment variables are set:
+
+```bash
+# Linux/macOS
+echo $AzureOpenAI__Endpoint
+
+# Windows PowerShell
+echo $env:AzureOpenAI__Endpoint
+```
+
+> **Note:** Environment variables take precedence over values in `appsettings.json`. You can still use `appsettings.json` for lab-specific overrides if needed.
 
 ---
 
@@ -269,11 +360,11 @@ We recommend following the labs in order, starting with the **AzureOpenAI** labs
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                        Part 2: MultiAgentSystem (Multi-Agent Solutions)                        │
 ├────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  Lab01 → Lab02 → ...                                                                           │
-│    │       │                                                                                   │
-│    ▼       ▼                                                                                   │
-│  Agent  Sequential                                                                             │
-│  as Tool Orchestration                                                                         │
+│  Lab01 → Lab02 → Lab03 → ...                                                                   │
+│    │       │       │                                                                           │
+│    ▼       ▼       ▼                                                                           │
+│  Agent  Sequential Concurrent                                                                  │
+│  as Tool Orchestr. Orchestr.                                                                   │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
