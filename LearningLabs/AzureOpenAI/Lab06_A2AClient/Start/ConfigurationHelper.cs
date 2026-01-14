@@ -24,10 +24,9 @@ public static class ConfigurationHelper
             ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing");
     }
 
-    public static A2AServerSettings GetA2AServerSettings()
+    public static RemoteAuthAgentSettings GetRemoteAuthAgentSettings()
     {
-        return Configuration.GetSection("A2AServer").Get<A2AServerSettings>()
-            ?? throw new InvalidOperationException("A2AServer configuration section is missing");
+        return Configuration.GetSection("RemoteAuthAgentSettings").Get<RemoteAuthAgentSettings>()
+            ?? throw new InvalidOperationException("RemoteAuthAgentSettings configuration section is missing");
     }
 }
-
