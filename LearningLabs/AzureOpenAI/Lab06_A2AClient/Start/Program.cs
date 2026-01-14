@@ -7,7 +7,6 @@ using OpenAI.Chat;
 using CommonUtilities;
 using A2AClient;
 using A2A;
-using A2A.Client;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -42,7 +41,7 @@ ColoredConsole.WriteDividerLine();
 
 if (ShouldRunScenario(1))
 {
-    ColoredConsole.WriteTitle("Scenario 1: A2A Client - Connect to Remote Auth Agent");
+    ColoredConsole.WriteInfoLine("Scenario 1: A2A Client - Connect to Remote Auth Agent");
 
     // TODO: Step 1 - Create an HTTP client for A2A communication
     // Hint: Use new HttpClient()
@@ -63,7 +62,7 @@ if (ShouldRunScenario(1))
     // - Send using await a2aClient.SendTaskAsync(taskRequest)
     // - Extract and display the response from response.Result.Status.Message.Parts
 
-    ColoredConsole.WriteInfo("TODO: Implement the A2A client logic");
+    ColoredConsole.WriteInfoLine("TODO: Implement the A2A client logic");
 }
 
 #endregion
@@ -72,7 +71,7 @@ if (ShouldRunScenario(1))
 
 if (ShouldRunScenario(2))
 {
-    ColoredConsole.WriteTitle("Scenario 2: Batch Requests to Remote Auth Agent");
+    ColoredConsole.WriteInfoLine("Scenario 2: Batch Requests to Remote Auth Agent");
 
     // TODO: Create an A2A client and send multiple batch requests
     // Example requests:
@@ -80,7 +79,7 @@ if (ShouldRunScenario(2))
     // - "Generate another API key"  
     // - "What can you help me with?"
 
-    ColoredConsole.WriteInfo("TODO: Implement batch requests logic");
+    ColoredConsole.WriteInfoLine("TODO: Implement batch requests logic");
 }
 
 #endregion

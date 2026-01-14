@@ -23,5 +23,10 @@ public static class ConfigurationHelper
         return Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
             ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing");
     }
-}
 
+    public static APIKeySettings GetAPIKeySettings()
+    {
+        return Configuration.GetSection("APIKeySettings").Get<APIKeySettings>()
+            ?? throw new InvalidOperationException("APIKeySettings configuration section is missing");
+    }
+}
