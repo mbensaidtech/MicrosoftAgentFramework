@@ -6,7 +6,7 @@ using OpenAI;
 using OpenAI.Chat;
 using CommonUtilities;
 using UseAgentAsTool;
-using UseAgentAsTool.Factories;
+using UseAgentAsTool.AgentCreation;
 using UseAgentAsTool.Models;
 
 // ============================================

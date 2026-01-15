@@ -9,9 +9,9 @@ namespace UseAgentAsTool;
 /// </summary>
 public static class ConfigurationHelper
 {
-    private static IConfiguration? _configuration;
+    private static IConfiguration? configuration;
 
-    public static IConfiguration Configuration => _configuration ??= BuildConfiguration();
+    public static IConfiguration Configuration => configuration ??= BuildConfiguration();
 
     private static IConfiguration BuildConfiguration()
     {

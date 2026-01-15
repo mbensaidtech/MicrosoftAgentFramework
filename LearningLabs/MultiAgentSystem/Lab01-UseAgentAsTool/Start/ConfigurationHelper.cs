@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using UseAgentAsTool.Configuration;
 
 namespace UseAgentAsTool;
 
@@ -8,9 +9,9 @@ namespace UseAgentAsTool;
 /// </summary>
 public static class ConfigurationHelper
 {
-    private static IConfiguration? _configuration;
+    private static IConfiguration? configuration;
 
-    public static IConfiguration Configuration => _configuration ??= BuildConfiguration();
+    public static IConfiguration Configuration => configuration ??= BuildConfiguration();
 
     private static IConfiguration BuildConfiguration()
     {
@@ -22,5 +23,12 @@ public static class ConfigurationHelper
     {
         return Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
             ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing");
+    }
+
+    public static AgentSettings GetAgentSettings(AgentType agentType)
+    {
+        var agentName = agentType.ToString();
+        return Configuration.GetSection($"Agents:{agentName}").Get<AgentSettings>()
+            ?? throw new InvalidOperationException($"Agent '{agentName}' configuration is missing");
     }
 }
