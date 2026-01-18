@@ -1,0 +1,161 @@
+{
+  "info": {
+    "name": "AIAgentsBackend - A2A Protocol",
+    "description": "Test AI Agents via A2A protocol only.\n\nIncludes:\n- Agent Discovery\n- History Agent (JSON-RPC)\n- History Agent (SSE Streaming)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5016",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "my-ww1-conversation",
+      "type": "string"
+    },
+    {
+      "key": "sseConversationId",
+      "value": "a2a-ww1-sse",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Agent Discovery",
+      "item": [
+        {
+          "name": "Get History Agent Card (v1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a2a/historyAgent/v1/card",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "historyAgent", "v1", "card"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Translation Agent Card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a2a/translationAgent/.well-known/agent.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "translationAgent", ".well-known", "agent.json"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "A2A - History Agent (JSON-RPC)",
+      "description": "A2A protocol endpoints using JSON-RPC format.\nTests WW1 conversation with memory.",
+      "item": [
+        {
+          "name": "1. WW1 Start Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"kind\": \"message\",\n      \"messageId\": \"msg-001\",\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"When did World War 1 start?\"\n        }\n      ]\n    },\n    \"contextId\": \"{{conversationId}}\"\n  },\n  \"id\": \"req-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/historyAgent",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "historyAgent"]
+            },
+            "description": "First question about WW1.\nExpected answer: 1914"
+          },
+          "response": []
+        },
+        {
+          "name": "2. WW1 End Follow-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"kind\": \"message\",\n      \"messageId\": \"msg-002\",\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"When did that war end?\"\n        }\n      ]\n    },\n    \"contextId\": \"{{conversationId}}\"\n  },\n  \"id\": \"req-002\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/historyAgent",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "historyAgent"]
+            },
+            "description": "Follow-up using 'that war' to test memory.\nAgent should remember WW1.\nExpected answer: 1918"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "A2A - History Agent (SSE Streaming)",
+      "description": "A2A protocol with SSE streaming.\nTests WW1 conversation with memory.",
+      "item": [
+        {
+          "name": "1. SSE - WW1 Start Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": {\n    \"kind\": \"message\",\n    \"role\": \"user\",\n    \"parts\": [\n      {\n        \"kind\": \"text\",\n        \"text\": \"When did World War 1 start?\",\n        \"metadata\": {}\n      }\n    ],\n    \"messageId\": null,\n    \"contextId\": \"{{sseConversationId}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/historyAgent/v1/message:stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "historyAgent", "v1", "message:stream"]
+            },
+            "description": "A2A SSE streaming - WW1 start question.\nExpected answer: 1914"
+          },
+          "response": []
+        },
+        {
+          "name": "2. SSE - WW1 End Follow-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": {\n    \"kind\": \"message\",\n    \"role\": \"user\",\n    \"parts\": [\n      {\n        \"kind\": \"text\",\n        \"text\": \"When did that war end?\",\n        \"metadata\": {}\n      }\n    ],\n    \"messageId\": null,\n    \"contextId\": \"{{sseConversationId}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/a2a/historyAgent/v1/message:stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["a2a", "historyAgent", "v1", "message:stream"]
+            },
+            "description": "A2A SSE streaming follow-up - uses 'that war'.\nTests conversation memory via SSE.\nExpected answer: 1918"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

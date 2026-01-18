@@ -1,0 +1,261 @@
+{
+  "info": {
+    "name": "AIAgentsBackend - REST API",
+    "description": "Test AI Agents via REST API (Controllers).\n\nSimple JSON format, TRUE token-by-token streaming.\n\nNo A2A protocol - direct HTTP calls.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5016",
+      "type": "string"
+    },
+    {
+      "key": "ww1ConversationId",
+      "value": "ww1-conversation-test",
+      "type": "string"
+    },
+    {
+      "key": "streamConversationId",
+      "value": "ww1-stream-test",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "History Agent - Standard Chat (WW1 Test)",
+      "description": "Test conversation memory with World War 1 questions.\n\nUse the same contextId to maintain conversation history.",
+      "item": [
+        {
+          "name": "1. When did World War 1 start?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"When did World War 1 start?\",\n  \"contextId\": \"{{ww1ConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "chat"]
+            },
+            "description": "First question - establishes the conversation about WW1.\n\nExpected answer: 1914"
+          },
+          "response": []
+        },
+        {
+          "name": "2. When did that war end?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"When did that war end?\",\n  \"contextId\": \"{{ww1ConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "chat"]
+            },
+            "description": "Follow-up question - uses 'that war' to test memory.\n\nAgent should understand we're talking about WW1.\n\nExpected answer: 1918"
+          },
+          "response": []
+        },
+        {
+          "name": "3. How long did it last?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"How long did it last?\",\n  \"contextId\": \"{{ww1ConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "chat"]
+            },
+            "description": "Third follow-up - tests continued memory.\n\nExpected answer: About 4 years (1914-1918)"
+          },
+          "response": []
+        },
+        {
+          "name": "4. What were the main causes?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What were the main causes?\",\n  \"contextId\": \"{{ww1ConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "chat"]
+            },
+            "description": "Fourth follow-up - deeper question about WW1.\n\nAgent should explain causes of WW1 (assassination, alliances, etc.)"
+          },
+          "response": []
+        },
+        {
+          "name": "TEST - New conversation (no contextId)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"When did that war end?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "chat"]
+            },
+            "description": "Test WITHOUT contextId - starts new conversation.\n\nAgent should NOT know which war we're referring to.\n\nExpected: Agent asks for clarification or gives generic answer."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "History Agent - SSE Streaming (WW1 Test)",
+      "description": "Same WW1 questions but with token-by-token streaming.\n\nUse curl -N for best streaming visualization.",
+      "item": [
+        {
+          "name": "1. Stream - When did World War 1 start?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"When did World War 1 start?\",\n  \"contextId\": \"{{streamConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "stream"]
+            },
+            "description": "Streaming response - tokens sent as generated.\n\nSSE Events:\n- event: start\n- event: token (multiple)\n- event: end\n\nCurl command:\ncurl -N -X POST http://localhost:5016/api/agents/history/stream \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"message\": \"When did World War 1 start?\", \"contextId\": \"ww1-stream\"}'"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Stream - When did that war end?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"When did that war end?\",\n  \"contextId\": \"{{streamConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "stream"]
+            },
+            "description": "Streaming follow-up with memory.\n\nAgent should understand 'that war' = WW1."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Stream - How long did it last?",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"How long did it last?\",\n  \"contextId\": \"{{streamConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "stream"]
+            },
+            "description": "Streaming follow-up - continued memory test."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Stream - Explain in detail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Can you explain in more detail the events that led to its outbreak?\",\n  \"contextId\": \"{{streamConversationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/history/stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "history", "stream"]
+            },
+            "description": "Longer streaming response - good for testing token-by-token delivery."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
