@@ -1,0 +1,38 @@
+{
+  "documentId": "return-policy",
+  "category": "returns",
+  "title": "Return Policy Terms",
+  "lastUpdated": "2025-01-15",
+  "sections": [
+    {
+      "id": "return-eligibility",
+      "title": "Return Eligibility",
+      "content": "Items are eligible for return within 30 days of delivery. Products must be unused, in original packaging, and with all tags attached. Electronics must include all original accessories and manuals. Perishable goods, personalized items, and intimate apparel are not eligible for return."
+    },
+    {
+      "id": "return-process",
+      "title": "How to Initiate a Return",
+      "content": "To initiate a return, log into your account and navigate to Order History. Select the item you wish to return and click 'Request Return'. You will receive a prepaid shipping label via email within 24 hours. Pack the item securely and drop it off at any authorized shipping location."
+    },
+    {
+      "id": "return-shipping",
+      "title": "Return Shipping",
+      "content": "For defective or incorrect items, return shipping is free. For change-of-mind returns, a flat shipping fee of $7.99 will be deducted from your refund. International returns require customers to cover shipping costs and any applicable customs fees."
+    },
+    {
+      "id": "return-inspection",
+      "title": "Return Inspection",
+      "content": "Once we receive your return, our team will inspect the item within 3-5 business days. Items that fail inspection due to damage, missing parts, or signs of use will be returned to you or a partial refund may be issued at our discretion."
+    },
+    {
+      "id": "return-exceptions",
+      "title": "Non-Returnable Items",
+      "content": "The following items cannot be returned: downloadable software, gift cards, clearance items marked as final sale, hazardous materials, and items that have been altered or customized. Health and personal care items are non-returnable once opened for hygiene reasons."
+    },
+    {
+      "id": "return-exchange",
+      "title": "Exchanges",
+      "content": "We offer free exchanges for items of equal or lesser value. For exchanges to higher-priced items, you will be charged the price difference. Exchange requests must be made within the same 30-day return window."
+    }
+  ]
+}

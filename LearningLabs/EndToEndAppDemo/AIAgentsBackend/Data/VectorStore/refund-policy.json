@@ -1,0 +1,48 @@
+{
+  "documentId": "refund-policy",
+  "category": "refunds",
+  "title": "Refund Policy Terms",
+  "lastUpdated": "2025-01-15",
+  "sections": [
+    {
+      "id": "refund-eligibility",
+      "title": "Refund Eligibility",
+      "content": "Refunds are issued for cancelled orders, returned items that pass inspection, defective products, and items not received within the estimated delivery window. Refund eligibility is determined based on the original purchase terms and condition of returned merchandise."
+    },
+    {
+      "id": "refund-timeline",
+      "title": "Refund Processing Time",
+      "content": "Refunds are processed within 5-7 business days after approval. Credit card refunds appear on your statement within 3-10 business days depending on your financial institution. Debit card refunds may take up to 14 business days. Bank transfers are completed within 3-5 business days."
+    },
+    {
+      "id": "refund-methods",
+      "title": "Refund Payment Methods",
+      "content": "Refunds are issued to the original payment method used at checkout. Orders paid with gift cards will be refunded as store credit. Split payments will be refunded proportionally to each payment method. We cannot refund to a different payment method than originally used."
+    },
+    {
+      "id": "refund-partial",
+      "title": "Partial Refunds",
+      "content": "Partial refunds may be issued for items returned with minor damage, missing accessories, or without original packaging. The refund amount will be reduced based on the condition assessment. Items with significant damage or excessive use may not qualify for any refund."
+    },
+    {
+      "id": "refund-shipping",
+      "title": "Shipping Cost Refunds",
+      "content": "Original shipping costs are refunded only if the return is due to our error (wrong item, defective product, or damaged during shipping). For change-of-mind returns, original shipping costs are non-refundable. Express shipping upgrades are never refundable."
+    },
+    {
+      "id": "refund-promotions",
+      "title": "Promotional Order Refunds",
+      "content": "For orders placed with promotional discounts or coupons, refunds are calculated based on the actual amount paid. If returning part of a 'Buy X Get Y' promotion, the discount may be voided and the remaining items charged at full price. Gift with purchase must be returned to receive a full refund."
+    },
+    {
+      "id": "refund-store-credit",
+      "title": "Store Credit Option",
+      "content": "You may choose to receive your refund as store credit for faster processing. Store credit refunds are issued instantly upon return approval. Store credit never expires and can be used on any future purchase including sale items. Store credit is non-transferable."
+    },
+    {
+      "id": "refund-disputes",
+      "title": "Refund Disputes",
+      "content": "If you disagree with a refund decision, you may submit an appeal within 14 days by contacting customer support with photos and documentation. Appeals are reviewed within 5 business days. Our decision on appeals is final. Customers who initiate chargebacks forfeit their right to appeal."
+    }
+  ]
+}

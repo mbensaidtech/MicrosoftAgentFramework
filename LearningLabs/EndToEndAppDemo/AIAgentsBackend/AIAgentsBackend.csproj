@@ -17,4 +17,11 @@
     <PackageReference Include="MongoDB.Driver" Version="2.30.0" />
   </ItemGroup>
 
+  <!-- Copy VectorStore data files to output directory -->
+  <ItemGroup>
+    <None Update="Data\VectorStore\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

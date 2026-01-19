@@ -1,0 +1,43 @@
+{
+  "documentId": "order-cancellation-policy",
+  "category": "cancellation",
+  "title": "Order Cancellation Terms",
+  "lastUpdated": "2025-01-15",
+  "sections": [
+    {
+      "id": "cancellation-window",
+      "title": "Cancellation Time Window",
+      "content": "Orders can be cancelled free of charge within 1 hour of placement. After this window, cancellation requests depend on the order status. Orders that have already been shipped cannot be cancelled and must follow the return process instead."
+    },
+    {
+      "id": "cancellation-process",
+      "title": "How to Cancel an Order",
+      "content": "To cancel an order, go to your account dashboard and select 'My Orders'. Find the order you wish to cancel and click 'Cancel Order'. If the cancellation button is not available, the order has already entered processing and cannot be cancelled online. Contact customer support for assistance."
+    },
+    {
+      "id": "cancellation-processing",
+      "title": "Orders in Processing",
+      "content": "For orders that have entered the processing stage but not yet shipped, we will attempt to cancel upon request. However, cancellation is not guaranteed. If we cannot stop the shipment, you may refuse delivery or return the item using our standard return process."
+    },
+    {
+      "id": "cancellation-refund",
+      "title": "Refund After Cancellation",
+      "content": "Cancelled orders are refunded to the original payment method within 5-7 business days. Credit card refunds may take an additional 3-5 business days to appear on your statement depending on your bank. PayPal refunds are typically processed within 24 hours."
+    },
+    {
+      "id": "cancellation-partial",
+      "title": "Partial Order Cancellation",
+      "content": "You may cancel individual items from a multi-item order if they have not yet shipped. Each item in an order may be at different processing stages. Items that have already shipped will be charged and must be returned separately."
+    },
+    {
+      "id": "cancellation-preorders",
+      "title": "Pre-Order Cancellations",
+      "content": "Pre-orders can be cancelled at any time before the item ships. Your payment method will not be charged until the pre-order item is ready to ship. Cancelling a pre-order will release any authorization holds on your payment method."
+    },
+    {
+      "id": "cancellation-subscriptions",
+      "title": "Subscription Cancellations",
+      "content": "Subscription orders can be cancelled at least 48 hours before the next scheduled shipment. Cancellations made within 48 hours of shipment will apply to the following cycle. You will continue to receive the current shipment and can return it using our standard return policy."
+    }
+  ]
+}
