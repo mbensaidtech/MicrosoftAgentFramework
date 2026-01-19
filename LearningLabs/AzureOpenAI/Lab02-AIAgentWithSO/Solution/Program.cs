@@ -15,7 +15,7 @@ using AIAgentWithSO.Models;
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
 // Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2, 3];
+HashSet<int> scenariosToRun = [1,2,3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -163,7 +163,13 @@ if (ShouldRunScenario(3))
 
     // Step 4: Run the agent with a restaurant question (with spinner to show loading)
     var response = await restaurantAgentWithStructuredOutput.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.").WithSpinner("Running agent");
-    var restaurantInfo = response.Deserialize<Restaurant>(JsonSerializerOptions.WebDefaults);
+    
+    // JsonSerializerOptions.Web doesn't include JsonStringEnumConverter, so we need custom options
+    var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+    var restaurantInfo = response.Deserialize<Restaurant>(jsonOptions);
 
     // Step 5: Display the structured response
     ColoredConsole.WritePrimaryLogLine("Structured response: ");
