@@ -8,14 +8,14 @@ using AIAgentsBackend.Services.VectorStore.Interfaces;
 namespace AIAgentsBackend.Services.VectorStore;
 
 /// <summary>
-/// Vector store service for return policy documents.
+/// Searches return policy documents.
 /// </summary>
 public class ReturnPolicyVectorStoreService : PolicyVectorStoreServiceBase, IReturnPolicyVectorStoreService
 {
-    private readonly VectorStoreSettings _settings;
+    private readonly VectorStoreSettings settings;
 
-    protected override string CollectionName => _settings.Collections.ReturnPolicy.CollectionName;
-    protected override string DataFilePath => Path.Combine(_settings.DataDirectory, _settings.Collections.ReturnPolicy.DataFileName);
+    protected override string CollectionName => settings.Collections.ReturnPolicy.CollectionName;
+    protected override string DataFilePath => Path.Combine(settings.DataDirectory, settings.Collections.ReturnPolicy.DataFileName);
     protected override string ServiceName => "ReturnPolicy";
 
     public ReturnPolicyVectorStoreService(
@@ -25,6 +25,6 @@ public class ReturnPolicyVectorStoreService : PolicyVectorStoreServiceBase, IRet
         ILogger<ReturnPolicyVectorStoreService> logger)
         : base(database, embeddingGenerator, logger)
     {
-        _settings = settings.Value;
+        this.settings = settings.Value;
     }
 }

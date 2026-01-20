@@ -1,12 +1,12 @@
 namespace AIAgentsBackend.Configuration;
 
 /// <summary>
-/// Configuration for individual vector store collections.
+/// Settings for each policy collection in the vector store.
 /// </summary>
 public class VectorStoreCollectionSettings
 {
     /// <summary>
-    /// Return policy vector store settings.
+    /// Return policy settings.
     /// </summary>
     public PolicyCollectionSettings ReturnPolicy { get; set; } = new()
     {
@@ -16,7 +16,7 @@ public class VectorStoreCollectionSettings
     };
 
     /// <summary>
-    /// Refund policy vector store settings.
+    /// Refund policy settings.
     /// </summary>
     public PolicyCollectionSettings RefundPolicy { get; set; } = new()
     {
@@ -26,7 +26,7 @@ public class VectorStoreCollectionSettings
     };
 
     /// <summary>
-    /// Order cancellation policy vector store settings.
+    /// Order cancellation policy settings.
     /// </summary>
     public PolicyCollectionSettings OrderCancellationPolicy { get; set; } = new()
     {

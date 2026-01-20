@@ -8,28 +8,27 @@ using AIAgentsBackend.Models.VectorStore;
 namespace AIAgentsBackend.Services.VectorStore.Base;
 
 /// <summary>
-/// Base class for policy vector store services.
-/// Provides common functionality for initializing and searching policy documents.
+/// Base class for searching policy documents using vector embeddings.
 /// </summary>
 public abstract class PolicyVectorStoreServiceBase
 {
-    private readonly IMongoDatabase _database;
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-    private readonly MongoVectorStore _vectorStore;
-    private readonly ILogger _logger;
+    private readonly IMongoDatabase database;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator;
+    private readonly MongoVectorStore vectorStore;
+    private readonly ILogger logger;
 
     /// <summary>
-    /// The MongoDB collection name for this vector store.
+    /// MongoDB collection name for this policy type.
     /// </summary>
     protected abstract string CollectionName { get; }
 
     /// <summary>
-    /// The path to the JSON data file.
+    /// Path to the JSON file with policy data.
     /// </summary>
     protected abstract string DataFilePath { get; }
 
     /// <summary>
-    /// Display name for logging purposes.
+    /// Name shown in logs.
     /// </summary>
     protected abstract string ServiceName { get; }
 
@@ -38,49 +37,42 @@ public abstract class PolicyVectorStoreServiceBase
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         ILogger logger)
     {
-        _database = database;
-        _embeddingGenerator = embeddingGenerator;
-        _logger = logger;
-        _vectorStore = new MongoVectorStore(database, new MongoVectorStoreOptions
+        this.database = database;
+        this.embeddingGenerator = embeddingGenerator;
+        this.logger = logger;
+        vectorStore = new MongoVectorStore(database, new MongoVectorStoreOptions
         {
             EmbeddingGenerator = embeddingGenerator
         });
     }
 
     /// <summary>
-    /// Initializes the vector store with policy data.
-    /// Creates the collection, indexes, and generates embeddings for all sections.
+    /// Loads policy data and creates embeddings in the vector store.
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("[{ServiceName}] Starting initialization...", ServiceName);
+        logger.LogInformation("[{ServiceName}] Starting initialization...", ServiceName);
 
         var document = await LoadPolicyDocumentAsync();
         var records = ConvertToRecords(document);
 
-        _logger.LogInformation("[{ServiceName}] Loaded {Count} sections from {DocumentId}",
+        logger.LogInformation("[{ServiceName}] Loaded {Count} sections from {DocumentId}",
             ServiceName, records.Count, document.DocumentId);
 
         var collection = GetCollection();
 
-        // Ensure collection and indexes exist
-        _logger.LogInformation("[{ServiceName}] Creating collection and indexes...", ServiceName);
+        logger.LogInformation("[{ServiceName}] Creating collection and indexes...", ServiceName);
         await collection.EnsureCollectionExistsAsync(cancellationToken);
 
-        // Upsert records
         await UpsertRecordsAsync(collection, records, cancellationToken);
 
-        _logger.LogInformation("[{ServiceName}] Initialization complete with {Count} sections",
+        logger.LogInformation("[{ServiceName}] Initialization complete with {Count} sections",
             ServiceName, records.Count);
     }
 
     /// <summary>
-    /// Searches for policy sections similar to the given query.
+    /// Finds policy sections that match the query.
     /// </summary>
-    /// <param name="query">The search query.</param>
-    /// <param name="topK">Number of results to return (default: 3).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>List of matching policy sections with scores.</returns>
     public async Task<IReadOnlyList<VectorSearchResult<PolicySectionRecord>>> SearchAsync(
         string query,
         int topK = 3,
@@ -95,14 +87,14 @@ public abstract class PolicyVectorStoreServiceBase
 
         var results = await collection.SearchAsync(query, topK, options, cancellationToken).ToListAsync(cancellationToken);
 
-        _logger.LogDebug("[{ServiceName}] Search for '{Query}' returned {Count} results",
+        logger.LogDebug("[{ServiceName}] Search for '{Query}' returned {Count} results",
             ServiceName, query, results.Count);
 
         return results;
     }
 
     /// <summary>
-    /// Searches and returns formatted string results.
+    /// Finds matching policies and returns them as readable text.
     /// </summary>
     public async Task<List<string>> SearchFormattedAsync(
         string query,
@@ -115,17 +107,11 @@ public abstract class PolicyVectorStoreServiceBase
             .ToList();
     }
 
-    /// <summary>
-    /// Gets the vector collection for this service.
-    /// </summary>
     private VectorStoreCollection<string, PolicySectionRecord> GetCollection()
     {
-        return _vectorStore.GetCollection<string, PolicySectionRecord>(CollectionName);
+        return vectorStore.GetCollection<string, PolicySectionRecord>(CollectionName);
     }
 
-    /// <summary>
-    /// Loads the policy document from the JSON file.
-    /// </summary>
     private async Task<PolicyDocument> LoadPolicyDocumentAsync()
     {
         var fullPath = Path.Combine(AppContext.BaseDirectory, DataFilePath);
@@ -143,9 +129,6 @@ public abstract class PolicyVectorStoreServiceBase
         }) ?? throw new InvalidOperationException($"Failed to deserialize policy document from {fullPath}");
     }
 
-    /// <summary>
-    /// Converts a policy document to vector store records.
-    /// </summary>
     private static List<PolicySectionRecord> ConvertToRecords(PolicyDocument document)
     {
         return document.Sections.Select(section => new PolicySectionRecord
@@ -159,9 +142,6 @@ public abstract class PolicyVectorStoreServiceBase
         }).ToList();
     }
 
-    /// <summary>
-    /// Upserts records into the vector store with progress logging.
-    /// </summary>
     private async Task UpsertRecordsAsync(
         VectorStoreCollection<string, PolicySectionRecord> collection,
         List<PolicySectionRecord> records,
@@ -174,11 +154,11 @@ public abstract class PolicyVectorStoreServiceBase
         {
             await collection.UpsertAsync(record, cancellationToken);
             processedCount++;
-            _logger.LogDebug("[{ServiceName}] Generated embedding {Processed}/{Total}",
+            logger.LogDebug("[{ServiceName}] Generated embedding {Processed}/{Total}",
                 ServiceName, processedCount, totalCount);
         }
 
-        _logger.LogInformation("[{ServiceName}] Upserted {Count} records with embeddings",
+        logger.LogInformation("[{ServiceName}] Upserted {Count} records with embeddings",
             ServiceName, totalCount);
     }
 }

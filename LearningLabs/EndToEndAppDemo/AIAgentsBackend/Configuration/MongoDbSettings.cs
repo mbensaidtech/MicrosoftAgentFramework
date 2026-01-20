@@ -1,27 +1,27 @@
 namespace AIAgentsBackend.Configuration;
 
 /// <summary>
-/// Configuration settings for MongoDB.
+/// MongoDB connection settings.
 /// </summary>
 public class MongoDbSettings
 {
     /// <summary>
-    /// Gets or sets the MongoDB connection string.
+    /// Connection string to MongoDB.
     /// </summary>
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the database name.
+    /// Database name.
     /// </summary>
     public string DatabaseName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the collection name for thread messages.
+    /// Collection name for thread messages.
     /// </summary>
     public string ThreadMessagesCollectionName { get; set; } = "threadMessages";
 
     /// <summary>
-    /// Gets or sets the collection name for chat message store (for backward compatibility with MongoVectorChatMessageStore).
+    /// Collection name for chat history (used by MongoVectorChatMessageStore).
     /// </summary>
     public string ChatMessageStoreCollectionName { get; set; } = "chat_history";
 }

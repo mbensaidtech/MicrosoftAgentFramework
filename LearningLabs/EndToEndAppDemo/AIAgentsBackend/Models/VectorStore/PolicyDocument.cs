@@ -1,33 +1,32 @@
 namespace AIAgentsBackend.Models.VectorStore;
 
 /// <summary>
-/// Represents the structure of a policy JSON document.
-/// Used for deserializing policy data files.
+/// A policy document loaded from JSON.
 /// </summary>
 public class PolicyDocument
 {
     /// <summary>
-    /// Unique identifier for the document.
+    /// Document ID.
     /// </summary>
     public string DocumentId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Category of the policy (e.g., "returns", "refunds", "cancellation").
+    /// Category (e.g., "returns", "refunds").
     /// </summary>
     public string Category { get; set; } = string.Empty;
 
     /// <summary>
-    /// Title of the policy document.
+    /// Document title.
     /// </summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>
-    /// Last update date of the document.
+    /// Last update date.
     /// </summary>
     public string LastUpdated { get; set; } = string.Empty;
 
     /// <summary>
-    /// List of sections in the document.
+    /// Sections in the document.
     /// </summary>
     public List<PolicySection> Sections { get; set; } = [];
 }

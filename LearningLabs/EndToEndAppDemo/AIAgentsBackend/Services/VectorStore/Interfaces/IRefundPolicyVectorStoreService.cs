@@ -1,6 +1,6 @@
 namespace AIAgentsBackend.Services.VectorStore.Interfaces;
 
 /// <summary>
-/// Interface for refund policy vector store service.
+/// Searches refund policy documents.
 /// </summary>
 public interface IRefundPolicyVectorStoreService : IPolicyVectorStoreService { }
