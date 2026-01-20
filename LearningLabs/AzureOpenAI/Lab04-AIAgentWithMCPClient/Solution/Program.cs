@@ -8,6 +8,7 @@ using CommonUtilities;
 using AIAgentWithMCPClient;
 using AIAgentWithMCPClient.Models;
 using ModelContextProtocol.Client;
+using System.ClientModel;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -31,8 +32,10 @@ ColoredConsole.WriteSecondaryLogLine($"Deployment: {settings.ChatDeploymentName}
 var huggingFaceMcpSettings = ConfigurationHelper.GetMCPServerSettings("HuggingFace");
 ColoredConsole.WriteSecondaryLogLine($"MCP Server: {huggingFaceMcpSettings.Endpoint}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 3: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);

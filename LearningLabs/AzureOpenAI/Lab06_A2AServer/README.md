@@ -51,13 +51,27 @@ Open `Start/appsettings.json` and update the Azure OpenAI values:
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME",
+    "APIKey": ""
   },
   "APIKeySettings": {
     "SecretKey": "MeknesUfoN2bp5zvU78T/hBJZPm2GboLX68axxSp4p2CbFHsY="
   }
 }
 ```
+
+#### Authentication Options
+
+The labs support two authentication methods:
+
+1. **API Key Authentication** (recommended for local development):
+   - Set `APIKey` in `appsettings.json` with your Azure OpenAI API key
+
+2. **DefaultAzureCredential** (for Azure-hosted apps):
+   - Leave `APIKey` empty
+   - Requires Azure CLI login (`az login`) or managed identity
+
+The Solution folder includes the conditional logic to handle both methods.
 
 > **Note**: The `SecretKey` is used for cryptographic signing of API keys. You can use the provided value for testing or generate your own.
 

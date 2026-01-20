@@ -6,6 +6,7 @@ using ModelContextProtocol.Server;
 using OpenAI.Chat;
 using OpenAI;
 using System.Reflection;
+using System.ClientModel;
 
 using CommonUtilities;
 using ExposeAIAgentAsMCPTool;
@@ -29,8 +30,10 @@ ColoredConsole.WritePrimaryLogLine("Azure OpenAI Settings: ");
 ColoredConsole.WriteSecondaryLogLine($"Azure OpenAI Endpoint: {settings.Endpoint}");
 ColoredConsole.WriteSecondaryLogLine($"Azure OpenAI Chat Deployment Name: {settings.ChatDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);

@@ -46,10 +46,26 @@ Open `Start/appsettings.json` and update the values:
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME",
+    "APIKey": ""
   }
 }
 ```
+
+#### Authentication Options
+
+The labs support two authentication methods:
+
+1. **API Key Authentication** (recommended for local development):
+   - Set `APIKey` in `appsettings.json` with your Azure OpenAI API key
+   - This is the simplest option for getting started
+
+2. **DefaultAzureCredential** (for Azure-hosted apps):
+   - Leave `APIKey` empty or remove it
+   - Requires Azure CLI login (`az login`) or managed identity
+   - Automatically uses the best available credential
+
+The Solution folder includes the conditional logic to handle both methods. In the Start folder, you'll implement `DefaultAzureCredential` as shown in the TODOs.
 
 ### Step 2: Complete the Program.cs
 

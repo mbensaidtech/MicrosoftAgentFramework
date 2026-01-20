@@ -5,6 +5,7 @@ using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
 using ToonNetSerializer;
+using System.ClientModel;
 
 using CommonUtilities;
 using DataFormatComparison;
@@ -27,8 +28,10 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 ColoredConsole.WriteSecondaryLogLine($"Endpoint: {settings.Endpoint}");
 ColoredConsole.WriteSecondaryLogLine($"Deployment: {settings.ChatDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);

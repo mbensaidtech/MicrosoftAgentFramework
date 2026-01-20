@@ -7,6 +7,7 @@ using OpenAI.Chat;
 using CommonUtilities;
 using A2AClient;
 using A2A;
+using System.ClientModel;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -27,8 +28,10 @@ Console.WriteLine($"Remote Auth Agent: {remoteAuthAgentSettings.Name}");
 Console.WriteLine($"Remote Auth Agent Description: {remoteAuthAgentSettings.Description}");
 Console.WriteLine($"Remote Auth Agent URL: {remoteAuthAgentSettings.Url}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
