@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUsername, clearSession, extendSession } from '../utils/session';
+import { getUsername, clearSession, extendSession, getContextId, saveContextId, clearContextId } from '../utils/session';
 import {
   sendRestMessage,
   sendRestStreamingMessage,
   sendA2AMessage,
   sendA2AStreamingMessage,
+  getThreadMessages,
 } from '../services/api';
 import type {
   ChatMessage,
@@ -32,13 +33,14 @@ export function ChatPage() {
   const [settings, setSettings] = useState<ChatSettings>({
     protocol: 'rest',
     streaming: 'http',
-    agentId: AGENTS_CONFIG[0]?.id || 'history',
+    agentId: 'history', // History Agent selected by default
   });
 
   const [showQuestionsPopup, setShowQuestionsPopup] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [debugHistory, setDebugHistory] = useState<DebugInfo[]>([]);
   const [expandedDebugEntries, setExpandedDebugEntries] = useState<Set<number>>(new Set());
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -63,16 +65,116 @@ export function ChatPage() {
     };
   }, []);
 
+  // Load contextId and thread history on mount
+  useEffect(() => {
+    console.log('[ChatPage] Mount effect triggered. Username:', username);
+    
+    if (!username) {
+      console.log('[ChatPage] No username, skipping auto-load');
+      return; // Only load if user is logged in
+    }
+
+    const savedContextId = getContextId();
+    console.log('[ChatPage] Saved contextId from localStorage:', savedContextId);
+    
+    if (savedContextId) {
+      console.log('[ChatPage] ✅ Found saved contextId:', savedContextId);
+      setContextId(savedContextId);
+      
+      // Auto-load thread history
+      const autoLoadHistory = async () => {
+        console.log('[ChatPage] 🚀 Starting auto-load for contextId:', savedContextId);
+        setIsLoadingHistory(true);
+        try {
+          console.log('[ChatPage] 📡 Fetching messages from backend...');
+          const { data, debug } = await getThreadMessages(savedContextId);
+          console.log('[ChatPage] 📥 Response received:', data);
+          
+          // Add debug info
+          setDebugHistory((prev) => [...prev, debug]);
+
+          if (data.messageCount > 0) {
+            // Convert thread messages to chat messages
+            const loadedMessages: ChatMessage[] = data.messages.map((msg, index) => {
+              // Parse the serialized message to determine role
+              let role: 'user' | 'agent' = 'user';
+              let content = msg.messageText || '';
+
+              try {
+                if (msg.serializedMessage) {
+                  const parsed = JSON.parse(msg.serializedMessage);
+                  console.log('[ChatPage] Parsed message:', parsed);
+                  
+                  // Check different possible role formats
+                  const messageRole = parsed.Role || parsed.role;
+                  
+                  // Handle both string and object role formats
+                  const roleValue = typeof messageRole === 'string' 
+                    ? messageRole.toLowerCase() 
+                    : messageRole?.Value?.toLowerCase() || '';
+                  
+                  role = (roleValue === 'assistant' || roleValue === 'agent') ? 'agent' : 'user';
+                  
+                  // Get content from various possible locations
+                  content = parsed.Text || parsed.text || parsed.Content || parsed.content || msg.messageText || '';
+                  
+                  console.log('[ChatPage] Determined role:', role, 'content:', content.substring(0, 50));
+                }
+              } catch (error) {
+                console.warn('[ChatPage] Failed to parse serialized message:', error);
+              }
+
+              return {
+                id: `history-${msg.timestamp}-${index}`,
+                role,
+                content,
+                timestamp: new Date(msg.timestamp),
+                isStreaming: false,
+                isLoading: false,
+              };
+            });
+
+            // Set loaded messages
+            setMessages(loadedMessages);
+            console.log(`[ChatPage] Auto-loaded ${data.messageCount} messages from thread ${savedContextId}`);
+          } else {
+            console.log('[ChatPage] No messages found for this thread');
+          }
+        } catch (error: any) {
+          console.log('[ChatPage] No previous messages found or error loading:', error.debug?.error || error.message);
+          
+          if (error.debug) {
+            setDebugHistory((prev) => [...prev, error.debug]);
+          }
+          
+          // Don't show alert for 404 - just means no previous messages
+          if (error.debug?.responseStatus !== 404) {
+            console.error('[ChatPage] Error auto-loading thread history:', error);
+          }
+        } finally {
+          setIsLoadingHistory(false);
+        }
+      };
+
+      autoLoadHistory();
+    } else {
+      console.log('[ChatPage] No saved contextId found');
+    }
+  }, [username]); // Only run on mount when username is available
+
   const handleLogout = () => {
     clearSession();
+    clearContextId();
     navigate('/login');
   };
 
   const clearChat = () => {
     setMessages([]);
     setContextId(undefined);
+    clearContextId(); // Clear from localStorage
     setDebugHistory([]);
     setExpandedDebugEntries(new Set());
+    console.log('[ChatPage] Chat cleared. Ready for new conversation.');
   };
 
   const handleSelectQuestion = (question: string) => {
@@ -160,10 +262,97 @@ export function ChatPage() {
 
   // Get current contextId or generate a new one
   const getOrCreateContextId = (): string => {
-    if (contextId) return contextId;
+    // First check if we already have contextId in state
+    if (contextId) {
+      console.log('[ChatPage] Using existing contextId from state:', contextId);
+      return contextId;
+    }
+    
+    // Then check if we have saved contextId in localStorage
+    const savedContextId = getContextId();
+    if (savedContextId) {
+      console.log('[ChatPage] Using saved contextId from localStorage:', savedContextId);
+      setContextId(savedContextId);
+      return savedContextId;
+    }
+    
+    // Only generate new contextId if neither exists
     const newContextId = generateContextId();
     setContextId(newContextId);
+    saveContextId(newContextId); // Save to localStorage
+    console.log('[ChatPage] Created and saved NEW contextId:', newContextId);
     return newContextId;
+  };
+
+  // Load thread history from backend
+  const loadThreadHistory = async () => {
+    if (!contextId) {
+      alert('No active thread. Start a conversation first.');
+      return;
+    }
+
+    setIsLoadingHistory(true);
+    try {
+      const { data, debug } = await getThreadMessages(contextId);
+      
+      // Add debug info
+      setDebugHistory((prev) => [...prev, debug]);
+
+      // Convert thread messages to chat messages
+      const loadedMessages: ChatMessage[] = data.messages.map((msg, index) => {
+        // Parse the serialized message to determine role
+        let role: 'user' | 'agent' = 'user';
+        let content = msg.messageText || '';
+
+        try {
+          if (msg.serializedMessage) {
+            const parsed = JSON.parse(msg.serializedMessage);
+            console.log('[Manual Load] Parsed message:', parsed);
+            
+            // Check different possible role formats
+            const messageRole = parsed.Role || parsed.role;
+            
+            // Handle both string and object role formats
+            const roleValue = typeof messageRole === 'string' 
+              ? messageRole.toLowerCase() 
+              : messageRole?.Value?.toLowerCase() || '';
+            
+            role = (roleValue === 'assistant' || roleValue === 'agent') ? 'agent' : 'user';
+            
+            // Get content from various possible locations
+            content = parsed.Text || parsed.text || parsed.Content || parsed.content || msg.messageText || '';
+            
+            console.log('[Manual Load] Determined role:', role, 'content:', content.substring(0, 50));
+          }
+        } catch (error) {
+          console.warn('[Manual Load] Failed to parse serialized message:', error);
+        }
+
+        return {
+          id: `history-${msg.timestamp}-${index}`,
+          role,
+          content,
+          timestamp: new Date(msg.timestamp),
+          isStreaming: false,
+          isLoading: false,
+        };
+      });
+
+      // Replace current messages with loaded history
+      setMessages(loadedMessages);
+      
+      console.log(`[ChatPage] Loaded ${data.messageCount} messages from thread ${contextId}`);
+    } catch (error: any) {
+      console.error('[ChatPage] Failed to load thread history:', error);
+      
+      if (error.debug) {
+        setDebugHistory((prev) => [...prev, error.debug]);
+      }
+      
+      alert(`Failed to load thread history: ${error.debug?.error || error.message || 'Unknown error'}`);
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -384,14 +573,33 @@ export function ChatPage() {
               <span className="context-badge" title={contextId || 'New conversation'}>
                 {contextId ? `ID: ${contextId.substring(0, 12)}...` : 'New conversation'}
               </span>
+              {contextId && (
+                <button
+                  className="load-history-button"
+                  onClick={loadThreadHistory}
+                  disabled={isLoadingHistory}
+                  title="Load thread history from database"
+                >
+                  {isLoadingHistory ? '⏳ Loading...' : '📜 Load History'}
+                </button>
+              )}
             </div>
           </div>
 
           <div className="messages-container">
             {messages.length === 0 ? (
               <div className="empty-state">
-                <p>Start a conversation with {selectedAgent?.name}</p>
-                <p className="hint">{selectedAgent?.description}</p>
+                {isLoadingHistory ? (
+                  <>
+                    <p>⏳ Loading conversation history...</p>
+                    <p className="hint">Please wait while we restore your previous messages</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Start a conversation with {selectedAgent?.name}</p>
+                    <p className="hint">{selectedAgent?.description}</p>
+                  </>
+                )}
               </div>
             ) : (
               messages.map((msg) => (

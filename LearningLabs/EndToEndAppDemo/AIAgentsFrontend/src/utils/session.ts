@@ -1,4 +1,5 @@
 const SESSION_KEY = 'aiagent_user_session';
+const CONTEXT_ID_KEY = 'aiagent_context_id';
 const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 interface UserSession {
@@ -58,4 +59,17 @@ export function getSessionTimeRemaining(): number {
   const session = getSession();
   if (!session) return 0;
   return Math.max(0, session.expiresAt - Date.now());
+}
+
+// Context ID Management
+export function saveContextId(contextId: string): void {
+  localStorage.setItem(CONTEXT_ID_KEY, contextId);
+}
+
+export function getContextId(): string | null {
+  return localStorage.getItem(CONTEXT_ID_KEY);
+}
+
+export function clearContextId(): void {
+  localStorage.removeItem(CONTEXT_ID_KEY);
 }

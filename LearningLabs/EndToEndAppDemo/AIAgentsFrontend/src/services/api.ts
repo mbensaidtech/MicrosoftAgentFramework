@@ -1,9 +1,24 @@
 import type { RestChatResponse, A2AResponse, DebugInfo } from '../types';
 import { API_BASE_URL, getAgentById } from '../config/agents.config';
+import { signContextId } from '../utils/contextIdSigner';
 
 export interface ApiResultWithDebug<T> {
   data: T;
   debug: DebugInfo;
+}
+
+// Types for Thread Messages
+export interface ThreadMessage {
+  key: string | null;
+  timestamp: number;
+  messageText: string | null;
+  serializedMessage: string | null;
+}
+
+export interface ThreadMessagesResponse {
+  threadId: string;
+  messageCount: number;
+  messages: ThreadMessage[];
 }
 
 /**
@@ -34,7 +49,19 @@ export async function sendRestMessage(
 ): Promise<ApiResultWithDebug<RestChatResponse>> {
   const paths = getAgentPaths(agentId);
   const url = `${API_BASE_URL}${paths.rest}/chat`;
-  const requestBody = { message, contextId };
+  
+  // Generate signature for contextId if provided
+  let signature: string | undefined;
+  if (contextId) {
+    try {
+      signature = await signContextId(contextId);
+      console.log('[REST] Signed contextId:', contextId, 'signature:', signature.substring(0, 20) + '...');
+    } catch (error) {
+      console.error('[REST] Failed to sign contextId:', error);
+    }
+  }
+  
+  const requestBody = { message, contextId, signature };
   const startTime = Date.now();
 
   const debug: DebugInfo = {
@@ -86,7 +113,19 @@ export async function sendRestStreamingMessage(
 ): Promise<void> {
   const paths = getAgentPaths(agentId);
   const url = `${API_BASE_URL}${paths.rest}/stream`;
-  const requestBody = { message, contextId };
+  
+  // Generate signature for contextId if provided
+  let signature: string | undefined;
+  if (contextId) {
+    try {
+      signature = await signContextId(contextId);
+      console.log('[REST Streaming] Signed contextId:', contextId, 'signature:', signature.substring(0, 20) + '...');
+    } catch (error) {
+      console.error('[REST Streaming] Failed to sign contextId:', error);
+    }
+  }
+  
+  const requestBody = { message, contextId, signature };
   const startTime = Date.now();
 
   const debug: DebugInfo = {
@@ -184,6 +223,18 @@ export async function sendA2AMessage(
 ): Promise<ApiResultWithDebug<{ text: string; contextId: string }>> {
   const paths = getAgentPaths(agentId);
   const url = `${API_BASE_URL}${paths.a2a}`;
+  
+  // Generate signature for contextId if provided
+  let signature: string | undefined;
+  if (contextId) {
+    try {
+      signature = await signContextId(contextId);
+      console.log('[A2A] Signed contextId:', contextId, 'signature:', signature.substring(0, 20) + '...');
+    } catch (error) {
+      console.error('[A2A] Failed to sign contextId:', error);
+    }
+  }
+  
   const requestBody = {
     jsonrpc: '2.0',
     method: 'message/send',
@@ -200,6 +251,7 @@ export async function sendA2AMessage(
         ],
       },
       contextId,
+      signature, // Add signature to params
     },
     id: `req-${Date.now()}`,
   };
@@ -259,6 +311,18 @@ export async function sendA2AStreamingMessage(
   onDebug?: (debug: DebugInfo) => void
 ): Promise<void> {
   const paths = getAgentPaths(agentId);
+  
+  // Generate signature for contextId if provided
+  let signature: string | undefined;
+  if (contextId) {
+    try {
+      signature = await signContextId(contextId);
+      console.log('[A2A Streaming] Signed contextId:', contextId, 'signature:', signature.substring(0, 20) + '...');
+    } catch (error) {
+      console.error('[A2A Streaming] Failed to sign contextId:', error);
+    }
+  }
+  
   const url = `${API_BASE_URL}${paths.a2a}/v1/message:stream`;
   const requestBody = {
     message: {
@@ -273,6 +337,7 @@ export async function sendA2AStreamingMessage(
       ],
       messageId: null,
       contextId,
+      signature, // Add signature
     },
   };
   const startTime = Date.now();
@@ -358,5 +423,56 @@ export async function sendA2AStreamingMessage(
     debug.error = error instanceof Error ? error.message : 'Unknown error';
     onDebug?.(debug);
     onError(debug.error);
+  }
+}
+
+/**
+ * Fetch thread messages by thread ID (contextId)
+ */
+export async function getThreadMessages(
+  threadId: string
+): Promise<ApiResultWithDebug<ThreadMessagesResponse>> {
+  const url = `${API_BASE_URL}/api/threads/${threadId}/messages`;
+  const startTime = Date.now();
+
+  const debug: DebugInfo = {
+    timestamp: new Date(),
+    method: 'GET',
+    url,
+  };
+
+  try {
+    console.log('[Threads] Fetching messages for threadId:', threadId);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    debug.responseStatus = response.status;
+    debug.duration = Date.now() - startTime;
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        debug.error = `Thread not found: ${threadId}`;
+      } else {
+        debug.error = `HTTP error! status: ${response.status}`;
+      }
+      throw new Error(debug.error);
+    }
+
+    const data: ThreadMessagesResponse = await response.json();
+    debug.responseBody = data;
+
+    console.log(`[Threads] Retrieved ${data.messageCount} messages for thread ${threadId}`);
+
+    return { data, debug };
+  } catch (error) {
+    debug.duration = Date.now() - startTime;
+    debug.error = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Threads] Error fetching thread messages:', debug.error);
+    throw { error, debug };
   }
 }

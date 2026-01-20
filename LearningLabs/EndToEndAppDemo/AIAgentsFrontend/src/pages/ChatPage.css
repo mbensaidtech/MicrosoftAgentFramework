@@ -238,6 +238,32 @@
   border-radius: 12px;
   font-size: 11px;
   color: #86868b;
+}
+
+.load-history-button {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.load-history-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.load-history-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
   cursor: default;
   max-width: 180px;
   overflow: hidden;
