@@ -16,7 +16,12 @@ public class MongoDbSettings
     public string DatabaseName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the collection name for chat message store.
+    /// Gets or sets the collection name for thread messages.
+    /// </summary>
+    public string ThreadMessagesCollectionName { get; set; } = "threadMessages";
+
+    /// <summary>
+    /// Gets or sets the collection name for chat message store (for backward compatibility with MongoVectorChatMessageStore).
     /// </summary>
     public string ChatMessageStoreCollectionName { get; set; } = "chat_history";
 }

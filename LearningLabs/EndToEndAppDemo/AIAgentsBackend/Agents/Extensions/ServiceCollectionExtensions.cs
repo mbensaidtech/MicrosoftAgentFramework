@@ -1,6 +1,8 @@
 using AIAgentsBackend.Agents.Configuration;
 using AIAgentsBackend.Agents.Factory;
 using AIAgentsBackend.Configuration;
+using AIAgentsBackend.Repositories;
+using AIAgentsBackend.Services;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.SemanticKernel.Connectors.MongoDB;
@@ -36,25 +38,38 @@ public static class ServiceCollectionExtensions
         var mongoSettings = configuration.GetSection("MongoDB").Get<MongoDbSettings>() 
             ?? new MongoDbSettings();
         services.AddSingleton(mongoSettings);
+        services.Configure<MongoDbSettings>(configuration.GetSection("MongoDB"));
 
-        services.AddSingleton<IMongoDatabase>(sp =>
+        // Register MongoDB client (single source of truth for MongoDB access)
+        services.AddSingleton<IMongoClient>(sp =>
         {
             var settings = sp.GetRequiredService<MongoDbSettings>();
-            var client = new MongoClient(settings.ConnectionString);
-            return client.GetDatabase(settings.DatabaseName);
+            return new MongoClient(settings.ConnectionString);
         });
 
+        // Register MongoVectorStore for Semantic Kernel (gets database from IMongoClient)
         services.AddSingleton<MongoVectorStore>(sp =>
         {
-            var database = sp.GetRequiredService<IMongoDatabase>();
+            var settings = sp.GetRequiredService<MongoDbSettings>();
+            var client = sp.GetRequiredService<IMongoClient>();
+            var database = client.GetDatabase(settings.DatabaseName);
             return new MongoVectorStore(database);
         });
+
+        // Register Thread Repository for MongoDB data access
+        services.AddScoped<IThreadRepository, ThreadRepository>();
 
         // Register HttpContextAccessor to access request context
         services.AddHttpContextAccessor();
 
         // Register agent configurations from appsettings.json
         services.Configure<AgentsConfiguration>(configuration.GetSection("AIAgents"));
+
+        // Register security settings for context ID signing
+        services.Configure<SecuritySettings>(configuration.GetSection("Security"));
+
+        // Register context ID validator service as Singleton (stateless, can be reused)
+        services.AddSingleton<IContextIdValidator, ContextIdValidator>();
 
         // Register the agent factory
         services.AddSingleton<IAgentFactory, AgentFactory>();

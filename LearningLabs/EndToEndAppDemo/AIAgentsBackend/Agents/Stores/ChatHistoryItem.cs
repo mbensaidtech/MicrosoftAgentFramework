@@ -1,4 +1,6 @@
 using Microsoft.Extensions.VectorData;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace AIAgentsBackend.Agents.Stores;
 
@@ -7,6 +9,11 @@ namespace AIAgentsBackend.Agents.Stores;
 /// </summary>
 public sealed class ChatHistoryItem
 {
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    [BsonIgnoreIfDefault]
+    public string? Id { get; set; }
+
     [VectorStoreKey]
     public string? Key { get; set; }
 
