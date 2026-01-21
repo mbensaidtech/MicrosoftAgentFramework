@@ -17,6 +17,7 @@ import type {
   DebugInfo,
 } from '../types';
 import { AGENTS_CONFIG, getAgentById } from '../config/agents.config';
+import { MessageFormatter } from '../components/MessageFormatter';
 import './ChatPage.css';
 
 export function ChatPage() {
@@ -621,8 +622,15 @@ export function ChatPage() {
                       </div>
                     ) : (
                       <>
-                        {msg.content}
-                        {msg.isStreaming && <span className="typing-cursor">|</span>}
+                        {msg.role !== 'user' ? (
+                          msg.isStreaming ? (
+                            <>{msg.content}<span className="typing-cursor">|</span></>
+                          ) : (
+                            <MessageFormatter content={msg.content} />
+                          )
+                        ) : (
+                          msg.content
+                        )}
                       </>
                     )}
                   </div>

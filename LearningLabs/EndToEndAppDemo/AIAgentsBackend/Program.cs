@@ -38,6 +38,7 @@ app.UseA2AContext();
 var agentFactory = app.Services.GetRequiredService<IAgentFactory>();
 
 var (translationAgent, translationAgentCard) = agentFactory.GetTranslationAgent();
+var (customerSupportAgent, customerSupportAgentCard) = agentFactory.GetCustomerSupportAgent();
 var (historyAgent, historyAgentCard) = agentFactory.GetHistoryAgent();
 
 // Expose agents via A2A protocol
@@ -46,14 +47,20 @@ app.MapA2A(translationAgent,
     agentCard: translationAgentCard,
     taskManager => app.MapWellKnownAgentCard(taskManager, "/a2a/translationAgent"));
 
+app.MapA2A(customerSupportAgent, 
+    path: "/a2a/customerSupportAgent", 
+    agentCard: customerSupportAgentCard,
+    taskManager => app.MapWellKnownAgentCard(taskManager, "/a2a/customerSupportAgent"));
+
 app.MapA2A(historyAgent, 
     path: "/a2a/historyAgent", 
     agentCard: historyAgentCard,
     taskManager => app.MapWellKnownAgentCard(taskManager, "/a2a/historyAgent"));
 
 Console.WriteLine("Exposed Agents:");
-Console.WriteLine("  - Translation Agent: /a2a/translationAgent");
-Console.WriteLine("  - History Agent:     /a2a/historyAgent (with MongoDB conversation memory)");
+Console.WriteLine("  - Translation Agent:       /a2a/translationAgent");
+Console.WriteLine("  - Customer Support Agent:  /a2a/customerSupportAgent (with policy tools)");
+Console.WriteLine("  - History Agent:           /a2a/historyAgent (with MongoDB conversation memory)");
 Console.WriteLine("========================================");
 
 // Configure the HTTP request pipeline.
