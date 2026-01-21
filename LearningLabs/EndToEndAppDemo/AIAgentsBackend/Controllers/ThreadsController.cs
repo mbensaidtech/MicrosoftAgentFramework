@@ -5,29 +5,26 @@ using Microsoft.AspNetCore.Mvc;
 namespace AIAgentsBackend.Controllers;
 
 /// <summary>
-/// Controller for managing conversation threads.
+/// API for retrieving conversation threads.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ThreadsController : ControllerBase
 {
-    private readonly IThreadRepository _threadRepository;
-    private readonly ILogger<ThreadsController> _logger;
+    private readonly IThreadRepository threadRepository;
+    private readonly ILogger<ThreadsController> logger;
 
     public ThreadsController(
         IThreadRepository threadRepository,
         ILogger<ThreadsController> logger)
     {
-        _threadRepository = threadRepository ?? throw new ArgumentNullException(nameof(threadRepository));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.threadRepository = threadRepository ?? throw new ArgumentNullException(nameof(threadRepository));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Gets all messages for a specific thread by thread ID.
+    /// Gets all messages from a conversation thread.
     /// </summary>
-    /// <param name="threadId">The thread identifier.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The thread messages.</returns>
     [HttpGet("{threadId}/messages")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -38,14 +35,14 @@ public class ThreadsController : ControllerBase
         if (string.IsNullOrWhiteSpace(threadId))
             return BadRequest("Thread ID is required");
 
-        _logger.LogInformation("Getting thread messages for threadId: {ThreadId}", threadId);
+        logger.LogInformation("Getting thread messages for threadId: {ThreadId}", threadId);
 
-        var messages = await _threadRepository.GetThreadMessagesAsync(threadId, cancellationToken);
+        var messages = await threadRepository.GetThreadMessagesAsync(threadId, cancellationToken);
         var messagesList = messages.ToList();
 
         if (!messagesList.Any())
         {
-            _logger.LogWarning("No messages found for thread: {ThreadId}", threadId);
+            logger.LogWarning("No messages found for thread: {ThreadId}", threadId);
             return NotFound($"No messages found for thread with ID '{threadId}'");
         }
 
@@ -65,4 +62,3 @@ public class ThreadsController : ControllerBase
         return Ok(response);
     }
 }
-

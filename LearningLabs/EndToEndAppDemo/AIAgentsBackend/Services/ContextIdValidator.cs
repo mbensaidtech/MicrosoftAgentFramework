@@ -6,12 +6,12 @@ using Microsoft.Extensions.Options;
 namespace AIAgentsBackend.Services;
 
 /// <summary>
-/// Service for validating signed context IDs using HMAC-SHA256.
+/// Validates context IDs using HMAC-SHA256 signatures.
 /// </summary>
 public class ContextIdValidator : IContextIdValidator
 {
-    private readonly byte[] _secretKey;
-    private readonly ILogger<ContextIdValidator> _logger;
+    private readonly byte[] secretKey;
+    private readonly ILogger<ContextIdValidator> logger;
 
     public ContextIdValidator(IOptions<SecuritySettings> securitySettings, ILogger<ContextIdValidator> logger)
     {
@@ -22,24 +22,24 @@ public class ContextIdValidator : IContextIdValidator
             throw new InvalidOperationException("ContextIdSigningKey is not configured in SecuritySettings");
         }
 
-        _secretKey = Encoding.UTF8.GetBytes(settings.ContextIdSigningKey);
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        secretKey = Encoding.UTF8.GetBytes(settings.ContextIdSigningKey);
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Validates a signed context ID using HMAC-SHA256.
+    /// Checks if the signature matches the context ID.
     /// </summary>
     public bool ValidateSignature(string contextId, string signature)
     {
         if (string.IsNullOrWhiteSpace(contextId))
         {
-            _logger.LogWarning("ContextId is null or empty");
+            logger.LogWarning("ContextId is null or empty");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(signature))
         {
-            _logger.LogWarning("Signature is null or empty");
+            logger.LogWarning("Signature is null or empty");
             return false;
         }
 
@@ -50,24 +50,24 @@ public class ContextIdValidator : IContextIdValidator
 
             if (!isValid)
             {
-                _logger.LogWarning("Invalid signature for contextId: {ContextId}", contextId);
+                logger.LogWarning("Invalid signature for contextId: {ContextId}", contextId);
             }
             else
             {
-                _logger.LogDebug("Valid signature for contextId: {ContextId}", contextId);
+                logger.LogDebug("Valid signature for contextId: {ContextId}", contextId);
             }
 
             return isValid;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating signature for contextId: {ContextId}", contextId);
+            logger.LogError(ex, "Error validating signature for contextId: {ContextId}", contextId);
             return false;
         }
     }
 
     /// <summary>
-    /// Generates an HMAC-SHA256 signature for a context ID.
+    /// Creates a signature for a context ID.
     /// </summary>
     public string GenerateSignature(string contextId)
     {
@@ -76,16 +76,15 @@ public class ContextIdValidator : IContextIdValidator
             throw new ArgumentException("ContextId cannot be null or empty", nameof(contextId));
         }
 
-        using var hmac = new HMACSHA256(_secretKey);
+        using var hmac = new HMACSHA256(secretKey);
         var contextIdBytes = Encoding.UTF8.GetBytes(contextId);
         var hashBytes = hmac.ComputeHash(contextIdBytes);
         
-        // Convert to Base64 for easy transmission
         return Convert.ToBase64String(hashBytes);
     }
 
     /// <summary>
-    /// Extracts the username from a context ID in format "username|timestamp".
+    /// Gets the username from a context ID like "username|timestamp".
     /// </summary>
     public string? ExtractUsername(string contextId)
     {
@@ -104,4 +103,3 @@ public class ContextIdValidator : IContextIdValidator
         return string.IsNullOrWhiteSpace(username) ? null : username;
     }
 }
-

@@ -1,8 +1,6 @@
-using AIAgentsBackend.Agents.Extensions;
 using AIAgentsBackend.Agents.Factory;
-using AIAgentsBackend.Agents.Middleware;
 using AIAgentsBackend.Configuration;
-using AIAgentsBackend.Services.VectorStore.Extensions;
+using AIAgentsBackend.Extensions;
 using A2A.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,11 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-// Register AI agents (settings, definitions, and factory)
-builder.Services.AddAIAgents(builder.Configuration);
-
-// Register Vector Store services (embedding generator, policy services, and initializer)
-builder.Services.AddVectorStoreServices(builder.Configuration);
+// Register all application services (Azure OpenAI, MongoDB, Agents, VectorStore)
+builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 

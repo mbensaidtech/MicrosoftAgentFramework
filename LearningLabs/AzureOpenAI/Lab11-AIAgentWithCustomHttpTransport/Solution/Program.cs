@@ -4,6 +4,7 @@ using Microsoft.Agents.AI;
 using OpenAI.Chat;
 using OpenAI;
 using System.ClientModel.Primitives;
+using System.ClientModel;
 using CommonUtilities;
 using AIAgentWithCustomHttpTransport;
 
@@ -26,10 +27,15 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 // Step 2: Create a custom HTTP client with the custom HTTP handler
 var httpClient = new HttpClient(new CustomHttpClientHandler());
 
-// Step 3: Create AzureOpenAIClient with managed identity authentication and the custom HTTP client
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), 
-new DefaultAzureCredential(),  
-new AzureOpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient), NetworkTimeout = TimeSpan.FromSeconds(30) });
+// Step 3: Create AzureOpenAIClient (API key or DefaultAzureCredential) with custom HTTP transport
+var clientOptions = new AzureOpenAIClientOptions 
+{ 
+    Transport = new HttpClientPipelineTransport(httpClient), 
+    NetworkTimeout = TimeSpan.FromSeconds(30) 
+};
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey), clientOptions)
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential(), clientOptions);
 
 // Step 4: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);

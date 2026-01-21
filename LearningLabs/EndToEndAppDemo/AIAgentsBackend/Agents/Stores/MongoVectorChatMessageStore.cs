@@ -7,10 +7,7 @@ using Microsoft.SemanticKernel.Connectors.MongoDB;
 namespace AIAgentsBackend.Agents.Stores;
 
 /// <summary>
-/// MongoDB implementation of ChatMessageStore using a vector store.
-/// Messages are persisted to MongoDB and survive application restarts.
-/// Uses IHttpContextAccessor to get the contextId from the HTTP request.
-/// Updated for Microsoft.Agents.AI.Hosting.A2A.AspNetCore 1.0.0-preview.260108.1
+/// Stores chat messages in MongoDB so conversations persist across restarts.
 /// </summary>
 public sealed class MongoVectorChatMessageStore : ChatMessageStore
 {
@@ -19,7 +16,7 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
     private readonly string collectionName;
 
     /// <summary>
-    /// Key used to store/retrieve contextId from HttpContext.Items
+    /// Key for storing the context ID in HttpContext.Items.
     /// </summary>
     public const string ContextIdKey = "A2A_ContextId";
 
@@ -33,7 +30,6 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
         this.httpContextAccessor = httpContextAccessor;
         this.collectionName = collectionName;
 
-        // Get contextId from HttpContext.Items (populated by A2AContextMiddleware)
         var httpContext = httpContextAccessor?.HttpContext;
         if (httpContext?.Items.TryGetValue(ContextIdKey, out var contextIdObj) == true 
             && contextIdObj is string contextId 
@@ -51,7 +47,7 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
     public string? ThreadDbKey { get; internal set; }
 
     /// <summary>
-    /// Called before the agent invocation. Returns messages to include in the context.
+    /// Gets previous messages from the conversation to include in context.
     /// </summary>
     public override async ValueTask<IEnumerable<ChatMessage>> InvokingAsync(
         InvokingContext context,
@@ -88,7 +84,7 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
     }
 
     /// <summary>
-    /// Called after the agent invocation. Stores the messages exchanged.
+    /// Saves the messages from this conversation turn.
     /// </summary>
     public override async ValueTask InvokedAsync(
         InvokedContext context,
@@ -100,7 +96,6 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
         
         Console.WriteLine($"[MongoStore] Using ThreadDbKey: {ThreadDbKey}");
 
-        // Combine request and response messages
         var allMessages = new List<ChatMessage>();
         
         if (context.RequestMessages != null)

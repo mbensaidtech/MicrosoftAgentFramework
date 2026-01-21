@@ -1,6 +1,6 @@
 namespace AIAgentsBackend.Services.VectorStore.Interfaces;
 
 /// <summary>
-/// Interface for order cancellation policy vector store service.
+/// Searches order cancellation policy documents.
 /// </summary>
 public interface IOrderCancellationPolicyVectorStoreService : IPolicyVectorStoreService { }

@@ -8,14 +8,14 @@ using AIAgentsBackend.Services.VectorStore.Interfaces;
 namespace AIAgentsBackend.Services.VectorStore;
 
 /// <summary>
-/// Vector store service for order cancellation policy documents.
+/// Searches order cancellation policy documents.
 /// </summary>
 public class OrderCancellationPolicyVectorStoreService : PolicyVectorStoreServiceBase, IOrderCancellationPolicyVectorStoreService
 {
-    private readonly VectorStoreSettings _settings;
+    private readonly VectorStoreSettings settings;
 
-    protected override string CollectionName => _settings.Collections.OrderCancellationPolicy.CollectionName;
-    protected override string DataFilePath => Path.Combine(_settings.DataDirectory, _settings.Collections.OrderCancellationPolicy.DataFileName);
+    protected override string CollectionName => settings.Collections.OrderCancellationPolicy.CollectionName;
+    protected override string DataFilePath => Path.Combine(settings.DataDirectory, settings.Collections.OrderCancellationPolicy.DataFileName);
     protected override string ServiceName => "OrderCancellationPolicy";
 
     public OrderCancellationPolicyVectorStoreService(
@@ -25,6 +25,6 @@ public class OrderCancellationPolicyVectorStoreService : PolicyVectorStoreServic
         ILogger<OrderCancellationPolicyVectorStoreService> logger)
         : base(database, embeddingGenerator, logger)
     {
-        _settings = settings.Value;
+        this.settings = settings.Value;
     }
 }

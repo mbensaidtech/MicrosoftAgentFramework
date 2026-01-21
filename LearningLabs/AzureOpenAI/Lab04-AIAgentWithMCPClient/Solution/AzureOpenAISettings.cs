@@ -14,4 +14,9 @@ public class AzureOpenAISettings
     /// Gets or sets the Azure OpenAI chat deployment name.
     /// </summary>
     public string ChatDeploymentName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the API key. If not set, DefaultAzureCredential is used.
+    /// </summary>
+    public string? APIKey { get; set; }
 }

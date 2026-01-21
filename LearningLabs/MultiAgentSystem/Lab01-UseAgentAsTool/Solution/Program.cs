@@ -8,6 +8,7 @@ using CommonUtilities;
 using UseAgentAsTool;
 using UseAgentAsTool.AgentCreation;
 using UseAgentAsTool.Models;
+using System.ClientModel;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -25,8 +26,10 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Default Deployment: {settings.DefaultDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient (singleton) with managed identity authentication
-AzureOpenAIClient openAIClient = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient openAIClient = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Create the agent factory (ChatClient is created per agent based on deployment)
 var agentFactory = new AgentFactory(openAIClient);

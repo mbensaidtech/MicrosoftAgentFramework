@@ -4,18 +4,17 @@ using AIAgentsBackend.Models.VectorStore;
 namespace AIAgentsBackend.Services.VectorStore.Interfaces;
 
 /// <summary>
-/// Interface for policy vector store services.
-/// Defines the contract for searching policy documents.
+/// Searches policy documents using vector embeddings.
 /// </summary>
 public interface IPolicyVectorStoreService
 {
     /// <summary>
-    /// Initializes the vector store with policy data.
+    /// Loads policy data and creates embeddings in the vector store.
     /// </summary>
     Task InitializeAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Searches for policy sections similar to the given query.
+    /// Finds policy sections that match the query.
     /// </summary>
     Task<IReadOnlyList<VectorSearchResult<PolicySectionRecord>>> SearchAsync(
         string query,
@@ -23,7 +22,7 @@ public interface IPolicyVectorStoreService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Searches and returns formatted string results.
+    /// Finds matching policies and returns them as readable text.
     /// </summary>
     Task<List<string>> SearchFormattedAsync(
         string query,

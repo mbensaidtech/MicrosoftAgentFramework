@@ -6,6 +6,7 @@ using OpenAI;
 using ChatOptions = Microsoft.Extensions.AI.ChatOptions;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 using Microsoft.Extensions.AI;
+using System.ClientModel;
 
 using CommonUtilities;
 using AIAgentWithAIContextProvider;
@@ -36,8 +37,10 @@ var mongoDatabase = ConfigurationHelper.GetMongoDatabase();
 // Step 4: Create UserMemoriesRepository
 var userMemoriesRepository = new UserMemoriesRepository(mongoDatabase, mongoConfig.UserMemoriesCollectionName);
 
-// Step 5: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 5: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 6: Get a ChatClient for the specific deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);

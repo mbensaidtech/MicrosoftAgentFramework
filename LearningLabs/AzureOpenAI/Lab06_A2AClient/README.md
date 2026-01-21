@@ -70,7 +70,8 @@ Open `Start/appsettings.json` and update the Azure OpenAI values:
 {
   "AzureOpenAI": {
     "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
-    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
+    "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME",
+    "APIKey": ""
   },
   "RemoteAuthAgentSettings": {
     "Name": "AuthAgent",
@@ -79,6 +80,19 @@ Open `Start/appsettings.json` and update the Azure OpenAI values:
   }
 }
 ```
+
+#### Authentication Options
+
+The labs support two authentication methods:
+
+1. **API Key Authentication** (recommended for local development):
+   - Set `APIKey` in `appsettings.json` with your Azure OpenAI API key
+
+2. **DefaultAzureCredential** (for Azure-hosted apps):
+   - Leave `APIKey` empty
+   - Requires Azure CLI login (`az login`) or managed identity
+
+The Solution folder includes the conditional logic to handle both methods.
 
 > **Note**: The `RemoteAuthAgentSettings.Url` should point to the A2A Server endpoint. If you changed the server port or path, update it accordingly.
 

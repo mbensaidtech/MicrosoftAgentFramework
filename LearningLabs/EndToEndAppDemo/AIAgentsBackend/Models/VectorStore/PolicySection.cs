@@ -1,12 +1,12 @@
 namespace AIAgentsBackend.Models.VectorStore;
 
 /// <summary>
-/// Represents a section within a policy document.
+/// A section within a policy document.
 /// </summary>
 public class PolicySection
 {
     /// <summary>
-    /// Section identifier.
+    /// Section ID.
     /// </summary>
     public string Id { get; set; } = string.Empty;
 

@@ -12,9 +12,7 @@ using Microsoft.SemanticKernel.Connectors.MongoDB;
 namespace AIAgentsBackend.Agents.Factory;
 
 /// <summary>
-/// Implementation of the agent factory.
-/// Each method creates a specific agent with its agent card using the appropriate builder.
-/// Agent cards are populated from configuration.
+/// Creates and configures AI agents with their A2A cards.
 /// </summary>
 public class AgentFactory : IAgentFactory
 {
@@ -41,7 +39,9 @@ public class AgentFactory : IAgentFactory
         this.httpContextAccessor = httpContextAccessor;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Creates a translation agent that outputs structured JSON with source/target languages.
+    /// </summary>
     public (AIAgent Agent, AgentCard Card) GetTranslationAgent()
     {
         var config = GetConfig("translation");
@@ -67,7 +67,9 @@ public class AgentFactory : IAgentFactory
         return (agent, card);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Creates a customer support agent for handling user inquiries.
+    /// </summary>
     public (ChatClientAgent Agent, AgentCard Card) GetCustomerSupportAgent()
     {
         var config = GetConfig("customer-support");
@@ -90,7 +92,9 @@ public class AgentFactory : IAgentFactory
         return (agent, card);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Creates a history expert agent with MongoDB conversation memory.
+    /// </summary>
     public (ChatClientAgent Agent, AgentCard Card) GetHistoryAgent()
     {
         var config = GetConfig("history");
@@ -130,7 +134,7 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <summary>
-    /// Creates an AgentCard from the agent configuration.
+    /// Builds an A2A agent card from the configuration.
     /// </summary>
     private static AgentCard CreateAgentCard(AgentConfiguration config)
     {

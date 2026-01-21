@@ -8,6 +8,7 @@ using CommonUtilities;
 using AgenticRAG;
 using AgenticRAG.Services;
 using AgenticRAG.Tools;
+using System.ClientModel;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
@@ -26,8 +27,10 @@ Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Chat Deployment: {settings.ChatDeploymentName}");
 Console.WriteLine($"Embedding Deployment: {settings.EmbeddingDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
+AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
+    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
+    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
 
 // Step 3: Get embedding generator
 IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator = client

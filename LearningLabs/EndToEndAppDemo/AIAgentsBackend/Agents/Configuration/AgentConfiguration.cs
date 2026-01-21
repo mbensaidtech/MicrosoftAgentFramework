@@ -1,91 +1,89 @@
 namespace AIAgentsBackend.Agents.Configuration;
 
 /// <summary>
-/// Configuration for an AI agent loaded from appsettings.json.
-/// Includes both agent settings and A2A card configuration.
+/// Settings for an AI agent from appsettings.json.
 /// </summary>
 public class AgentConfiguration
 {
     /// <summary>
-    /// Gets or sets the unique identifier for this agent.
+    /// Unique ID for this agent.
     /// </summary>
     public string AgentId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the chat deployment name for this agent.
-    /// If not specified, the default deployment from AzureOpenAI settings will be used.
+    /// Azure OpenAI deployment name. Uses default if not set.
     /// </summary>
     public string? ChatDeploymentName { get; set; }
 
     /// <summary>
-    /// Gets or sets the display name of the agent.
+    /// Display name.
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the description of what this agent does.
+    /// What this agent does.
     /// </summary>
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the system instructions (prompt) for the agent.
+    /// System prompt for the agent.
     /// </summary>
     public string Instructions { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the temperature setting for response generation (0.0 - 2.0).
+    /// Response randomness (0.0 - 2.0).
     /// </summary>
     public float? Temperature { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum output tokens for responses.
+    /// Maximum response length in tokens.
     /// </summary>
     public int? MaxOutputTokens { get; set; }
 
     /// <summary>
-    /// Gets or sets the top-p (nucleus sampling) value.
+    /// Top-p sampling value.
     /// </summary>
     public float? TopP { get; set; }
 
-    #region A2A Card Configuration
+    #region A2A Card Settings
 
     /// <summary>
-    /// Gets or sets the version of the agent card.
+    /// Agent card version.
     /// </summary>
     public string Version { get; set; } = "1.0.0";
 
     /// <summary>
-    /// Gets or sets whether the agent supports streaming.
+    /// Whether streaming is supported.
     /// </summary>
     public bool Streaming { get; set; } = false;
 
     /// <summary>
-    /// Gets or sets the A2A endpoint URL for this agent.
+    /// A2A endpoint URL.
     /// </summary>
     public string Url { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the skill ID for the agent card.
+    /// Skill ID for the agent card.
     /// </summary>
     public string SkillId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the skill name for the agent card.
+    /// Skill name.
     /// </summary>
     public string SkillName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the skill description for the agent card.
+    /// Skill description.
     /// </summary>
     public string SkillDescription { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the tags for the agent skill.
+    /// Tags for categorization.
     /// </summary>
     public List<string> Tags { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the example prompts for the agent skill.
+    /// Example prompts.
     /// </summary>
     public List<string> Examples { get; set; } = [];
 

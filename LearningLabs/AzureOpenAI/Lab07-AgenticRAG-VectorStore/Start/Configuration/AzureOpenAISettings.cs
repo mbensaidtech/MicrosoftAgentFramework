@@ -19,4 +19,9 @@ public class AzureOpenAISettings
     /// Gets or sets the Azure OpenAI embedding deployment name.
     /// </summary>
     public string EmbeddingDeploymentName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the API key. If not set, DefaultAzureCredential is used.
+    /// </summary>
+    public string? APIKey { get; set; }
 }
