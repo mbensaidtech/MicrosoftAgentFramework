@@ -1,0 +1,54 @@
+/* Message Formatter Styles */
+.formatted-message {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.main-content {
+  line-height: 1.6;
+}
+
+/* Sources Badges Container */
+.sources-badges-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sources-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888888;
+}
+
+.sources-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Source Badge - Small pill */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #444444;
+  background: #ebebeb;
+  border: none;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.source-badge:hover {
+  background: #dcdcdc;
+}
+
+/* Bold text styling */
+.formatted-message strong {
+  font-weight: 600;
+}

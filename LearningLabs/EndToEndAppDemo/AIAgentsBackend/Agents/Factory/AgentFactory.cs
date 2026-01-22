@@ -3,6 +3,7 @@ using AIAgentsBackend.Agents.Builder;
 using AIAgentsBackend.Agents.Configuration;
 using AIAgentsBackend.Agents.Models;
 using AIAgentsBackend.Agents.Stores;
+using AIAgentsBackend.Agents.Tools;
 using AIAgentsBackend.Configuration;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
@@ -22,6 +23,7 @@ public class AgentFactory : IAgentFactory
     private readonly MongoVectorStore mongoVectorStore;
     private readonly MongoDbSettings mongoDbSettings;
     private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly IServiceProvider serviceProvider;
 
     public AgentFactory(
         AzureOpenAIClient azureClient,
@@ -29,7 +31,8 @@ public class AgentFactory : IAgentFactory
         IOptions<AgentsConfiguration> agentsConfig,
         MongoVectorStore mongoVectorStore,
         MongoDbSettings mongoDbSettings,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IServiceProvider serviceProvider)
     {
         this.azureClient = azureClient;
         this.settings = settings;
@@ -37,6 +40,7 @@ public class AgentFactory : IAgentFactory
         this.mongoVectorStore = mongoVectorStore;
         this.mongoDbSettings = mongoDbSettings;
         this.httpContextAccessor = httpContextAccessor;
+        this.serviceProvider = serviceProvider;
     }
 
     /// <summary>
@@ -69,17 +73,22 @@ public class AgentFactory : IAgentFactory
 
     /// <summary>
     /// Creates a customer support agent for handling user inquiries.
+    /// Includes tools for searching return, refund, and order cancellation policies.
     /// </summary>
     public (ChatClientAgent Agent, AgentCard Card) GetCustomerSupportAgent()
     {
         var config = GetConfig("customer-support");
+        var tools = new CustomerSupportTools(serviceProvider);
 
         var builder = new FluentChatClientAgentBuilder(azureClient, settings)
             .WithName(config.Name)
             .WithDescription(config.Description)
             .WithInstructions(config.Instructions)
             .WithTemperature(config.Temperature ?? 0.7f)
-            .WithMaxOutputTokens(config.MaxOutputTokens ?? 800);
+            .WithMaxOutputTokens(config.MaxOutputTokens ?? 800)
+            .WithToolFromMethod(tools.SearchReturnPolicyAsync, "SearchReturnPolicy")
+            .WithToolFromMethod(tools.SearchRefundPolicyAsync, "SearchRefundPolicy")
+            .WithToolFromMethod(tools.SearchOrderCancellationPolicyAsync, "SearchOrderCancellationPolicy");
 
         if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
         {

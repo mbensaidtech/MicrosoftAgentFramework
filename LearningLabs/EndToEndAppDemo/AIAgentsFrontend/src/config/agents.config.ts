@@ -43,16 +43,26 @@ export const AGENTS_CONFIG: AgentConfig[] = [
   {
     id: 'customer-support',
     name: 'Customer Support Agent',
-    description: 'Handles customer inquiries',
+    description: 'Handles customer inquiries with policy knowledge base',
     supportsStreaming: true, // ChatClientAgent - has RunStreamingAsync
     restPath: '/api/agents/customer-support',
     a2aPath: '/a2a/customerSupportAgent',
     presetQuestions: [
-      "I ordered a product 5 days ago but haven't received it yet",
-      'Can you check the tracking status for me?',
-      "What are my options if it's lost?",
-      'How do I request a refund for this order?',
-      'What is your return policy timeframe?',
+      // Return Policy Questions
+      'How many days do I have to return an item?',
+      'What items cannot be returned?',
+      'How do I initiate a return for an order?',
+      'Is return shipping free?',
+      // Refund Policy Questions
+      'How long does it take to get a refund?',
+      'Can I get a refund to a different payment method?',
+      'What happens if I return an item with missing parts?',
+      'Can I get store credit instead of a refund?',
+      // Order Cancellation Questions
+      'How long do I have to cancel my order for free?',
+      'How do I cancel an order that is already processing?',
+      'Can I cancel just one item from my order?',
+      'When will I get my money back after cancelling?',
     ],
   },
   {
