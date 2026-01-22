@@ -24,4 +24,9 @@ public class MongoDbSettings
     /// Collection name for chat history (used by MongoVectorChatMessageStore).
     /// </summary>
     public string ChatMessageStoreCollectionName { get; set; } = "chat_history";
+
+    /// <summary>
+    /// Collection name for customer-seller conversations.
+    /// </summary>
+    public string CustomerSellerConversationCollectionName { get; set; } = "customer_seller_conversations";
 }

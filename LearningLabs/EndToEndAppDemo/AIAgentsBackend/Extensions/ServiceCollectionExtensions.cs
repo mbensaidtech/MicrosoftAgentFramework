@@ -4,6 +4,7 @@ using AIAgentsBackend.Configuration;
 using AIAgentsBackend.HostedServices;
 using AIAgentsBackend.Repositories;
 using AIAgentsBackend.Services;
+using AIAgentsBackend.Services.Conversation;
 using AIAgentsBackend.Services.VectorStore;
 using AIAgentsBackend.Services.VectorStore.Interfaces;
 using Azure.AI.OpenAI;
@@ -94,6 +95,8 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<IThreadRepository, ThreadRepository>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IConversationService, ConversationService>();
 
         return services;
     }
@@ -122,6 +125,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReturnPolicyVectorStoreService, ReturnPolicyVectorStoreService>();
         services.AddScoped<IRefundPolicyVectorStoreService, RefundPolicyVectorStoreService>();
         services.AddScoped<IOrderCancellationPolicyVectorStoreService, OrderCancellationPolicyVectorStoreService>();
+        services.AddScoped<ISellerRequirementsVectorStoreService, SellerRequirementsVectorStoreService>();
 
         services.AddHostedService<VectorStoreInitializerHostedService>();
 

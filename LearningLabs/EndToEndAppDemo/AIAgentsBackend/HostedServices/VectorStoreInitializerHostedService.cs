@@ -70,6 +70,16 @@ public class VectorStoreInitializerHostedService : IHostedService
                 logger.LogInformation("Order Cancellation Policy vector store is disabled.");
             }
 
+            if (collections.SellerRequirements.Enabled)
+            {
+                var sellerRequirementsService = scope.ServiceProvider.GetRequiredService<ISellerRequirementsVectorStoreService>();
+                await sellerRequirementsService.InitializeAsync(cancellationToken);
+            }
+            else
+            {
+                logger.LogInformation("Seller Requirements vector store is disabled.");
+            }
+
             logger.LogInformation("========================================");
             logger.LogInformation("Vector Store Initialization Complete!");
             logger.LogInformation("========================================");

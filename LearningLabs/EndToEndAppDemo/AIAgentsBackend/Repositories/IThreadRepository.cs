@@ -11,4 +11,9 @@ public interface IThreadRepository
     /// Gets all messages from a conversation thread, sorted by time.
     /// </summary>
     Task<IEnumerable<ChatHistoryItem>> GetThreadMessagesAsync(string threadId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes all messages from threads that start with the given prefix.
+    /// </summary>
+    Task<long> DeleteThreadsByPrefixAsync(string threadIdPrefix, CancellationToken cancellationToken = default);
 }

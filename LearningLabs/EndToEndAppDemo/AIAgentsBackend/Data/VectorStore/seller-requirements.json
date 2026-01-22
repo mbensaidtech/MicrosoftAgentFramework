@@ -1,0 +1,68 @@
+{
+  "documentId": "seller-requirements",
+  "category": "seller-requirements",
+  "title": "Ce que les vendeurs demandent généralement",
+  "lastUpdated": "2025-01-22",
+  "sections": [
+    {
+      "id": "damaged-product",
+      "title": "Produit endommagé / cassé à la réception",
+      "problemType": "damage",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photos des dégâts (plusieurs angles, gros plan)\n- Photo de l'emballage (extérieur + étiquette transporteur)\n- Photo du bon de livraison (si disponible)\n- Numéro de suivi du colis\n\nAstuces / actions simples possibles :\n- Vérifier l'état du colis (choc, perforation) avant de le jeter\n\nNote: Conserver le produit et l'emballage jusqu'à résolution."
+    },
+    {
+      "id": "defective-electronic",
+      "title": "Appareil électronique défectueux / ne fonctionne pas",
+      "problemType": "malfunction",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Vidéo courte montrant le problème (ex: ne s'allume pas)\n- Photo du numéro de série / étiquette produit\n- Facture / preuve d'achat (si demande de garantie)\n\nAstuces / actions simples possibles :\n- Charger l'appareil 30 minutes puis réessayer\n- Tester avec un autre câble / chargeur compatible\n- Tenter un redémarrage forcé / réinitialisation (si applicable)"
+    },
+    {
+      "id": "wrong-product",
+      "title": "Produit reçu différent de la commande",
+      "problemType": "wrong-item",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photo du produit reçu\n- Photo de l'étiquette / référence du produit reçu\n- Photo du bon de livraison (si disponible)\n\nAstuces / actions simples possibles :\n- Vérifier sur l'étiquette si une variante/couleur/capacité différente a été envoyée"
+    },
+    {
+      "id": "missing-parts",
+      "title": "Produit incomplet / pièces manquantes",
+      "problemType": "incomplete",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photo du contenu reçu (tout ce qu'il y avait dans la boîte)\n- Photo de l'emballage/boîte où la liste des accessoires est indiquée (si présent)\n\nAstuces / actions simples possibles :\n- Vérifier sous les cales/cartons/compartiments de la boîte (accessoires parfois cachés)"
+    },
+    {
+      "id": "delivery-not-received",
+      "title": "Colis non reçu / problème de livraison",
+      "problemType": "delivery",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Capture d'écran du suivi (statut + date)\n- Confirmation de l'adresse de livraison\n\nAstuces / actions simples possibles :\n- Vérifier boîte aux lettres / point relais / voisins / gardien\n- Vérifier si un avis de passage a été laissé"
+    },
+    {
+      "id": "quality-issue",
+      "title": "Problème de qualité / ne correspond pas à la description",
+      "problemType": "quality",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photos/vidéos montrant la non-conformité (taille, couleur, finition, défaut)\n- Capture d'écran de l'annonce/fiche produit (si utile)\n\nAstuces / actions simples possibles :\n- Comparer la référence exacte du produit reçu à celle affichée sur l'annonce"
+    },
+    {
+      "id": "size-fit-issue",
+      "title": "Problème de taille / ne convient pas",
+      "problemType": "size",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photo des étiquettes intactes\n- Photos de l'article dans son état d'origine (non porté)\n\nAstuces / actions simples possibles :\n- Vérifier le guide des tailles / correspondances (EU/US/UK) de la fiche produit"
+    },
+    {
+      "id": "warranty-claim",
+      "title": "Demande de garantie / panne après utilisation",
+      "problemType": "warranty",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Facture / preuve d'achat\n- Photo du numéro de série\n- Vidéo courte montrant la panne\n\nAstuces / actions simples possibles :\n- Vérifier si la garantie couvre le type de panne (choc, oxydation, etc.)"
+    },
+    {
+      "id": "refund-request",
+      "title": "Demande de remboursement",
+      "problemType": "refund",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Photos du produit (état actuel)\n- Photo de l'emballage (si retour)\n\nAstuces / actions simples possibles :\n- Vérifier si le produit doit être retourné avant remboursement (selon le cas)"
+    },
+    {
+      "id": "tracking-issue",
+      "title": "Problème de suivi de commande",
+      "problemType": "tracking",
+      "content": "Documents / preuves que le vendeur peut demander :\n- Capture d'écran du suivi\n- Numéro de suivi\n\nAstuces / actions simples possibles :\n- Patienter 24-48h si le suivi vient d'être créé (parfois non mis à jour immédiatement)"
+    }
+  ]
+}

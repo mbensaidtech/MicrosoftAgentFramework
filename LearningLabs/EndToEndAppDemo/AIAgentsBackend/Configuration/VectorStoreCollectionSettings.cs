@@ -34,4 +34,14 @@ public class VectorStoreCollectionSettings
         CollectionName = "order-cancellation-policy",
         DataFileName = "order-cancellation-policy.json"
     };
+
+    /// <summary>
+    /// Seller requirements knowledge base settings.
+    /// </summary>
+    public PolicyCollectionSettings SellerRequirements { get; set; } = new()
+    {
+        Enabled = true,
+        CollectionName = "seller-requirements",
+        DataFileName = "seller-requirements.json"
+    };
 }

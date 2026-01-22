@@ -66,4 +66,27 @@ public class ThreadRepository : IThreadRepository
         
         return results;
     }
+
+    /// <summary>
+    /// Deletes all messages from threads that start with the given prefix.
+    /// This is used to delete all AI assistant threads related to a conversation.
+    /// </summary>
+    public async Task<long> DeleteThreadsByPrefixAsync(
+        string threadIdPrefix, 
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(threadIdPrefix))
+            throw new ArgumentException("Thread ID prefix cannot be null or empty", nameof(threadIdPrefix));
+
+        // Use regex to match all threadIds that start with the prefix
+        var filter = Builders<ChatHistoryItem>.Filter.Regex(
+            x => x.ThreadId, 
+            new MongoDB.Bson.BsonRegularExpression($"^{threadIdPrefix}"));
+
+        var result = await collection.DeleteManyAsync(filter, cancellationToken);
+
+        Console.WriteLine($"[ThreadRepository] Deleted {result.DeletedCount} messages from threads with prefix '{threadIdPrefix}'");
+        
+        return result.DeletedCount;
+    }
 }

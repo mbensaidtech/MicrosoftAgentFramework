@@ -22,4 +22,9 @@ public interface IAgentFactory
     /// Creates a history expert agent with conversation memory.
     /// </summary>
     (ChatClientAgent Agent, AgentCard Card) GetHistoryAgent();
+
+    /// <summary>
+    /// Creates a message formulator agent that helps customers write clear messages to sellers.
+    /// </summary>
+    (ChatClientAgent Agent, AgentCard Card) GetMessageFormulatorAgent();
 }

@@ -131,6 +131,40 @@ public class AgentFactory : IAgentFactory
         return (agent, card);
     }
 
+    /// <summary>
+    /// Creates a message formulator agent with MongoDB conversation memory.
+    /// Helps customers write clear, well-structured messages to sellers.
+    /// Includes tools for searching seller requirements.
+    /// </summary>
+    public (ChatClientAgent Agent, AgentCard Card) GetMessageFormulatorAgent()
+    {
+        var config = GetConfig("message-formulator");
+        var tools = new MessageFormulatorTools(serviceProvider);
+
+        var builder = new FluentChatClientAgentBuilder(azureClient, settings)
+            .WithName(config.Name)
+            .WithDescription(config.Description)
+            .WithInstructions(config.Instructions)
+            .WithTemperature(config.Temperature ?? 0.7f)
+            .WithMaxOutputTokens(config.MaxOutputTokens ?? 1500)
+            .WithChatMessageStoreFactory(ctx => new MongoVectorChatMessageStore(
+                mongoVectorStore,
+                httpContextAccessor,
+                mongoDbSettings.ChatMessageStoreCollectionName,
+                ctx.JsonSerializerOptions))
+            .WithToolFromMethod(tools.SearchSellerRequirementsAsync, "SearchSellerRequirements");
+
+        if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
+        {
+            builder.WithDeployment(config.ChatDeploymentName);
+        }
+
+        var agent = builder.Build();
+        var card = CreateAgentCard(config);
+
+        return (agent, card);
+    }
+
     private AgentConfiguration GetConfig(string agentId)
     {
         if (!agentsConfig.Agents.TryGetValue(agentId, out var config))

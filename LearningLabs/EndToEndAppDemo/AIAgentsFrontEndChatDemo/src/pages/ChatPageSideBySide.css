@@ -1,0 +1,126 @@
+/* Import base chat styles */
+@import './ChatPage.css';
+
+/* Main Layout for Side-by-Side View */
+.chat-main-side-by-side {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* Two Columns Container */
+.columns-container {
+  display: grid;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.columns-container.show-single {
+  grid-template-columns: 1fr;
+}
+
+.columns-container.show-both {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Column Styles */
+.conversation-column,
+.assistant-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Column Headers - Professional Style */
+.column-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.seller-column-header {
+  background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-green-dark) 100%);
+}
+
+.assistant-column-header {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.column-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.3px;
+}
+
+/* Messages in Columns */
+.conversation-column .messages-container,
+.assistant-column .messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* Shared Input Area */
+.input-area-shared {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .columns-container.show-both {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .chat-main-side-by-side {
+    padding: 16px;
+  }
+
+  .column-header {
+    padding: 14px 16px;
+  }
+
+  .column-title {
+    font-size: 14px;
+  }
+
+  .conversation-column .messages-container,
+  .assistant-column .messages-container {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .chat-main-side-by-side {
+    padding: 12px;
+  }
+
+  .input-area-shared {
+    padding: 16px;
+  }
+}
