@@ -53,21 +53,24 @@
 .star-button {
   background: none;
   border: none;
-  font-size: 22px;
+  font-size: 20px;
   color: #d1d5db;
   cursor: pointer;
   padding: 0;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
   line-height: 1;
 }
 
 .star-button:hover {
-  transform: scale(1.15);
+  transform: scale(1.1);
+}
+
+.star-button:active {
+  transform: scale(0.95);
 }
 
 .star-button.active {
   color: #f59e0b;
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
 }
 
 /* Actions */
@@ -81,40 +84,47 @@
 }
 
 .feedback-skip {
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 7px 14px;
+  font-size: 12px;
   font-weight: 500;
   color: #1d1d1f;
   background: #ffffff;
   border: 1px solid #d2d2d7;
-  border-radius: 6px;
+  border-radius: 980px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .feedback-skip:hover {
   background: #f5f5f7;
 }
 
+.feedback-skip:active {
+  transform: scale(0.98);
+}
+
 .feedback-submit {
-  padding: 8px 20px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
   color: white;
   background: #1d1d1f;
   border: none;
-  border-radius: 6px;
+  border-radius: 980px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .feedback-submit:hover:not(:disabled) {
   background: #000000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.feedback-submit:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .feedback-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 

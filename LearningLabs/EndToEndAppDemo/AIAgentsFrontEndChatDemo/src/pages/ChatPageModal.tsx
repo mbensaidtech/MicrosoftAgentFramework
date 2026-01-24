@@ -20,6 +20,7 @@ import {
 } from '../services/api';
 import { MessageFormatter } from '../components/MessageFormatter';
 import { FeedbackRating } from '../components/FeedbackRating';
+import { DemoQuestionsModal } from '../components/DemoQuestionsModal';
 import './ChatPageModal.css';
 
 // Message sent to seller (after AI assistant approval)
@@ -51,6 +52,7 @@ export function ChatPageModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Persistent conversation ID (for customer-seller conversation)
@@ -417,6 +419,16 @@ export function ChatPageModal() {
     inputRef.current?.focus();
   };
 
+  const handleDemoSelect = (message: string) => {
+    if (isModalOpen) {
+      setDraftInputValue(message);
+      modalInputRef.current?.focus();
+    } else {
+      setInputValue(message);
+      inputRef.current?.focus();
+    }
+  };
+
   const lastAgentMessage = draftMessages.filter(m => m.role === 'seller').pop();
   const showApproveButton = lastAgentMessage && 
     !lastAgentMessage.isTyping && 
@@ -551,6 +563,18 @@ export function ChatPageModal() {
                   autoFocus
                 />
                 <button
+                  type="button"
+                  className="demo-button"
+                  onClick={() => setShowDemoModal(true)}
+                  disabled={isLoading || isModalOpen}
+                  title="Questions de démo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                  </svg>
+                  <span>Démo</span>
+                </button>
+                <button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading || isModalOpen}
                   title="Envoyer"
@@ -583,6 +607,13 @@ export function ChatPageModal() {
       <footer className="chat-footer">
         <p>MBS Store - Chat avec assistance IA (Vue modal)</p>
       </footer>
+
+      {/* Demo Questions Modal */}
+      <DemoQuestionsModal
+        isOpen={showDemoModal}
+        onClose={() => setShowDemoModal(false)}
+        onSelect={handleDemoSelect}
+      />
 
       {/* Modal for AI Assistant */}
       {isModalOpen && (
@@ -667,6 +698,18 @@ export function ChatPageModal() {
                   disabled={isLoading}
                   autoFocus
                 />
+                <button
+                  type="button"
+                  className="demo-button"
+                  onClick={() => setShowDemoModal(true)}
+                  disabled={isLoading}
+                  title="Questions de démo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                  </svg>
+                  <span>Démo</span>
+                </button>
                 <button
                   type="submit"
                   disabled={!draftInputValue.trim() || isLoading}

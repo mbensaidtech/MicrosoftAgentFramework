@@ -20,6 +20,7 @@ import {
 } from '../services/api';
 import { MessageFormatter } from '../components/MessageFormatter';
 import { FeedbackRating } from '../components/FeedbackRating';
+import { DemoQuestionsModal } from '../components/DemoQuestionsModal';
 import './ChatPageSideBySide.css';
 
 // Message sent to seller (after AI assistant approval)
@@ -37,6 +38,7 @@ export function ChatPageSideBySide() {
   const draftMessagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackDismissTimeoutRef = useRef<number | null>(null);
+  const columnsContainerRef = useRef<HTMLDivElement>(null);
 
   // Draft messages (conversation with AI assistant)
   const [draftMessages, setDraftMessages] = useState<ChatMessage[]>([]);
@@ -49,7 +51,12 @@ export function ChatPageSideBySide() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
   const [showAssistant, setShowAssistant] = useState(false);
+  
+  // Resizable columns state
+  const [leftColumnWidth, setLeftColumnWidth] = useState(50); // percentage
+  const [isResizing, setIsResizing] = useState(false);
   
   // Persistent conversation ID (for customer-seller conversation)
   const [conversationId, setConversationId] = useState<string>('');
@@ -123,6 +130,51 @@ export function ChatPageSideBySide() {
       window.removeEventListener('keypress', handleActivity);
     };
   }, []);
+
+  // Handle column resizing
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing || !columnsContainerRef.current) return;
+      
+      const container = columnsContainerRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+      
+      // Clamp between 20% and 80%
+      const clampedWidth = Math.min(Math.max(newLeftWidth, 20), 80);
+      setLeftColumnWidth(clampedWidth);
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  // Reset column width when assistant is hidden
+  useEffect(() => {
+    if (!showAssistant) {
+      setLeftColumnWidth(50);
+    }
+  }, [showAssistant]);
 
   // Generate a new context ID for AI assistant thread
   const generateContextId = useCallback((convId?: string): string => {
@@ -348,6 +400,12 @@ export function ChatPageSideBySide() {
     inputRef.current?.focus();
   };
 
+  const handleDemoSelect = (message: string) => {
+    setInputValue(message);
+    setShowDemoModal(false);
+    inputRef.current?.focus();
+  };
+
   const lastAgentMessage = draftMessages.filter(m => m.role === 'seller').pop();
   const showApproveButton = lastAgentMessage && 
     !lastAgentMessage.isTyping && 
@@ -398,9 +456,15 @@ export function ChatPageSideBySide() {
 
       {/* Main Chat Area - Two Columns */}
       <main className="chat-main-side-by-side">
-        <div className={`columns-container ${showAssistant ? 'show-both' : 'show-single'}`}>
+        <div 
+          ref={columnsContainerRef}
+          className={`columns-container ${showAssistant ? 'show-both' : 'show-single'} ${isResizing ? 'resizing' : ''}`}
+        >
           {/* Left Column: Customer-Seller Conversation */}
-          <div className="conversation-column">
+          <div 
+            className="conversation-column"
+            style={showAssistant ? { width: `${leftColumnWidth}%` } : undefined}
+          >
             <div className="column-header seller-column-header">
               <span className="column-title">Conversation avec le vendeur</span>
             </div>
@@ -443,11 +507,35 @@ export function ChatPageSideBySide() {
             </div>
           </div>
 
+          {/* Resizer Handle */}
+          {showAssistant && (
+            <div 
+              className="column-resizer"
+              onMouseDown={handleResizeStart}
+              title="Glisser pour redimensionner"
+            >
+              <div className="resizer-handle">
+                <span className="resizer-dots">⋮</span>
+              </div>
+              {isResizing && (
+                <div className="resize-indicator">
+                  {Math.round(leftColumnWidth)}% / {Math.round(100 - leftColumnWidth)}%
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Right Column: AI Assistant - Only shown when drafting */}
           {showAssistant && (
-            <div className="assistant-column">
+            <div 
+              className="assistant-column"
+              style={{ width: `${100 - leftColumnWidth}%` }}
+            >
               <div className="column-header assistant-column-header">
-                <span className="column-title">Assistant de rédaction</span>
+                <div className="column-header-content">
+                  <span className="column-title">Assistant de rédaction</span>
+                  <span className="column-subtitle">L'assistant vous aide à rédiger votre demande avant de l'envoyer au vendeur</span>
+                </div>
               </div>
             <div className="messages-container">
               {draftMessages.map((msg) => {
@@ -533,6 +621,18 @@ export function ChatPageSideBySide() {
                   autoFocus
                 />
                 <button
+                  type="button"
+                  className="demo-button"
+                  onClick={() => setShowDemoModal(true)}
+                  disabled={isLoading}
+                  title="Questions de démo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                  </svg>
+                  <span>Démo</span>
+                </button>
+                <button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
                   title="Envoyer"
@@ -565,6 +665,13 @@ export function ChatPageSideBySide() {
       <footer className="chat-footer">
         <p>MBS Store - Chat avec assistance IA (Vue côte à côte)</p>
       </footer>
+
+      {/* Demo Questions Modal */}
+      <DemoQuestionsModal
+        isOpen={showDemoModal}
+        onClose={() => setShowDemoModal(false)}
+        onSelect={handleDemoSelect}
+      />
     </div>
   );
 }

@@ -1,0 +1,322 @@
+.order-status-timeline {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--gray-200);
+}
+
+/* Header */
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.timeline-icon {
+  font-size: 18px;
+}
+
+.timeline-title h3 {
+  margin: 0;
+  color: var(--gray-800);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.order-id {
+  display: block;
+  color: var(--primary-blue);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  margin-top: 1px;
+}
+
+/* Horizontal Timeline Track */
+.timeline-track {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 4px 0;
+  overflow-x: auto;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 60px;
+}
+
+/* Horizontal connector line */
+.step-connector {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  z-index: 0;
+}
+
+.timeline-step:last-child .step-connector {
+  display: none;
+}
+
+.connector-line {
+  width: 100%;
+  height: 100%;
+  background: var(--gray-300);
+  border-radius: 1px;
+}
+
+/* Completed connector */
+.timeline-step.completed .connector-line {
+  background: var(--gray-400);
+}
+
+/* Current step connector */
+.timeline-step.current .connector-line {
+  background: linear-gradient(90deg, var(--accent-green) 0%, var(--gray-300) 100%);
+}
+
+/* Step marker (circle) */
+.step-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+  background: var(--white);
+}
+
+/* Completed status - Gray */
+.timeline-step.completed .step-marker {
+  background: var(--gray-400);
+  border-color: var(--gray-400);
+}
+
+/* Current status - Green */
+.timeline-step.current .step-marker {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+}
+
+/* Pending status - Orange */
+.timeline-step.pending .step-marker {
+  background: var(--white);
+  border-color: #F59E0B;
+}
+
+.check-icon {
+  width: 10px;
+  height: 10px;
+  color: white;
+}
+
+.current-icon {
+  font-size: 10px;
+  color: white;
+}
+
+.pending-dot {
+  width: 6px;
+  height: 6px;
+  background: #F59E0B;
+  border-radius: 50%;
+}
+
+/* Step content (label below the marker) */
+.step-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6px;
+  text-align: center;
+  max-width: 70px;
+}
+
+.step-label {
+  color: var(--gray-500);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Completed label - Gray */
+.timeline-step.completed .step-label {
+  color: var(--gray-400);
+}
+
+/* Current label - Green and bold */
+.timeline-step.current .step-label {
+  color: var(--accent-green);
+  font-weight: 600;
+  font-size: 10px;
+}
+
+/* Pending label - Orange */
+.timeline-step.pending .step-label {
+  color: #F59E0B;
+}
+
+.current-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: var(--radius-full);
+  color: var(--accent-green);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.current-badge::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: var(--accent-green);
+  border-radius: 50%;
+}
+
+/* Canceled Status */
+.timeline-canceled {
+  text-align: center;
+  padding: 12px 10px;
+}
+
+.canceled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(220, 53, 69, 0.06);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.canceled-icon {
+  font-size: 14px;
+  background: #DC3545;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.canceled-text {
+  color: #DC3545;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.canceled-description {
+  color: var(--gray-500);
+  font-size: 11px;
+  margin: 0;
+}
+
+/* Description */
+.timeline-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+}
+
+.description-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.timeline-description p {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Footer */
+.timeline-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.update-label {
+  color: var(--gray-400);
+  font-size: 10px;
+}
+
+.update-time {
+  color: var(--gray-500);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+  .order-status-timeline {
+    padding: 10px;
+  }
+
+  .timeline-track {
+    gap: 2px;
+  }
+
+  .timeline-step {
+    min-width: 50px;
+  }
+
+  .step-marker {
+    width: 18px;
+    height: 18px;
+  }
+
+  .step-connector {
+    top: 8px;
+  }
+
+  .step-label {
+    font-size: 8px;
+  }
+
+  .timeline-step.current .step-label {
+    font-size: 9px;
+  }
+
+  .current-badge {
+    font-size: 7px;
+    padding: 1px 4px;
+  }
+}

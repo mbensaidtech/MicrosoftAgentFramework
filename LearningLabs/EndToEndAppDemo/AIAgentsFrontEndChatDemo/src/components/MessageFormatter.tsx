@@ -1,4 +1,5 @@
 import './MessageFormatter.css';
+import { OrderStatusTimeline, parseOrderStatusMessage } from './OrderStatusTimeline';
 
 interface MessageFormatterProps {
   content: string;
@@ -7,6 +8,19 @@ interface MessageFormatterProps {
 }
 
 export function MessageFormatter({ content, hideSellerInfo, customerName }: MessageFormatterProps) {
+  // Check if message contains order status information
+  const orderStatus = parseOrderStatusMessage(content);
+  if (orderStatus) {
+    return (
+      <OrderStatusTimeline
+        orderId={orderStatus.orderId}
+        currentStatus={orderStatus.status}
+        description={orderStatus.description}
+        lastUpdated={orderStatus.lastUpdated}
+      />
+    );
+  }
+
   // Check if message contains a proposed message to seller (must have the emoji 📝)
   const hasProposedMessage = content.includes('📝');
   
@@ -183,10 +197,41 @@ function FormattedText({ text }: { text: string }) {
     const trimmedLine = line.trim();
     if (!trimmedLine) continue;
 
+    // Check for horizontal rule (---)
+    if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') {
+      flushList();
+      elements.push(<hr key={`hr-${keyIndex++}`} className="policy-divider" />);
+      continue;
+    }
+
+    // Check for h3 header (### )
+    const h3Match = trimmedLine.match(/^###\s+(.+)$/);
+    if (h3Match) {
+      flushList();
+      elements.push(
+        <h3 key={`h3-${keyIndex++}`} className="policy-section-title">
+          {formatLine(h3Match[1])}
+        </h3>
+      );
+      continue;
+    }
+
+    // Check for h2 header (## )
+    const h2Match = trimmedLine.match(/^##\s+(.+)$/);
+    if (h2Match) {
+      flushList();
+      elements.push(
+        <h2 key={`h2-${keyIndex++}`} className="policy-title">
+          {formatLine(h2Match[1])}
+        </h2>
+      );
+      continue;
+    }
+
     // Check if line is a numbered item (1. or 1) format)
     const numberedMatch = trimmedLine.match(/^(\d+)[\.)]\s*(.+)$/);
-    // Check if line is a bullet item (- or •)
-    const bulletMatch = trimmedLine.match(/^[-•]\s*(.+)$/);
+    // Check if line is a bullet item (- or • or ◦)
+    const bulletMatch = trimmedLine.match(/^[-•◦]\s*(.+)$/);
     
     if (numberedMatch) {
       if (listType !== 'numbered') {
@@ -216,33 +261,59 @@ function FormattedText({ text }: { text: string }) {
 }
 
 function formatLine(text: string): React.ReactNode {
+  // Process bold (**text**) and italic (*text*) formatting
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let keyIndex = 0;
   
   while (remaining.length > 0) {
+    // Find bold (**) or italic (*) markers
     const boldStart = remaining.indexOf('**');
+    const italicStart = remaining.search(/(?<!\*)\*(?!\*)/); // Single * not preceded or followed by another *
     
-    if (boldStart === -1) {
+    // Determine which comes first
+    let nextMarker: 'bold' | 'italic' | null = null;
+    let markerPos = -1;
+    
+    if (boldStart !== -1 && (italicStart === -1 || boldStart < italicStart)) {
+      nextMarker = 'bold';
+      markerPos = boldStart;
+    } else if (italicStart !== -1) {
+      nextMarker = 'italic';
+      markerPos = italicStart;
+    }
+    
+    if (nextMarker === null) {
       parts.push(remaining);
       break;
     }
     
-    if (boldStart > 0) {
-      parts.push(remaining.substring(0, boldStart));
+    // Add text before the marker
+    if (markerPos > 0) {
+      parts.push(remaining.substring(0, markerPos));
     }
     
-    const boldEnd = remaining.indexOf('**', boldStart + 2);
-    
-    if (boldEnd === -1) {
-      parts.push(remaining.substring(boldStart));
-      break;
+    if (nextMarker === 'bold') {
+      const boldEnd = remaining.indexOf('**', markerPos + 2);
+      if (boldEnd === -1) {
+        parts.push(remaining.substring(markerPos));
+        break;
+      }
+      const boldText = remaining.substring(markerPos + 2, boldEnd);
+      parts.push(<strong key={`b-${keyIndex++}`}>{boldText}</strong>);
+      remaining = remaining.substring(boldEnd + 2);
+    } else {
+      // Find closing italic marker (single * not preceded or followed by another *)
+      const afterFirst = remaining.substring(markerPos + 1);
+      const italicEnd = afterFirst.search(/(?<!\*)\*(?!\*)/);
+      if (italicEnd === -1) {
+        parts.push(remaining.substring(markerPos));
+        break;
+      }
+      const italicText = afterFirst.substring(0, italicEnd);
+      parts.push(<em key={`i-${keyIndex++}`} className="italic-text">{italicText}</em>);
+      remaining = afterFirst.substring(italicEnd + 1);
     }
-    
-    const boldText = remaining.substring(boldStart + 2, boldEnd);
-    parts.push(<strong key={keyIndex++}>{boldText}</strong>);
-    
-    remaining = remaining.substring(boldEnd + 2);
   }
   
   return <>{parts}</>;
