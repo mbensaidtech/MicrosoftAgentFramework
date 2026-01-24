@@ -1,0 +1,114 @@
+{
+  "orders": [
+    {
+      "orderId": "ORD-2026-001",
+      "customer": "mbensaid",
+      "items": [
+        {
+          "productId": "PROD-001",
+          "productName": "Casque Bluetooth Sony WH-1000XM5",
+          "quantity": 1,
+          "unitPrice": 349.99
+        },
+        {
+          "productId": "PROD-002",
+          "productName": "Câble USB-C Premium 2m",
+          "quantity": 2,
+          "unitPrice": 15.99
+        }
+      ],
+      "totalAmount": 381.97,
+      "currency": "EUR",
+      "statusId": "STATUS-SHIPPING",
+      "shippingAddress": {
+        "street": "15 Rue de la Paix",
+        "city": "Paris",
+        "postalCode": "75002",
+        "country": "France"
+      },
+      "createdAt": "2026-01-20T10:30:00Z",
+      "updatedAt": "2026-01-22T14:15:00Z"
+    },
+    {
+      "orderId": "ORD-2026-002",
+      "customer": "sbensaid",
+      "items": [
+        {
+          "productId": "PROD-003",
+          "productName": "iPhone 16 Pro 256GB",
+          "quantity": 1,
+          "unitPrice": 1229.00
+        }
+      ],
+      "totalAmount": 1229.00,
+      "currency": "EUR",
+      "statusId": "STATUS-CONFIRMED",
+      "shippingAddress": {
+        "street": "42 Avenue des Champs-Élysées",
+        "city": "Paris",
+        "postalCode": "75008",
+        "country": "France"
+      },
+      "createdAt": "2026-01-23T08:00:00Z",
+      "updatedAt": "2026-01-23T08:00:00Z"
+    },
+    {
+      "orderId": "ORD-2026-003",
+      "customer": "mbensaid",
+      "items": [
+        {
+          "productId": "PROD-004",
+          "productName": "Livre: Clean Code par Robert C. Martin",
+          "quantity": 1,
+          "unitPrice": 35.00
+        },
+        {
+          "productId": "PROD-005",
+          "productName": "Livre: Design Patterns",
+          "quantity": 1,
+          "unitPrice": 45.00
+        }
+      ],
+      "totalAmount": 80.00,
+      "currency": "EUR",
+      "statusId": "STATUS-DELIVERED",
+      "shippingAddress": {
+        "street": "15 Rue de la Paix",
+        "city": "Paris",
+        "postalCode": "75002",
+        "country": "France"
+      },
+      "createdAt": "2026-01-10T16:45:00Z",
+      "updatedAt": "2026-01-15T11:30:00Z"
+    },
+    {
+      "orderId": "ORD-2026-004",
+      "customer": "hbensaid",
+      "items": [
+        {
+          "productId": "PROD-006",
+          "productName": "MacBook Air M3 13 pouces",
+          "quantity": 1,
+          "unitPrice": 1299.00
+        },
+        {
+          "productId": "PROD-007",
+          "productName": "Housse MacBook 13 pouces",
+          "quantity": 1,
+          "unitPrice": 49.99
+        }
+      ],
+      "totalAmount": 1348.99,
+      "currency": "EUR",
+      "statusId": "STATUS-CANCELED",
+      "shippingAddress": {
+        "street": "8 Place Bellecour",
+        "city": "Lyon",
+        "postalCode": "69002",
+        "country": "France"
+      },
+      "createdAt": "2026-01-18T09:20:00Z",
+      "updatedAt": "2026-01-19T10:00:00Z"
+    }
+  ]
+}

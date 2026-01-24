@@ -152,7 +152,15 @@ public class AgentFactory : IAgentFactory
                 httpContextAccessor,
                 mongoDbSettings.ChatMessageStoreCollectionName,
                 ctx.JsonSerializerOptions))
-            .WithToolFromMethod(tools.SearchSellerRequirementsAsync, "SearchSellerRequirements");
+            .WithToolFromMethod(tools.SearchSellerRequirementsAsync, "SearchSellerRequirements")
+            // Order tools - for answering customer questions about their orders
+            .WithToolFromMethod(tools.GetOrderByIdAsync, "GetOrderById")
+            .WithToolFromMethod(tools.GetOrderStatusAsync, "GetOrderStatus")
+            .WithToolFromMethod(tools.SearchOrdersByCustomerAsync, "SearchOrdersByCustomer")
+            // Policy tools - for answering questions about policies directly
+            .WithToolFromMethod(tools.SearchReturnPolicyAsync, "SearchReturnPolicy")
+            .WithToolFromMethod(tools.SearchRefundPolicyAsync, "SearchRefundPolicy")
+            .WithToolFromMethod(tools.SearchOrderCancellationPolicyAsync, "SearchOrderCancellationPolicy");
 
         if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
         {

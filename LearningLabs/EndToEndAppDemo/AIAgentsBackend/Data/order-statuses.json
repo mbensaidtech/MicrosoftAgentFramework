@@ -1,0 +1,59 @@
+{
+  "statuses": [
+    {
+      "statusId": "STATUS-PENDING",
+      "code": "PENDING",
+      "displayName": "En attente",
+      "description": "La commande a été reçue et est en attente de confirmation de paiement.",
+      "sortOrder": 1,
+      "colorCode": "#FFC107",
+      "isFinal": false
+    },
+    {
+      "statusId": "STATUS-CONFIRMED",
+      "code": "CONFIRMED",
+      "displayName": "Confirmée",
+      "description": "Le paiement a été confirmé et la commande est validée.",
+      "sortOrder": 2,
+      "colorCode": "#17A2B8",
+      "isFinal": false
+    },
+    {
+      "statusId": "STATUS-IN_PREPARATION",
+      "code": "IN_PREPARATION",
+      "displayName": "En préparation",
+      "description": "La commande est en cours de préparation dans notre entrepôt.",
+      "sortOrder": 3,
+      "colorCode": "#6F42C1",
+      "isFinal": false
+    },
+    {
+      "statusId": "STATUS-SHIPPING",
+      "code": "SHIPPING",
+      "displayName": "En livraison",
+      "description": "La commande a été expédiée et est en cours de livraison.",
+      "sortOrder": 4,
+      "colorCode": "#007BFF",
+      "isFinal": false
+    },
+    {
+      "statusId": "STATUS-DELIVERED",
+      "code": "DELIVERED",
+      "displayName": "Livrée",
+      "description": "La commande a été livrée avec succès.",
+      "sortOrder": 5,
+      "colorCode": "#28A745",
+      "isFinal": true
+    },
+    {
+      "statusId": "STATUS-CANCELED",
+      "code": "CANCELED",
+      "displayName": "Annulée",
+      "description": "La commande a été annulée.",
+      "sortOrder": 6,
+      "colorCode": "#DC3545",
+      "isFinal": true
+    }
+  ]
+}
+

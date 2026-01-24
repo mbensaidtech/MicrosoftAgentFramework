@@ -29,4 +29,14 @@ public class MongoDbSettings
     /// Collection name for customer-seller conversations.
     /// </summary>
     public string CustomerSellerConversationCollectionName { get; set; } = "customer_seller_conversations";
+
+    /// <summary>
+    /// Collection name for orders.
+    /// </summary>
+    public string OrdersCollectionName { get; set; } = "orders";
+
+    /// <summary>
+    /// Collection name for order statuses.
+    /// </summary>
+    public string OrderStatusesCollectionName { get; set; } = "order_statuses";
 }

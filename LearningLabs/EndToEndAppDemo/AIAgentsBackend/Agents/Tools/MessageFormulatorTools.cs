@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Text;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using AIAgentsBackend.Models.Orders;
 using AIAgentsBackend.Models.VectorStore;
+using AIAgentsBackend.Repositories;
 using AIAgentsBackend.Services.VectorStore.Interfaces;
 using Microsoft.Extensions.VectorData;
 
@@ -20,6 +22,175 @@ public class MessageFormulatorTools
     {
         this.serviceProvider = serviceProvider;
     }
+
+    #region Order Tools
+
+    /// <summary>
+    /// Gets order information by order ID.
+    /// Use this when the customer provides an order ID and you need to retrieve the order details.
+    /// </summary>
+    /// <param name="orderId">The order ID (e.g., ORD-2026-001)</param>
+    /// <returns>Order information including items, amounts, and current status</returns>
+    [Description("Récupère les informations d'une commande à partir de son numéro. Utilise cet outil quand le client fournit un numéro de commande et que tu dois obtenir les détails (produits, montants, statut).")]
+    public async Task<string> GetOrderByIdAsync(
+        [Description("Le numéro de commande (ex: 'ORD-2026-001')")] string orderId)
+    {
+        if (string.IsNullOrWhiteSpace(orderId))
+        {
+            return "Numéro de commande non fourni. Demande au client son numéro de commande.";
+        }
+
+        using var scope = serviceProvider.CreateScope();
+        var orderRepository = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
+
+        var order = await orderRepository.GetOrderByIdAsync(orderId);
+        if (order == null)
+        {
+            return $"Aucune commande trouvée avec le numéro '{orderId}'. Vérifie le numéro de commande avec le client.";
+        }
+
+        var status = await orderRepository.GetOrderStatusByIdAsync(order.StatusId);
+        return FormatOrderInfo(order, status);
+    }
+
+    /// <summary>
+    /// Gets the status of an order by order ID.
+    /// Use this when the customer asks about the status of their order.
+    /// </summary>
+    /// <param name="orderId">The order ID (e.g., ORD-2026-001)</param>
+    /// <returns>Current order status with description</returns>
+    [Description("Récupère le statut d'une commande. Utilise cet outil quand le client demande où en est sa commande ou quel est le statut de sa livraison.")]
+    public async Task<string> GetOrderStatusAsync(
+        [Description("Le numéro de commande (ex: 'ORD-2026-001')")] string orderId)
+    {
+        if (string.IsNullOrWhiteSpace(orderId))
+        {
+            return "Numéro de commande non fourni. Demande au client son numéro de commande.";
+        }
+
+        using var scope = serviceProvider.CreateScope();
+        var orderRepository = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
+
+        var order = await orderRepository.GetOrderByIdAsync(orderId);
+        if (order == null)
+        {
+            return $"Aucune commande trouvée avec le numéro '{orderId}'. Vérifie le numéro de commande avec le client.";
+        }
+
+        var status = await orderRepository.GetOrderStatusByIdAsync(order.StatusId);
+        if (status == null)
+        {
+            return $"Statut de commande non trouvé pour la commande '{orderId}'.";
+        }
+
+        return FormatOrderStatus(order, status);
+    }
+
+    /// <summary>
+    /// Searches orders by customer login/username.
+    /// Use this when the customer wants to find their orders but doesn't have the order ID.
+    /// </summary>
+    /// <param name="customer">The customer's login/username (e.g., mbensaid)</param>
+    /// <returns>List of orders for the customer</returns>
+    [Description("Recherche les commandes d'un client par son identifiant/login. Utilise cet outil quand le client veut retrouver ses commandes mais ne connaît pas son numéro de commande.")]
+    public async Task<string> SearchOrdersByCustomerAsync(
+        [Description("L'identifiant/login du client (ex: 'mbensaid')")] string customer)
+    {
+        if (string.IsNullOrWhiteSpace(customer))
+        {
+            return "Identifiant client non fourni. Demande au client son identifiant pour rechercher ses commandes.";
+        }
+
+        using var scope = serviceProvider.CreateScope();
+        var orderRepository = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
+
+        var orders = await orderRepository.GetOrdersByCustomerAsync(customer);
+        var ordersList = orders.ToList();
+
+        if (ordersList.Count == 0)
+        {
+            return $"Aucune commande trouvée pour le client '{customer}'. Vérifie l'identifiant.";
+        }
+
+        return await FormatOrdersListAsync(ordersList, orderRepository);
+    }
+
+    private static string FormatOrderInfo(Order order, OrderStatus? status)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"📦 **Commande {order.OrderId}**");
+        sb.AppendLine();
+        sb.AppendLine($"**Client:** {order.Customer}");
+        sb.AppendLine($"**Date de commande:** {order.CreatedAt:dd/MM/yyyy HH:mm}");
+        sb.AppendLine();
+        
+        sb.AppendLine("**Articles commandés:**");
+        foreach (var item in order.Items)
+        {
+            sb.AppendLine($"  - {item.ProductName} x{item.Quantity} : {item.UnitPrice:N2} {order.Currency}");
+        }
+        sb.AppendLine();
+        sb.AppendLine($"**Total:** {order.TotalAmount:N2} {order.Currency}");
+        sb.AppendLine();
+        
+        if (status != null)
+        {
+            sb.AppendLine($"**Statut actuel:** {status.DisplayName}");
+            sb.AppendLine($"**Description:** {status.Description}");
+        }
+        
+        sb.AppendLine();
+        sb.AppendLine("**Adresse de livraison:**");
+        sb.AppendLine($"  {order.ShippingAddress.Street}");
+        sb.AppendLine($"  {order.ShippingAddress.PostalCode} {order.ShippingAddress.City}");
+        sb.AppendLine($"  {order.ShippingAddress.Country}");
+
+        return sb.ToString();
+    }
+
+    private static string FormatOrderStatus(Order order, OrderStatus status)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"📋 **Statut de la commande {order.OrderId}**");
+        sb.AppendLine();
+        sb.AppendLine($"**Statut:** {status.DisplayName}");
+        sb.AppendLine($"**Description:** {status.Description}");
+        sb.AppendLine();
+        sb.AppendLine($"**Dernière mise à jour:** {order.UpdatedAt:dd/MM/yyyy HH:mm}");
+        
+        if (status.IsFinal)
+        {
+            sb.AppendLine();
+            sb.AppendLine("ℹ️ Cette commande est dans un statut final.");
+        }
+
+        return sb.ToString();
+    }
+
+    private static async Task<string> FormatOrdersListAsync(List<Order> orders, IOrderRepository orderRepository)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"📋 **{orders.Count} commande(s) trouvée(s)**");
+        sb.AppendLine();
+
+        foreach (var order in orders)
+        {
+            var status = await orderRepository.GetOrderStatusByIdAsync(order.StatusId);
+            var statusText = status?.DisplayName ?? "Inconnu";
+
+            sb.AppendLine($"**{order.OrderId}** - {order.CreatedAt:dd/MM/yyyy}");
+            sb.AppendLine($"  Montant: {order.TotalAmount:N2} {order.Currency}");
+            sb.AppendLine($"  Statut: {statusText}");
+            sb.AppendLine($"  Articles: {string.Join(", ", order.Items.Select(i => i.ProductName))}");
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    #endregion
+
+    #region Seller Requirements Tool
 
     /// <summary>
     /// Searches the seller requirements knowledge base to find what documents or information
@@ -300,6 +471,152 @@ public class MessageFormulatorTools
         return string.Join("\n", selected).Trim();
     }
 
+    #endregion
+
+    #region Policy Tools
+
+    /// <summary>
+    /// Searches the return policy for information about returning products.
+    /// Use this when customers ask about returns, return windows, return conditions, or how to return items.
+    /// </summary>
+    /// <param name="query">The customer's question about return policy</param>
+    /// <returns>Relevant return policy information</returns>
+    [Description("Recherche dans la politique de retour. Utilise cet outil quand le client pose des questions sur les retours, délais de retour, conditions de retour, ou comment retourner un produit.")]
+    public async Task<string> SearchReturnPolicyAsync(
+        [Description("La question du client sur la politique de retour")] string query)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IReturnPolicyVectorStoreService>();
+        
+        var results = await service.SearchAsync(query, topK: 3);
+        
+        if (results.Count == 0)
+        {
+            return "Aucune information sur la politique de retour trouvée.";
+        }
+
+        return FormatPolicyResults(results, "Politique de Retour");
+    }
+
+    /// <summary>
+    /// Searches the refund policy for information about getting refunds.
+    /// Use this when customers ask about refunds, refund timelines, refund methods, or refund eligibility.
+    /// </summary>
+    /// <param name="query">The customer's question about refund policy</param>
+    /// <returns>Relevant refund policy information</returns>
+    [Description("Recherche dans la politique de remboursement. Utilise cet outil quand le client pose des questions sur les remboursements, délais de remboursement, méthodes de remboursement, ou éligibilité au remboursement.")]
+    public async Task<string> SearchRefundPolicyAsync(
+        [Description("La question du client sur la politique de remboursement")] string query)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IRefundPolicyVectorStoreService>();
+        
+        var results = await service.SearchAsync(query, topK: 3);
+        
+        if (results.Count == 0)
+        {
+            return "Aucune information sur la politique de remboursement trouvée.";
+        }
+
+        return FormatPolicyResults(results, "Politique de Remboursement");
+    }
+
+    /// <summary>
+    /// Searches the order cancellation policy for information about cancelling orders.
+    /// Use this when customers ask about cancelling orders, cancellation windows, or cancellation fees.
+    /// </summary>
+    /// <param name="query">The customer's question about order cancellation</param>
+    /// <returns>Relevant order cancellation policy information</returns>
+    [Description("Recherche dans la politique d'annulation de commande. Utilise cet outil quand le client pose des questions sur l'annulation de commandes, délais d'annulation, ou frais d'annulation.")]
+    public async Task<string> SearchOrderCancellationPolicyAsync(
+        [Description("La question du client sur l'annulation de commande")] string query)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOrderCancellationPolicyVectorStoreService>();
+        
+        var results = await service.SearchAsync(query, topK: 3);
+        
+        if (results.Count == 0)
+        {
+            return "Aucune information sur la politique d'annulation trouvée.";
+        }
+
+        return FormatPolicyResults(results, "Politique d'Annulation");
+    }
+
+    /// <summary>
+    /// Formats policy search results with elegant markdown styling.
+    /// </summary>
+    private static string FormatPolicyResults(
+        IReadOnlyList<VectorSearchResult<PolicySectionRecord>> results,
+        string policyName)
+    {
+        var sb = new StringBuilder();
+        
+        // Header with emoji based on policy type
+        var emoji = policyName switch
+        {
+            "Politique de Retour" => "📦",
+            "Politique de Remboursement" => "💰",
+            "Politique d'Annulation" => "❌",
+            _ => "📋"
+        };
+        
+        sb.AppendLine($"{emoji} **{policyName}**");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+
+        foreach (var result in results)
+        {
+            var record = result.Record;
+            
+            // Section header with ### for elegance
+            sb.AppendLine($"### {record.Title}");
+            sb.AppendLine();
+            
+            // Format content - split into sentences for better readability
+            var content = record.Content;
+            var sentences = content.Split(new[] { ". " }, StringSplitOptions.RemoveEmptyEntries);
+            
+            if (sentences.Length > 1)
+            {
+                // Multiple sentences - format as bullet points
+                foreach (var sentence in sentences)
+                {
+                    var cleanSentence = sentence.Trim();
+                    if (!string.IsNullOrWhiteSpace(cleanSentence))
+                    {
+                        // Add period if missing
+                        if (!cleanSentence.EndsWith(".") && !cleanSentence.EndsWith("!") && !cleanSentence.EndsWith("?"))
+                        {
+                            cleanSentence += ".";
+                        }
+                        sb.AppendLine($"• {cleanSentence}");
+                    }
+                }
+            }
+            else
+            {
+                // Single sentence - just display it
+                sb.AppendLine(content);
+            }
+            
+            sb.AppendLine();
+        }
+
+        // Footer with helpful note
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine("💡 *Si vous avez d'autres questions, n'hésitez pas à me demander !*");
+
+        return sb.ToString();
+    }
+
+    #endregion
+
+    #region Private Helpers
+
     private static bool IsDocumentLike(string bulletLine)
     {
         // bulletLine usually starts with "- "
@@ -355,4 +672,6 @@ public class MessageFormulatorTools
 
         return noDiacritics;
     }
+
+    #endregion
 }

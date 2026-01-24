@@ -22,7 +22,7 @@ namespace AIAgentsBackend.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers Azure OpenAI, MongoDB, agents, and vector store services.
+    /// Registers Azure OpenAI, MongoDB, agents, vector store, and order services.
     /// </summary>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
     {
@@ -31,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddSecurityServices(configuration);
         services.AddAgentServices(configuration);
         services.AddVectorStoreServices(configuration);
+        services.AddOrderServices(configuration);
 
         return services;
     }
@@ -128,6 +129,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISellerRequirementsVectorStoreService, SellerRequirementsVectorStoreService>();
 
         services.AddHostedService<VectorStoreInitializerHostedService>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddOrderServices(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<OrderDataSettings>(configuration.GetSection(OrderDataSettings.SectionName));
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddHostedService<OrderDataInitializerHostedService>();
 
         return services;
     }
