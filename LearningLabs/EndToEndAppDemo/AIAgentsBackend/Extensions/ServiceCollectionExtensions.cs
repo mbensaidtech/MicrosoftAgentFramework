@@ -5,6 +5,7 @@ using AIAgentsBackend.HostedServices;
 using AIAgentsBackend.Repositories;
 using AIAgentsBackend.Services;
 using AIAgentsBackend.Services.Conversation;
+using AIAgentsBackend.Services.MessageContext;
 using AIAgentsBackend.Services.VectorStore;
 using AIAgentsBackend.Services.VectorStore.Interfaces;
 using Azure.AI.OpenAI;
@@ -98,6 +99,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IThreadRepository, ThreadRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IConversationService, ConversationService>();
+        services.AddScoped<IMessageContextService, MessageContextService>();
 
         return services;
     }

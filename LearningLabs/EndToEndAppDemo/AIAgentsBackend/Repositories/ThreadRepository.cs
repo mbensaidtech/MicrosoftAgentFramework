@@ -62,8 +62,6 @@ public class ThreadRepository : IThreadRepository
             .Sort(sort)
             .ToListAsync(cancellationToken);
 
-        Console.WriteLine($"[ThreadRepository] Retrieved {results.Count} messages for thread {threadId}");
-        
         return results;
     }
 
@@ -84,9 +82,6 @@ public class ThreadRepository : IThreadRepository
             new MongoDB.Bson.BsonRegularExpression($"^{threadIdPrefix}"));
 
         var result = await collection.DeleteManyAsync(filter, cancellationToken);
-
-        Console.WriteLine($"[ThreadRepository] Deleted {result.DeletedCount} messages from threads with prefix '{threadIdPrefix}'");
-        
         return result.DeletedCount;
     }
 }

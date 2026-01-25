@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CommonUtilities;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
@@ -20,6 +21,19 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
     /// </summary>
     public const string ContextIdKey = "A2A_ContextId";
 
+    /// <summary>
+    /// Gets or sets the thread/context identifier used to store and retrieve conversation messages from MongoDB.
+    /// This is typically set from HttpContext.Items during construction or generated automatically when saving messages.
+    /// </summary>
+    public string? ThreadDbKey { get; internal set; }
+
+    /// <summary>
+    /// Initializes a new instance of the MongoVectorChatMessageStore.
+    /// </summary>
+    /// <param name="mongoVectorStore">The MongoDB vector store to use.</param>
+    /// <param name="httpContextAccessor">The HTTP context accessor to access the HTTP context.</param>
+    /// <param name="collectionName">The name of the collection to use for storing chat messages.</param>
+    /// <param name="jsonSerializerOptions">The JSON serializer options to use for serializing chat messages.</param>
     public MongoVectorChatMessageStore(
         MongoVectorStore mongoVectorStore,
         IHttpContextAccessor httpContextAccessor,
@@ -36,28 +50,21 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
             && !string.IsNullOrWhiteSpace(contextId))
         {
             ThreadDbKey = contextId;
-            Console.WriteLine($"[MongoStore] Using contextId from HttpContext: {ThreadDbKey}");
-        }
-        else
-        {
-            Console.WriteLine("[MongoStore] No contextId in HttpContext, will generate new one on first message");
         }
     }
-
-    public string? ThreadDbKey { get; internal set; }
 
     /// <summary>
     /// Gets previous messages from the conversation to include in context.
     /// </summary>
+    /// <param name="context">The invoking context.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The previous messages from the conversation.</returns>
     public override async ValueTask<IEnumerable<ChatMessage>> InvokingAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
-        Console.WriteLine($"[MongoStore] InvokingAsync called with ThreadDbKey: {ThreadDbKey ?? "(null)"}");
-        
         if (string.IsNullOrWhiteSpace(ThreadDbKey))
         {
-            Console.WriteLine("[MongoStore] ThreadDbKey is empty, returning no messages");
             return Array.Empty<ChatMessage>();
         }
 
@@ -78,23 +85,20 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
 
         messages.Reverse();
         
-        Console.WriteLine($"[MongoStore] Retrieved {messages.Count} messages from thread {ThreadDbKey}");
-        
         return messages;
     }
 
     /// <summary>
     /// Saves the messages from this conversation turn.
     /// </summary>
+    /// <param name="context">The invoked context.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The task result.</returns>
     public override async ValueTask InvokedAsync(
         InvokedContext context,
         CancellationToken cancellationToken = default)
     {
-        Console.WriteLine($"[MongoStore] InvokedAsync called with ThreadDbKey: {ThreadDbKey ?? "(null)"}");
-        
         ThreadDbKey ??= Guid.NewGuid().ToString("N");
-        
-        Console.WriteLine($"[MongoStore] Using ThreadDbKey: {ThreadDbKey}");
 
         var allMessages = new List<ChatMessage>();
         
@@ -110,7 +114,6 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
 
         if (allMessages.Count == 0)
         {
-            Console.WriteLine("[MongoStore] No messages to store");
             return;
         }
 
@@ -137,17 +140,19 @@ public sealed class MongoVectorChatMessageStore : ChatMessageStore
         }).ToList();
 
         await collection.UpsertAsync(chatHistoryItems, cancellationToken);
-        
-        Console.WriteLine($"[MongoStore] Added {chatHistoryItems.Count} messages to thread {ThreadDbKey}");
     }
 
+    /// <summary>
+    /// Serializes the chat message store state to a JSON element.
+    /// </summary>
+    /// <param name="jsonSerializerOptions">The JSON serializer options to use for serializing the chat message store state.</param>
+    /// <returns>The serialized chat message store state.</returns>
     public override JsonElement Serialize(JsonSerializerOptions? jsonSerializerOptions = null)
     {
         if (string.IsNullOrWhiteSpace(ThreadDbKey))
         {
             ThreadDbKey = Guid.NewGuid().ToString("N");
         }
-        Console.WriteLine($"[MongoStore] Serialize() returning ThreadDbKey: {ThreadDbKey}");
         return JsonSerializer.SerializeToElement(ThreadDbKey);
     }
 }

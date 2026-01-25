@@ -1,14 +1,17 @@
 using A2A;
 using AIAgentsBackend.Agents.Builder;
 using AIAgentsBackend.Agents.Configuration;
+using AIAgentsBackend.Middlewares.Agent;
 using AIAgentsBackend.Agents.Models;
 using AIAgentsBackend.Agents.Stores;
 using AIAgentsBackend.Agents.Tools;
 using AIAgentsBackend.Configuration;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel.Connectors.MongoDB;
+using OpenAI.Chat;
 
 namespace AIAgentsBackend.Agents.Factory;
 
@@ -132,9 +135,68 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <summary>
-    /// Creates a message formulator agent with MongoDB conversation memory.
-    /// Helps customers write clear, well-structured messages to sellers.
-    /// Includes tools for searching seller requirements.
+    /// Creates an order agent that handles order data and order actions.
+    /// This agent is stateless (no message store) and is used as a tool by the orchestrator.
+    /// </summary>
+    public (ChatClientAgent Agent, AgentCard Card) GetOrderAgent()
+    {
+        var config = GetConfig("order");
+        var tools = new OrderTools(serviceProvider);
+
+        var builder = new FluentChatClientAgentBuilder(azureClient, settings)
+            .WithName(config.Name)
+            .WithDescription(config.Description)
+            .WithInstructions(config.Instructions)
+            .WithTemperature(config.Temperature ?? 0.5f)
+            .WithMaxOutputTokens(config.MaxOutputTokens ?? 1000)
+            .WithToolFromMethod(tools.GetOrderByIdAsync, "GetOrderById")
+            .WithToolFromMethod(tools.GetOrderStatusAsync, "GetOrderStatus")
+            .WithToolFromMethod(tools.SearchOrdersByCustomerAsync, "SearchOrdersByCustomer");
+
+        if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
+        {
+            builder.WithDeployment(config.ChatDeploymentName);
+        }
+
+        var agent = builder.Build();
+        var card = CreateAgentCard(config);
+
+        return (agent, card);
+    }
+
+    /// <summary>
+    /// Creates a policy agent that handles return, refund, and cancellation policies.
+    /// This agent is stateless (no message store) and is used as a tool by the orchestrator.
+    /// </summary>
+    public (ChatClientAgent Agent, AgentCard Card) GetPolicyAgent()
+    {
+        var config = GetConfig("policy");
+        var tools = new PolicyTools(serviceProvider);
+
+        var builder = new FluentChatClientAgentBuilder(azureClient, settings)
+            .WithName(config.Name)
+            .WithDescription(config.Description)
+            .WithInstructions(config.Instructions)
+            .WithTemperature(config.Temperature ?? 0.5f)
+            .WithMaxOutputTokens(config.MaxOutputTokens ?? 1200)
+            .WithToolFromMethod(tools.SearchReturnPolicyAsync, "SearchReturnPolicy")
+            .WithToolFromMethod(tools.SearchRefundPolicyAsync, "SearchRefundPolicy")
+            .WithToolFromMethod(tools.SearchOrderCancellationPolicyAsync, "SearchOrderCancellationPolicy");
+
+        if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
+        {
+            builder.WithDeployment(config.ChatDeploymentName);
+        }
+
+        var agent = builder.Build();
+        var card = CreateAgentCard(config);
+
+        return (agent, card);
+    }
+
+    /// <summary>
+    /// Creates a message formulator agent that helps customers compose messages to sellers.
+    /// This agent is stateless (no message store) and is used as a tool by the orchestrator.
     /// </summary>
     public (ChatClientAgent Agent, AgentCard Card) GetMessageFormulatorAgent()
     {
@@ -147,20 +209,51 @@ public class AgentFactory : IAgentFactory
             .WithInstructions(config.Instructions)
             .WithTemperature(config.Temperature ?? 0.7f)
             .WithMaxOutputTokens(config.MaxOutputTokens ?? 1500)
+            .WithToolFromMethod(tools.SearchSellerRequirementsAsync, "SearchSellerRequirements");
+
+        if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
+        {
+            builder.WithDeployment(config.ChatDeploymentName);
+        }
+
+        var agent = builder.Build();
+        var card = CreateAgentCard(config);
+
+        return (agent, card);
+    }
+
+    /// <summary>
+    /// Creates an orchestrator agent that coordinates the specialized agents.
+    /// This is the ONLY agent with a message store for conversation memory.
+    /// Uses AIAgent (not ChatClientAgent) to support middleware for function call logging.
+    /// </summary>
+    public (AIAgent Agent, AgentCard Card) GetOrchestratorAgent()
+    {
+        var config = GetConfig("orchestrator");
+
+        var (orderAgent, _) = GetOrderAgent();
+        var (policyAgent, _) = GetPolicyAgent();
+        var (messageFormulatorAgent, _) = GetMessageFormulatorAgent();
+
+        var orderAgentTool = OrchestratorTools.CreateOrderAgentTool(orderAgent);
+        var policyAgentTool = OrchestratorTools.CreatePolicyAgentTool(policyAgent);
+        var messageFormulatorAgentTool = OrchestratorTools.CreateMessageFormulatorAgentTool(messageFormulatorAgent);
+
+        var builder = new FluentAIAgentBuilder(azureClient, settings)
+            .WithName(config.Name)
+            .WithDescription(config.Description)
+            .WithInstructions(config.Instructions)
+            .WithTemperature(config.Temperature ?? 0.3f)
+            .WithMaxOutputTokens(config.MaxOutputTokens ?? 2000)
             .WithChatMessageStoreFactory(ctx => new MongoVectorChatMessageStore(
                 mongoVectorStore,
                 httpContextAccessor,
                 mongoDbSettings.ChatMessageStoreCollectionName,
                 ctx.JsonSerializerOptions))
-            .WithToolFromMethod(tools.SearchSellerRequirementsAsync, "SearchSellerRequirements")
-            // Order tools - for answering customer questions about their orders
-            .WithToolFromMethod(tools.GetOrderByIdAsync, "GetOrderById")
-            .WithToolFromMethod(tools.GetOrderStatusAsync, "GetOrderStatus")
-            .WithToolFromMethod(tools.SearchOrdersByCustomerAsync, "SearchOrdersByCustomer")
-            // Policy tools - for answering questions about policies directly
-            .WithToolFromMethod(tools.SearchReturnPolicyAsync, "SearchReturnPolicy")
-            .WithToolFromMethod(tools.SearchRefundPolicyAsync, "SearchRefundPolicy")
-            .WithToolFromMethod(tools.SearchOrderCancellationPolicyAsync, "SearchOrderCancellationPolicy");
+            .WithTool(orderAgentTool)
+            .WithTool(policyAgentTool)
+            .WithTool(messageFormulatorAgentTool)
+            .WithMiddleware(FunctionCallLoggingMiddleware.LogFunctionCallAsync);
 
         if (!string.IsNullOrWhiteSpace(config.ChatDeploymentName))
         {

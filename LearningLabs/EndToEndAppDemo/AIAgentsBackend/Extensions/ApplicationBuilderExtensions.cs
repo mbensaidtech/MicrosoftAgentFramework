@@ -1,4 +1,4 @@
-using AIAgentsBackend.Agents.Middleware;
+using AIAgentsBackend.Middlewares.Http;
 
 namespace AIAgentsBackend.Extensions;
 
@@ -8,10 +8,11 @@ namespace AIAgentsBackend.Extensions;
 public static class ApplicationBuilderExtensions
 {
     /// <summary>
-    /// Adds the A2A context middleware. Call this before MapA2A().
+    /// Adds the unified agent context middleware for all agent endpoints (A2A and Frontend).
+    /// Call this before MapA2A() and before routing.
     /// </summary>
-    public static IApplicationBuilder UseA2AContext(this IApplicationBuilder builder)
+    public static IApplicationBuilder UseAgentContext(this IApplicationBuilder builder)
     {
-        return builder.UseMiddleware<A2AContextMiddleware>();
+        return builder.UseMiddleware<AgentContextMiddleware>();
     }
 }

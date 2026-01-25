@@ -9,11 +9,12 @@ namespace AIAgentsBackend.Agents.Builder;
 
 /// <summary>
 /// Fluent API builder for creating AIAgent instances.
-/// Use this builder when you need structured output with ChatResponseFormat.
+/// Use this builder when you need structured output with ChatResponseFormat or middleware support.
 /// </summary>
 public sealed class FluentAIAgentBuilder : FluentAgentBuilderBase<FluentAIAgentBuilder, AIAgent>
 {
     private AIExtensions.ChatResponseFormat? responseFormat;
+    private readonly List<Func<AIAgent, FunctionInvocationContext, Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>>, CancellationToken, ValueTask<object?>>> middlewares = [];
 
     /// <summary>
     /// Creates a new FluentAIAgentBuilder using a shared AzureOpenAIClient singleton.
@@ -45,7 +46,19 @@ public sealed class FluentAIAgentBuilder : FluentAgentBuilderBase<FluentAIAgentB
     }
 
     /// <summary>
-    /// Builds and returns the configured AIAgent.
+    /// Adds a middleware to the agent for intercepting function calls.
+    /// Middleware is useful for logging, monitoring, or modifying function invocations.
+    /// </summary>
+    public FluentAIAgentBuilder WithMiddleware(
+        Func<AIAgent, FunctionInvocationContext, Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>>, CancellationToken, ValueTask<object?>> middleware)
+    {
+        middlewares.Add(middleware);
+        return this;
+    }
+
+    /// <summary>
+    /// Builds and returns the configured AIAgent with all middlewares applied.
+    /// Creates agent with full options, then wraps with middleware using AsBuilder().
     /// </summary>
     public override AIAgent Build()
     {
@@ -59,6 +72,19 @@ public sealed class FluentAIAgentBuilder : FluentAgentBuilderBase<FluentAIAgentB
         }
 
         var agentOptions = CreateAgentOptions(chatOptions);
-        return (AIAgent)chatClient.CreateAIAgent(agentOptions);
+        
+        // Create the base agent with full options (including message store)
+        var agentBuilder = chatClient.CreateAIAgent(agentOptions).AsBuilder();
+
+        // Apply middlewares using the AsBuilder pattern
+        // The agent must be created first with all options, then middleware is applied
+        if (middlewares.Count > 0)
+        {
+            foreach (var middleware in middlewares)
+            {
+                agentBuilder = agentBuilder.Use(middleware);
+            }
+        }
+        return agentBuilder.Build();
     }
 }

@@ -55,8 +55,6 @@ public class ConversationRepository : IConversationRepository
 
         message.Timestamp = DateTime.UtcNow;
         await collection.InsertOneAsync(message, cancellationToken: cancellationToken);
-
-        Console.WriteLine($"[ConversationRepository] Added message to conversation {message.ConversationId} from {message.From}");
         
         return message;
     }
@@ -76,8 +74,6 @@ public class ConversationRepository : IConversationRepository
             .Find(filter)
             .Sort(sort)
             .ToListAsync(cancellationToken);
-
-        Console.WriteLine($"[ConversationRepository] Retrieved {results.Count} messages for conversation {conversationId}");
         
         return results;
     }
@@ -130,7 +126,5 @@ public class ConversationRepository : IConversationRepository
 
         var filter = Builders<ConversationMessage>.Filter.Eq(x => x.ConversationId, conversationId);
         var result = await collection.DeleteManyAsync(filter, cancellationToken);
-
-        Console.WriteLine($"[ConversationRepository] Deleted {result.DeletedCount} messages from conversation {conversationId}");
     }
 }

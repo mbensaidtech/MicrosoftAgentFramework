@@ -27,7 +27,8 @@ export interface ConversationResponse {
   messages: ConversationMessage[];
 }
 
-const API_BASE_URL = '/api/agents/message-formulator';
+// Updated to use the Orchestrator Agent that coordinates specialized agents
+const API_BASE_URL = '/api/agents/orchestrator';
 
 /**
  * Send a message to the Message Formulator Agent with SSE streaming

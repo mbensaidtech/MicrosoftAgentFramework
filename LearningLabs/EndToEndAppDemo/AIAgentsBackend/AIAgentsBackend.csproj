@@ -17,6 +17,10 @@
     <PackageReference Include="MongoDB.Driver" Version="2.30.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\CommonUtilities\CommonUtilities.csproj" />
+  </ItemGroup>
+
   <!-- Copy VectorStore data files to output directory -->
   <ItemGroup>
     <None Update="Data\VectorStore\*.json">

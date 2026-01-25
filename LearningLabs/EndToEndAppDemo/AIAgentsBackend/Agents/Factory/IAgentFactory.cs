@@ -24,7 +24,23 @@ public interface IAgentFactory
     (ChatClientAgent Agent, AgentCard Card) GetHistoryAgent();
 
     /// <summary>
-    /// Creates a message formulator agent that helps customers write clear messages to sellers.
+    /// Creates an order agent that handles order data and order actions.
+    /// </summary>
+    (ChatClientAgent Agent, AgentCard Card) GetOrderAgent();
+
+    /// <summary>
+    /// Creates a policy agent that handles return, refund, and cancellation policies.
+    /// </summary>
+    (ChatClientAgent Agent, AgentCard Card) GetPolicyAgent();
+
+    /// <summary>
+    /// Creates a message formulator agent that helps customers compose messages to sellers.
     /// </summary>
     (ChatClientAgent Agent, AgentCard Card) GetMessageFormulatorAgent();
+
+    /// <summary>
+    /// Creates an orchestrator agent that coordinates the specialized agents.
+    /// Uses AIAgent to support middleware.
+    /// </summary>
+    (AIAgent Agent, AgentCard Card) GetOrchestratorAgent();
 }

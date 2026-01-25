@@ -30,9 +30,9 @@ static string MaskApiKey(string apiKey)
     return apiKey[..4] + "****" + apiKey[^4..];
 }
 
-// IMPORTANT: Add A2A context middleware BEFORE MapA2A
-// This extracts contextId from request body and stores in HttpContext.Items
-app.UseA2AContext();
+// IMPORTANT: Add unified agent context middleware BEFORE MapA2A and routing
+// This extracts contextId from ALL agent requests (A2A and Frontend) and stores in HttpContext.Items
+app.UseAgentContext();
 
 // Create agent instances with their cards
 var agentFactory = app.Services.GetRequiredService<IAgentFactory>();
