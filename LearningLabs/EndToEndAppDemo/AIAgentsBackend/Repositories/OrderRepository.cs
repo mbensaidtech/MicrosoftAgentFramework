@@ -59,8 +59,6 @@ public class OrderRepository : IOrderRepository
                 new CreateIndexOptions { Name = "idx_code", Unique = true });
 
             orderStatusesCollection.Indexes.CreateMany([statusIdIndex, codeIndex]);
-
-            logger.LogInformation("[OrderRepository] Indexes created successfully");
         }
         catch (Exception ex)
         {
@@ -77,8 +75,6 @@ public class OrderRepository : IOrderRepository
 
         var filter = Builders<Order>.Filter.Eq(x => x.OrderId, orderId);
         var order = await ordersCollection.Find(filter).FirstOrDefaultAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetOrderByIdAsync: {OrderId} - Found: {Found}", orderId, order != null);
         return order;
     }
 
@@ -96,8 +92,6 @@ public class OrderRepository : IOrderRepository
             .Find(filter)
             .Sort(sort)
             .ToListAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetOrdersByCustomerAsync: {Customer} - Count: {Count}", customer, orders.Count);
         return orders;
     }
 
@@ -108,8 +102,6 @@ public class OrderRepository : IOrderRepository
             .Find(FilterDefinition<Order>.Empty)
             .Sort(sort)
             .ToListAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetAllOrdersAsync - Count: {Count}", orders.Count);
         return orders;
     }
 
@@ -122,8 +114,6 @@ public class OrderRepository : IOrderRepository
         order.UpdatedAt = DateTime.UtcNow;
 
         await ordersCollection.InsertOneAsync(order, cancellationToken: cancellationToken);
-        logger.LogInformation("[OrderRepository] AddOrderAsync: {OrderId}", order.OrderId);
-
         return order;
     }
 
@@ -134,7 +124,6 @@ public class OrderRepository : IOrderRepository
             return;
 
         await ordersCollection.InsertManyAsync(ordersList, cancellationToken: cancellationToken);
-        logger.LogInformation("[OrderRepository] AddOrdersAsync - Count: {Count}", ordersList.Count);
     }
 
     public async Task<bool> UpdateOrderAsync(Order order, CancellationToken cancellationToken = default)
@@ -146,10 +135,6 @@ public class OrderRepository : IOrderRepository
 
         var filter = Builders<Order>.Filter.Eq(x => x.OrderId, order.OrderId);
         var result = await ordersCollection.ReplaceOneAsync(filter, order, cancellationToken: cancellationToken);
-
-        logger.LogInformation("[OrderRepository] UpdateOrderAsync: {OrderId} - Modified: {Modified}", 
-            order.OrderId, result.ModifiedCount > 0);
-
         return result.ModifiedCount > 0;
     }
 
@@ -170,8 +155,6 @@ public class OrderRepository : IOrderRepository
 
         var filter = Builders<OrderStatus>.Filter.Eq(x => x.StatusId, statusId);
         var status = await orderStatusesCollection.Find(filter).FirstOrDefaultAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetOrderStatusByIdAsync: {StatusId} - Found: {Found}", statusId, status != null);
         return status;
     }
 
@@ -182,8 +165,6 @@ public class OrderRepository : IOrderRepository
 
         var filter = Builders<OrderStatus>.Filter.Eq(x => x.Code, code.ToUpperInvariant());
         var status = await orderStatusesCollection.Find(filter).FirstOrDefaultAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetOrderStatusByCodeAsync: {Code} - Found: {Found}", code, status != null);
         return status;
     }
 
@@ -194,8 +175,6 @@ public class OrderRepository : IOrderRepository
             .Find(FilterDefinition<OrderStatus>.Empty)
             .Sort(sort)
             .ToListAsync(cancellationToken);
-
-        logger.LogInformation("[OrderRepository] GetAllOrderStatusesAsync - Count: {Count}", statuses.Count);
         return statuses;
     }
 
@@ -205,8 +184,6 @@ public class OrderRepository : IOrderRepository
             throw new ArgumentNullException(nameof(status));
 
         await orderStatusesCollection.InsertOneAsync(status, cancellationToken: cancellationToken);
-        logger.LogInformation("[OrderRepository] AddOrderStatusAsync: {StatusId}", status.StatusId);
-
         return status;
     }
 
@@ -217,7 +194,6 @@ public class OrderRepository : IOrderRepository
             return;
 
         await orderStatusesCollection.InsertManyAsync(statusesList, cancellationToken: cancellationToken);
-        logger.LogInformation("[OrderRepository] AddOrderStatusesAsync - Count: {Count}", statusesList.Count);
     }
 
     public async Task<bool> HasOrderStatusesAsync(CancellationToken cancellationToken = default)
