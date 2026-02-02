@@ -31,3 +31,9 @@ msbuild.wrn
 
 # AgentsThreads - exclude all files and folders 1
 **/AgentsThreads/
+
+# Node.js - never commit dependencies
+node_modules/
+
+# LearningLabs/EndToEndAppDemo - duplicate/leftover (moved to root EndToEndAppDemo)
+LearningLabs/EndToEndAppDemo/
