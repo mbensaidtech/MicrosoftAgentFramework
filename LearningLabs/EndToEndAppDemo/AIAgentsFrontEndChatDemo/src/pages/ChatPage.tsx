@@ -196,7 +196,35 @@ export function ChatPage() {
       return combined;
     };
 
-    const proposedStart = content.indexOf('📝');
+    // Look for either 📝 or 📜 emoji (agent might use either)
+    const proposedStart = content.indexOf('📝') !== -1 ? content.indexOf('📝') : content.indexOf('📜');
+    
+    if (proposedStart === -1) {
+      console.log('[ChatPage] extractProposedMessage: No 📝 or 📜 emoji found');
+      // Fallback format (older agent output)
+      const marker = 'Voici un message que vous pourriez envoyer au vendeur';
+      const markerIndex = content.toLowerCase().indexOf(marker.toLowerCase());
+      if (markerIndex !== -1) {
+        const lines = content.split(/\r?\n/);
+        const delimiterIndexes: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim() === '--') delimiterIndexes.push(i);
+        }
+
+        let messageBlock = '';
+        if (delimiterIndexes.length >= 2) {
+          messageBlock = lines.slice(delimiterIndexes[0] + 1, delimiterIndexes[1]).join('\n').trim();
+        } else {
+          // try after marker
+          messageBlock = content.substring(markerIndex).trim();
+        }
+
+        messageBlock = stripOptionalProvideBlock(messageBlock);
+        messageBlock = replaceSignaturePlaceholders(messageBlock);
+        return messageBlock.trim();
+      }
+      return '';
+    }
     
     // Find where the seller info section starts (💡 Le vendeur pourrait...)
     let sellerInfoStart = content.indexOf('💡');
@@ -221,60 +249,80 @@ export function ChatPage() {
       }
     }
     
-    if (proposedStart !== -1) {
-      // End at seller info section OR approval text, whichever comes first
-      let endIndex = content.length;
-      if (sellerInfoStart !== -1 && sellerInfoStart > proposedStart) {
-        endIndex = sellerInfoStart;
-      }
-      if (approvalStart !== -1 && approvalStart > proposedStart && approvalStart < endIndex) {
-        endIndex = approvalStart;
-      }
-      
-      const rawProposed = content.substring(proposedStart, endIndex);
-      const messageHeaderEnd = rawProposed.indexOf(':');
-      if (messageHeaderEnd !== -1) {
-        let message = rawProposed.substring(messageHeaderEnd + 1).trim();
+    // End at seller info section OR approval text, whichever comes first
+    let endIndex = content.length;
+    if (sellerInfoStart !== -1 && sellerInfoStart > proposedStart) {
+      endIndex = Math.min(endIndex, sellerInfoStart);
+    }
+    if (approvalStart !== -1 && approvalStart > proposedStart) {
+      endIndex = Math.min(endIndex, approvalStart);
+    }
+    
+    const rawProposed = content.substring(proposedStart, endIndex);
+    console.log('[ChatPage] extractProposedMessage: rawProposed preview:', rawProposed.substring(0, 200));
+    
+    // Look for the colon after "Message proposé au vendeur:" or similar patterns
+    // The format is: 📝 or 📜 **Message proposé au vendeur:**\n\n[message]
+    const colonIndex = rawProposed.indexOf(':');
+    if (colonIndex === -1) {
+      console.warn('[ChatPage] extractProposedMessage: No colon found after emoji');
+      // Try to extract message directly after emoji, skipping any header text
+      // Look for double newline which typically separates header from message
+      const doubleNewlineIndex = rawProposed.indexOf('\n\n');
+      if (doubleNewlineIndex !== -1) {
+        let message = rawProposed.substring(doubleNewlineIndex + 2).trim();
         message = message.replace(/\*\*/g, '').trim();
         message = stripOptionalProvideBlock(message);
         message = replaceSignaturePlaceholders(message);
         return message;
       }
+      // Last resort: extract everything after the emoji, removing markdown formatting
+      let message = rawProposed.substring(1).trim(); // Skip emoji
+      message = message.replace(/^\*\*.*?\*\*:?\s*/g, ''); // Remove **header**: pattern
+      message = message.replace(/\*\*/g, '').trim();
+      message = stripOptionalProvideBlock(message);
+      message = replaceSignaturePlaceholders(message);
+      return message;
     }
-
-    // Fallback format (older agent output)
-    // "Voici un message que vous pourriez envoyer au vendeur :\n\n--\n<message>\n--\nSouhaitez-vous..."
-    const marker = 'Voici un message que vous pourriez envoyer au vendeur';
-    const markerIndex = content.toLowerCase().indexOf(marker.toLowerCase());
-    if (markerIndex !== -1) {
-      const lines = content.split(/\r?\n/);
-      const delimiterIndexes: number[] = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === '--') delimiterIndexes.push(i);
+    
+    // Extract message after the colon
+    let message = rawProposed.substring(colonIndex + 1).trim();
+    
+    // Remove markdown formatting (**)
+    message = message.replace(/\*\*/g, '').trim();
+    
+    // Remove any remaining header text that might be on the same line
+      // Sometimes the format is: 📝 or 📜 **Message proposé au vendeur:** [message]
+    // We want to skip any text before the actual message starts
+    const lines = message.split('\n');
+    if (lines.length > 0 && lines[0].trim().length > 0) {
+      // Check if first line looks like a continuation of the header
+      const firstLine = lines[0].trim();
+      if (firstLine.toLowerCase().includes('message proposé') || 
+          firstLine.toLowerCase().includes('au vendeur')) {
+        // Skip this line, start from next line
+        message = lines.slice(1).join('\n').trim();
       }
-
-      let messageBlock = '';
-      if (delimiterIndexes.length >= 2) {
-        messageBlock = lines.slice(delimiterIndexes[0] + 1, delimiterIndexes[1]).join('\n').trim();
-      } else {
-        // try after marker
-        messageBlock = content.substring(markerIndex).trim();
-      }
-
-      messageBlock = stripOptionalProvideBlock(messageBlock);
-      messageBlock = replaceSignaturePlaceholders(messageBlock);
-      return messageBlock.trim();
     }
-
-    return '';
+    
+    // Clean up the message
+    message = stripOptionalProvideBlock(message);
+    message = replaceSignaturePlaceholders(message);
+    
+    console.log('[ChatPage] extractProposedMessage: extracted message length:', message.length);
+    return message;
   };
 
   // Check if AI response contains a proposed message
   const hasProposedMessage = (content: string): boolean => {
-    return (
-      content.includes('Message proposé au vendeur') ||
-      content.includes('Voici un message que vous pourriez envoyer au vendeur')
-    );
+    // Check for emoji (most reliable indicator) - support both 📝 and 📜
+    if (content.includes('📝') || content.includes('📜')) return true;
+    // Check for text patterns
+    if (content.includes('Message proposé au vendeur')) return true;
+    if (content.includes('Voici un message que vous pourriez envoyer au vendeur')) return true;
+    // Check for "Cliquez sur le bouton Approuver" which indicates a message proposal
+    if (content.includes('Cliquez sur le bouton Approuver') || content.includes('Approuver pour envoyer')) return true;
+    return false;
   };
 
 
@@ -344,10 +392,39 @@ export function ChatPage() {
     );
 
     // Check if this message contains a proposed message
-    if (!options.isStreaming && hasProposedMessage(content)) {
-      const proposed = extractProposedMessage(content);
-      if (proposed) {
-        setLastProposedMessage(proposed);
+    if (!options.isStreaming) {
+      if (hasProposedMessage(content)) {
+        const proposed = extractProposedMessage(content);
+        console.log('[ChatPage] updateDraftMessage - hasProposedMessage:', {
+          hasProposed: true,
+          extractedLength: proposed?.length || 0,
+          extractedPreview: proposed?.substring(0, 50) || 'empty',
+          contentPreview: content.substring(0, 200)
+        });
+        if (proposed && proposed.trim().length > 0) {
+          setLastProposedMessage(proposed);
+          console.log('[ChatPage] Set lastProposedMessage:', proposed.substring(0, 50) + '...');
+        } else {
+          console.warn('[ChatPage] hasProposedMessage returned true but extractProposedMessage returned empty', {
+            contentHasEmoji: content.includes('📝') || content.includes('📜'),
+            contentLength: content.length
+          });
+          // Try to extract again with more lenient logic
+          // Sometimes the message might be formatted differently
+          const retryExtracted = extractProposedMessage(content);
+          if (retryExtracted && retryExtracted.trim().length > 0) {
+            console.log('[ChatPage] Retry extraction succeeded');
+            setLastProposedMessage(retryExtracted);
+          }
+        }
+      } else {
+        // Clear lastProposedMessage if this message doesn't have a proposal
+        // (but only if this is the last agent message)
+        const isLastAgentMessage = draftMessages.filter(m => m.role === 'seller').pop()?.id === id;
+        if (isLastAgentMessage) {
+          console.log('[ChatPage] Last agent message does not contain proposed message, clearing lastProposedMessage');
+          setLastProposedMessage('');
+        }
       }
     }
   };
@@ -391,18 +468,97 @@ export function ChatPage() {
 
   // Handle approval button click - directly save and show feedback
   const handleApprove = async () => {
-    if (isLoading || !lastProposedMessage || !conversationId) return;
+    console.log('[ChatPage] handleApprove called', {
+      isLoading,
+      lastProposedMessage: lastProposedMessage ? 'exists' : 'missing',
+      conversationId: conversationId || 'missing',
+      lastProposedMessageLength: lastProposedMessage?.length || 0,
+      draftMessagesCount: draftMessages.length,
+      lastAgentMessageId: draftMessages.filter(m => m.role === 'seller').pop()?.id
+    });
+
+    if (isLoading) {
+      console.log('[ChatPage] Approve blocked: isLoading is true');
+      return;
+    }
+    
+    if (!conversationId) {
+      console.error('[ChatPage] Approve blocked: conversationId is missing');
+      return;
+    }
+    
+    // Determine the message to send (use lastProposedMessage or extract from last agent message)
+    let messageToSend = lastProposedMessage;
+    
+    if (!messageToSend || messageToSend.trim().length === 0) {
+      console.log('[ChatPage] lastProposedMessage is empty, trying to extract from last agent message');
+      // Try to extract from last agent message as fallback
+      const lastAgentMsg = draftMessages.filter(m => m.role === 'seller').pop();
+      if (lastAgentMsg) {
+        console.log('[ChatPage] Found last agent message:', {
+          id: lastAgentMsg.id,
+          contentLength: lastAgentMsg.content.length,
+          contentPreview: lastAgentMsg.content.substring(0, 200),
+          hasProposed: hasProposedMessage(lastAgentMsg.content)
+        });
+        
+        if (hasProposedMessage(lastAgentMsg.content)) {
+          const extracted = extractProposedMessage(lastAgentMsg.content);
+          console.log('[ChatPage] Extraction result:', {
+            extractedLength: extracted?.length || 0,
+            extractedPreview: extracted?.substring(0, 100) || 'empty'
+          });
+          
+          if (extracted && extracted.trim().length > 0) {
+            console.log('[ChatPage] Extracted message from last agent message as fallback');
+            messageToSend = extracted;
+            // Also update state for future reference
+            setLastProposedMessage(extracted);
+          } else {
+            console.error('[ChatPage] Could not extract proposed message from content', {
+              contentHasEmoji: lastAgentMsg.content.includes('📝') || lastAgentMsg.content.includes('📜'),
+              contentHasMarker: lastAgentMsg.content.includes('Message proposé'),
+              contentLength: lastAgentMsg.content.length
+            });
+            addDraftMessage('seller', 'Erreur: Impossible d\'extraire le message proposé. Veuillez réessayer.');
+            return;
+          }
+        } else {
+          console.error('[ChatPage] Last agent message does not contain a proposed message', {
+            contentPreview: lastAgentMsg.content.substring(0, 200)
+          });
+          addDraftMessage('seller', 'Erreur: Aucun message proposé trouvé. Veuillez réessayer.');
+          return;
+        }
+      } else {
+        console.error('[ChatPage] No last agent message found');
+        addDraftMessage('seller', 'Erreur: Aucun message proposé trouvé. Veuillez réessayer.');
+        return;
+      }
+    }
+    
+    if (!messageToSend || messageToSend.trim().length === 0) {
+      console.error('[ChatPage] Message to send is empty after extraction');
+      addDraftMessage('seller', 'Erreur: Le message est vide. Veuillez réessayer.');
+      return;
+    }
     
     setIsLoading(true);
 
     try {
+      console.log('[ChatPage] Saving message to conversation:', {
+        conversationId,
+        messageLength: messageToSend.length,
+        messagePreview: messageToSend.substring(0, 50) + '...'
+      });
+      
       // Save to backend
-      await saveMessageToConversation(conversationId, lastProposedMessage, username || undefined);
+      await saveMessageToConversation(conversationId, messageToSend, username || undefined);
       
       // Add to sent messages
       const sentMsg: SentMessage = {
         id: `sent-${Date.now()}`,
-        content: lastProposedMessage,
+        content: messageToSend,
         timestamp: new Date(),
         from: 'customer',
       };
@@ -458,10 +614,26 @@ export function ChatPage() {
 
   // Check if the last agent message has a proposed message (for showing approve button)
   const lastAgentMessage = draftMessages.filter(m => m.role === 'seller').pop();
+  const hasProposed = lastAgentMessage ? hasProposedMessage(lastAgentMessage.content) : false;
   const showApproveButton = lastAgentMessage && 
     !lastAgentMessage.isTyping && 
-    hasProposedMessage(lastAgentMessage.content) &&
+    hasProposed &&
     !isLoading;
+  
+  // Debug logging for approve button visibility
+  useEffect(() => {
+    if (lastAgentMessage) {
+      console.log('[ChatPage] Approve button visibility check:', {
+        hasLastAgentMessage: !!lastAgentMessage,
+        isTyping: lastAgentMessage.isTyping,
+        hasProposedMessage: hasProposed,
+        isLoading,
+        showApproveButton,
+        lastProposedMessage: lastProposedMessage ? 'set' : 'not set',
+        conversationId: conversationId || 'missing'
+      });
+    }
+  }, [lastAgentMessage, hasProposed, isLoading, showApproveButton, lastProposedMessage, conversationId]);
 
   // Are we currently in a drafting session?
   const isDrafting = draftMessages.length > 0;

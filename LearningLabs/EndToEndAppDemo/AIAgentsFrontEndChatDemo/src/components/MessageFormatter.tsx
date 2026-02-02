@@ -21,8 +21,8 @@ export function MessageFormatter({ content, hideSellerInfo, customerName }: Mess
     );
   }
 
-  // Check if message contains a proposed message to seller (must have the emoji 📝)
-  const hasProposedMessage = content.includes('📝');
+  // Check if message contains a proposed message to seller (must have the emoji 📝 or 📜)
+  const hasProposedMessage = content.includes('📝') || content.includes('📜');
   
   if (hasProposedMessage) {
     return <FormattedProposedMessage content={content} hideSellerInfo={hideSellerInfo} customerName={customerName} />;
@@ -49,7 +49,8 @@ function FormattedProposedMessage({
   hideSellerInfo?: boolean;
   customerName?: string;
 }) {
-  const proposedMessageStart = content.indexOf('📝');
+  // Look for either 📝 or 📜 emoji (agent might use either)
+  const proposedMessageStart = content.indexOf('📝') !== -1 ? content.indexOf('📝') : content.indexOf('📜');
   
   // Look for seller requirements section
   let sellerInfoStart = content.indexOf('💡');

@@ -235,9 +235,14 @@ public class AgentFactory : IAgentFactory
         var (policyAgent, _) = GetPolicyAgent();
         var (messageFormulatorAgent, _) = GetMessageFormulatorAgent();
 
-        var orderAgentTool = OrchestratorTools.CreateOrderAgentTool(orderAgent);
-        var policyAgentTool = OrchestratorTools.CreatePolicyAgentTool(policyAgent);
-        var messageFormulatorAgentTool = OrchestratorTools.CreateMessageFormulatorAgentTool(messageFormulatorAgent);
+        // Get tool configurations from appsettings.json
+        var orderToolConfig = agentsConfig.OrchestratorTools.Tools.TryGetValue("order_agent", out var orderConfig) ? orderConfig : null;
+        var policyToolConfig = agentsConfig.OrchestratorTools.Tools.TryGetValue("policy_agent", out var policyConfig) ? policyConfig : null;
+        var messageFormulatorToolConfig = agentsConfig.OrchestratorTools.Tools.TryGetValue("message_formulator_agent", out var msgConfig) ? msgConfig : null;
+
+        var orderAgentTool = OrchestratorTools.CreateOrderAgentTool(orderAgent, orderToolConfig);
+        var policyAgentTool = OrchestratorTools.CreatePolicyAgentTool(policyAgent, policyToolConfig);
+        var messageFormulatorAgentTool = OrchestratorTools.CreateMessageFormulatorAgentTool(messageFormulatorAgent, messageFormulatorToolConfig);
 
         var builder = new FluentAIAgentBuilder(azureClient, settings)
             .WithName(config.Name)

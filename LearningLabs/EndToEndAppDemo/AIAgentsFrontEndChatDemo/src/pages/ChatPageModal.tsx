@@ -218,7 +218,7 @@ export function ChatPageModal() {
   };
 
   const hasProposedMessage = (content: string): boolean => {
-    return content.includes('📝');
+    return content.includes('📝') || content.includes('📜');
   };
 
   const extractProposedMessage = (content: string): string => {
@@ -230,7 +230,8 @@ export function ChatPageModal() {
         .replace(/\[VOTRE\s+NOM\]/g, username);
     };
 
-    const proposedStart = content.indexOf('📝');
+    // Look for either 📝 or 📜 emoji (agent might use either)
+    const proposedStart = content.indexOf('📝') !== -1 ? content.indexOf('📝') : content.indexOf('📜');
     
     let sellerInfoStart = content.indexOf('💡');
     if (sellerInfoStart === -1) {
