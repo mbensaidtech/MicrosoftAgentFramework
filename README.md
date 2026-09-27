@@ -35,10 +35,193 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 
 ## Prerequisites
 
-- .NET 8 SDK or newer
-- Azure OpenAI resource deployed
-- Azure CLI logged in (`az login`) for DefaultAzureCredential
-- Visual Studio Code or Visual Studio 2022+
+| Requirement | Needed for | Notes |
+|-------------|-----------|-------|
+| **.NET 10 SDK** or newer | CLI and Dashboard | All labs and the dashboard target `net10.0`. Check with `dotnet --version`. |
+| **Azure OpenAI resource** with a chat deployment | Every lab | You need the endpoint URL and the **deployment name** (not the model name). |
+| **Authentication** | Every lab | Either the resource **API key**, or **Microsoft Entra ID**: `az login` + the *Cognitive Services OpenAI User* role on the resource (used automatically when no key is set). |
+| Embedding deployment | Lab07+ | e.g. `text-embedding-ada-002` |
+| MongoDB | Lab05, Lab12 | e.g. `mongodb://localhost:27017`. Lab05 provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). |
+| Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
+| Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
+
+> **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Only the migrated labs are available in the dashboard; every lab runs with the CLI.
+
+---
+
+## Running the Labs: CLI or Dashboard
+
+There are two ways to run a lab. Both run **the same projects, with the same `dotnet` commands and the same configuration**, so you can switch at any time.
+
+| | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
+|---|---|---|
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05) |
+| How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
+| Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
+| Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
+| Interactive labs (`Console.ReadLine`) | Supported (keyboard) | Supported for labs declared interactive: an input box asks for each value |
+| Best for | Every lab, debugging, IDE workflow | Getting started, quick feedback on the migrated labs |
+
+Whichever you choose, **configure Azure OpenAI once first**: the configuration is shared by every lab and by both options.
+
+### Configure Azure OpenAI
+
+Each lab reads its settings from these sources (the last one wins):
+
+1. `appsettings.json` of the lab (ships with `YOUR-…` placeholders)
+2. **User secrets** shared by all migrated labs (id `microsoft-agent-framework-learninglabs`, stored outside the repository)
+3. **Environment variables** `AzureOpenAI__*`
+
+Pick one method:
+
+- **Dashboard form**, no terminal needed — see [step 4 of Option B](#4-configure-azure-openai-from-the-dashboard).
+- **User secrets** (recommended for the API key), from any migrated lab project folder:
+  ```bash
+  cd LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
+  dotnet user-secrets set "AzureOpenAI:Endpoint" "https://my-resource.openai.azure.com/"
+  dotnet user-secrets set "AzureOpenAI:ChatDeploymentName" "gpt-4o"
+  dotnet user-secrets set "AzureOpenAI:APIKey" "<your-api-key>"   # optional: omit it to use Microsoft Entra ID
+  dotnet user-secrets list
+  ```
+- **Environment variables**, required for the labs that are **not migrated yet** (they don't read user secrets) — see [Environment Variables Configuration](#environment-variables-configuration).
+- **`appsettings.json`** of a single lab — works, but never commit a real key.
+
+If the endpoint or the deployment is missing, a migrated lab stops with *"'AzureOpenAI:Endpoint' is not configured"*. No API version is needed: the labs use the Azure OpenAI **v1** API (`…/openai/v1/`).
+
+---
+
+### Option A — Run a lab with the `dotnet` CLI
+
+#### 1. Find the lab
+
+Labs live in `LearningLabs/<Part>/<LabFolder>/`, and each lab has two projects:
+
+| Folder | Content | When to run it |
+|--------|---------|----------------|
+| `Start/` | The exercise, with `TODO` comments to complete | While you work on the lab |
+| `Solution/` | The complete reference implementation | To see the expected behavior, or to compare |
+
+```bash
+ls LearningLabs/AzureOpenAI        # Part 1: Lab01-FirstBasicAIAgent, Lab02-AIAgentWithSO, ...
+ls LearningLabs/MultiAgentSystem   # Part 2: Lab01-UseAgentAsTool, Lab02_OrchestrationSequential, ...
+```
+
+What each lab covers is listed in [Labs Overview](#labs-overview).
+
+#### 2. Run it
+
+From the lab folder:
+
+```bash
+cd LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
+dotnet run
+```
+
+Or from the repository root:
+
+```bash
+# My exercise
+dotnet run --project LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
+
+# Reference solution
+dotnet run --project LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Solution
+```
+
+The first `dotnet run` restores the NuGet packages and builds the project (including the shared `CommonUtilities` project).
+To only check that your code compiles: `dotnet build LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start`.
+
+> **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal, then `Lab06_A2AClient` in another.
+
+#### 3. Read the result
+
+The program prints each scenario (`=== Scenario 1: … ===`), the agent answers and, in most labs, the token usage (`Input tokens: …`).
+Compare it with the output of `Solution/`. Stop a running lab with `Ctrl+C`.
+
+---
+
+### Option B — Run a lab with the Lab Bench Dashboard
+
+The dashboard is a local web UI (listening on `127.0.0.1` only) that builds and runs the labs for you and shows the live output, a verdict, the token usage and the run history. It is optional: no lab depends on it.
+
+#### 1. Start the dashboard
+
+Run it from its own folder (it locates the labs relative to this folder):
+
+```bash
+cd Dashboard/LabDashboard
+dotnet run
+```
+
+The terminal prints `Lab dashboard running on http://127.0.0.1:5057 (Ctrl+C to stop)`. Keep it open; stop the dashboard with `Ctrl+C`.
+
+> Port 5057 already in use? `Dashboard__Port=5058 dotnet run` (macOS/Linux) or `$env:Dashboard__Port=5058; dotnet run` (PowerShell).
+
+#### 2. Open the interface
+
+Open <http://127.0.0.1:5057> in your browser. The top bar shows:
+
+- the runner status (**Runner connected**);
+- the **Azure OpenAI** button with the authentication status: *API key*, *Microsoft Entra ID* or *Not configured*;
+- the **EN | FR** language selector.
+
+The **Labs** list on the left shows every registered lab with its progress (*Not started*, *In progress*, *Completed*) and last result.
+
+#### 3. Select a lab
+
+Click a lab in the list. Its page has five tabs:
+
+| Tab | Content |
+|-----|---------|
+| **Run** | Run the lab and follow its execution |
+| **Instructions** | The lab `README.md` (the French version when the lab provides a `README.fr.md`) |
+| **History** | The last 30 runs: project, result, date, duration, tokens |
+| **About** | What you will learn, the lab folder, the NuGet packages, the equivalent `dotnet` commands, and the checks used to judge a run |
+| **Solution** | The solution files that differ from the exercise, behind a *"Try it yourself first"* gate |
+
+#### 4. Configure Azure OpenAI from the dashboard
+
+Click **Azure OpenAI** in the top bar and fill in:
+
+- **Endpoint** — e.g. `https://my-resource.openai.azure.com/`
+- **Chat deployment** — the deployment name in your resource (not the model name)
+- **API key** — optional; leave it empty to use Microsoft Entra ID (`az login`). Once saved, the key is never displayed again (*"•••• stored — leave empty to keep it"*); **Remove API key** deletes it.
+
+Click **Save**. The values are written to the shared user secrets (outside the repository) and are used by the **next run, from the dashboard and from `dotnet run` alike**. The form shows where each value comes from and warns when an `AzureOpenAI__*` environment variable overrides it.
+
+#### 5. Run the lab
+
+In the **Run** tab:
+
+1. Choose the project: **My exercise** (`Start/`) or **Reference solution** (`Solution/`).
+2. Click **Run**. The dashboard runs `dotnet build`, then `dotnet run --no-build` — the same commands as the CLI.
+3. Follow the steps **Build → Run → Checks**. **Cancel** stops the run (the whole process tree is killed); a run also stops when the lab timeout is reached.
+
+Only one run can be in progress at a time.
+
+**Interactive labs** (the program calls `Console.ReadLine()`): during the run, an input box appears under the output. When the program reads, the box is focused with a *Waiting for input #n* badge; type the value and press **Enter** — it is echoed in the output and sent to the program. You can type ahead, and **End input** closes the standard input (the next `ReadLine()` returns `null`, like `Ctrl+D`). Waiting for your answer does not count against the lab time limit; a prompt left unanswered for 10 minutes stops the run. The **About** tab says whether a lab is interactive.
+
+#### 6. Read the results, logs and execution details
+
+| Where | What it shows |
+|-------|---------------|
+| **Output** terminal | The program output (stdout/stderr), live; the console spinner is shown as a status line. **Copy output** copies it. |
+| **Verdict** | **Passed** when the build succeeds, the exit code is 0 **and** every check matches the output; otherwise **Failed** with the reason (build errors, exit code, failed checks, *Timed out*, *Cancelled*), plus the build/run durations and the exit code. |
+| **Checks** | Each expected behavior of the lab (e.g. *"Scenario 2 answered"*) and its status. The delivered exercise fails them until its TODOs are completed. |
+| **Errors / Build warnings** | Compiler errors (`error CS…`) or the program's stderr. A missing Azure OpenAI setting links to the settings form. |
+| **Token usage** | Input / output / reasoning / total tokens per scenario, as printed by the lab; *Not available* when the lab prints none. No cost estimate. |
+| **History** tab | Past runs, stored in `Dashboard/.data/history.json` (git-ignored). |
+
+The API key never appears in the output, the history or a copied output: it is replaced by `••••`.
+
+#### Dashboard limitations
+
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab05): run the other labs with the CLI.
+- Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
+- Console colors are not rendered.
+
+More details (architecture, HTTP API, security, registering a new lab, tests): [Dashboard/README.md](Dashboard/README.md).
 
 ---
 
@@ -62,6 +245,7 @@ This part focuses on building **individual AI agents** with various capabilities
 | Scenario 2 | Create an agent with custom instructions and name |
 | Scenario 3 | Use ChatMessages for fine-grained control |
 | Scenario 4 | Monitor token usage from responses |
+| Scenario 5 | Stream the response with `RunStreamingAsync` |
 
 ---
 
@@ -71,9 +255,10 @@ This part focuses on building **individual AI agents** with various capabilities
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Manual structured output with JSON parsing |
-| Scenario 2 | Automatic structured output with `RunAsync<T>` (Recommended) |
-| Scenario 3 | Structured output using `AIAgent` with `ChatOptions` |
+| Scenario 1 | Manual structured output: JSON format described in the instructions, parsed with `JsonSerializer` |
+| Scenario 2 | Automatic structured output with `RunAsync<T>` and `AgentResponse<T>.Result` (Recommended) |
+| Scenario 3 | Response format configured on the agent (`ChatClientAgentOptions` + `ChatResponseFormat.ForJsonSchema<T>()`) |
+| Scenario 4 | Response format for a single run (`AgentRunOptions`) with streaming |
 
 ---
 
@@ -83,9 +268,10 @@ This part focuses on building **individual AI agents** with various capabilities
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Basic function tools calling |
-| Scenario 2 | Function tools using reflection |
-| Scenario 3 | Static tools with Dependency Injection |
+| Scenario 1 | Basic function tools calling: `AIFunctionFactory.Create()`, `[Description]`, `AsAIAgent(..., tools: ...)` |
+| Scenario 2 | Function tools discovered with reflection (`MethodInfo` + `AIFunctionFactory.Create(method, target)`) |
+| Scenario 3 | Static tools with dependency injection (`IServiceProvider` parameter + `AsAIAgent(..., services: ...)`) |
+| Scenario 4 | Function calling middleware that traces every tool call (`AsBuilder().Use(...)`) |
 
 ---
 
@@ -95,18 +281,21 @@ This part focuses on building **individual AI agents** with various capabilities
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Connect to MCP server and use available tools |
+| Scenario 1 | Connect to the Hugging Face MCP server (`McpClient.CreateAsync` + `HttpClientTransport`) and discover its tools (`ListToolsAsync`) |
+| Scenario 2 | Agent with the MCP tools (`ChatClientAgentOptions`) and structured output (`RunAsync<T>`), with the list of tools called |
+| Scenario 3 | Give the agent only the MCP tool it needs, and compare the token usage |
 
 ---
 
-### Lab 05 - AI Agent with Threads
+### Lab 05 - AI Agent with Sessions
 
-**Learn how to maintain conversation context across multiple interactions**
+**Learn how to hold, save and resume conversations (`AgentSession`) and where their chat history is stored (`ChatHistoryProvider`)**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Multi-turn conversations with thread context |
-| Scenario 2 | Persistent chat history with MongoDB |
+| Scenario 1 | Session with the default in-memory chat history: `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync`, the messages kept in the session |
+| Scenario 2 | Custom `ChatHistoryProvider` storing the chat history in a vector store (`InMemoryVectorStore`): the serialized session only holds a key |
+| Scenario 3 | The same with MongoDB: a new agent resumes the saved session after a simulated restart (MongoDB container provided) |
 
 ---
 
@@ -236,26 +425,24 @@ The `CommonUtilities` project provides shared helper classes used across all lab
 
 ## Getting Started
 
-1. **Clone the repository**
+1. **Clone the repository** and check the [prerequisites](#prerequisites)
    ```bash
    git clone <repository-url>
    cd MicrosoftAgentFramework
+   dotnet --version   # 10.0 or newer
    ```
 
-2. **Choose a lab to start with** (AzureOpenAI/Lab01 recommended for beginners)
-   ```bash
-   # For individual agents (Part 1)
-   cd LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
-   
-   # For multi-agent systems (Part 2)
-   cd LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool/Start
-   ```
+2. **Configure Azure OpenAI once** — see [Configure Azure OpenAI](#configure-azure-openai)
 
-3. **Configure your settings** - See the [Environment Variables Configuration](#environment-variables-configuration) section below
+3. **Choose a lab** (AzureOpenAI/Lab01 recommended for beginners), read its `README.md` and complete the TODOs in `Start/Program.cs`
 
-4. **Complete the TODOs** and run your solution
+4. **Run it** with either option (see [Running the Labs](#running-the-labs-cli-or-dashboard)):
    ```bash
-   dotnet run
+   # Option A — CLI
+   dotnet run --project LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
+
+   # Option B — Dashboard: then open http://127.0.0.1:5057, select the lab and click Run
+   cd Dashboard/LabDashboard && dotnet run
    ```
 
 ---
@@ -270,6 +457,7 @@ Instead of editing each `appsettings.json` file in every lab, you can set enviro
 |----------|-------------|---------|
 | `AzureOpenAI__Endpoint` | Your Azure OpenAI endpoint URL | `https://my-resource.openai.azure.com/` |
 | `AzureOpenAI__ChatDeploymentName` | Your chat model deployment name | `gpt-4o` |
+| `AzureOpenAI__APIKey` | Optional API key (if unset, `DefaultAzureCredential` is used) | `<your-api-key>` |
 | `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-ada-002` |
 | `MongoDB__ConnectionString` | MongoDB connection string (Lab05, Lab12) | `mongodb://localhost:27017` |
 
@@ -338,6 +526,10 @@ echo $env:AzureOpenAI__Endpoint
 ```
 
 > **Note:** Environment variables take precedence over values in `appsettings.json`. You can still use `appsettings.json` for lab-specific overrides if needed.
+>
+> Migrated labs also read **user secrets** (shared id `microsoft-agent-framework-learninglabs`), the recommended place for the API key during local development:
+> `dotnet user-secrets set "AzureOpenAI:APIKey" "<your-api-key>"` (run from any migrated lab project folder),
+> or, without a terminal, the **Azure OpenAI settings** of the [Lab Bench dashboard](Dashboard/README.md#azure-openai-settings), which write the same file.
 
 ---
 
@@ -374,7 +566,7 @@ We recommend following the labs in order, starting with the **AzureOpenAI** labs
 
 ## Useful Links
 
-- [Microsoft Agents Framework](https://github.com/microsoft/agents)
+- [Microsoft Agent Framework](https://github.com/microsoft/agent-framework)
 - [Microsoft Agents Documentation](https://learn.microsoft.com/en-us/agent-framework/)
 - [Azure OpenAI Documentation](https://learn.microsoft.com/azure/ai-services/openai/)
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)

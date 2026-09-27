@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="LabDashboard.Tests/LabDashboard.Tests.csproj" />
+  <Project Path="LabDashboard/LabDashboard.csproj" />
+  <Project Path="LabInputHook/LabInputHook.csproj" />
+</Solution>

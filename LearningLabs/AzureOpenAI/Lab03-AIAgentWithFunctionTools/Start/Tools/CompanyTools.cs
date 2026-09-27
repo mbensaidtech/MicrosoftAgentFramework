@@ -1,11 +1,13 @@
 using System.ComponentModel;
-using Microsoft.Extensions.AI;
 
 namespace AIAgentWithFunctionTools.Tools;
 
 /// <summary>
 /// Internal company tools that provide real-time data the LLM cannot know from training.
 /// These tools give the agent access to internal systems: employees, meeting rooms, vacations, etc.
+/// The [Description] attributes on the methods and their parameters are sent to the model with the tool
+/// (function description and JSON schema of the parameters): they tell the model when and how to call each tool.
+/// Only the public methods are exposed in scenario 2 (reflection); the private ones stay internal helpers.
 /// </summary>
 public class CompanyTools
 {
@@ -36,11 +38,9 @@ public class CompanyTools
     /// <summary>
     /// Gets employee information by their employee ID.
     /// </summary>
-    // TODO: Add [Description] attribute to describe the method to the LLM
-    // Hint: The Description attribute helps the LLM understand when to use this function
+    [Description("Retrieves detailed information about an employee using their employee ID (e.g., EMP001, EMP002).")]
     public string GetEmployeeInfo(
-        // TODO: Add [Description] attribute to describe the parameter to the LLM
-        string employeeId)
+        [Description("The employee ID (e.g., EMP001)")] string employeeId)
     {
         if (_employees.TryGetValue(employeeId.ToUpper(), out var employee))
         {
@@ -157,7 +157,7 @@ public class CompanyTools
             .Any();
 
         if (conflicts)
-            return $" Cannot book: Room {roomId} is already booked during this time.";
+            return $"Cannot book: Room {roomId} is already booked during this time.";
 
         _bookings.Add(new RoomBooking(roomId, employeeId, start, end, subject));
         var room = _meetingRooms[roomId];
@@ -202,4 +202,3 @@ public class CompanyTools
 public record Employee(string Id, string Name, string Department, string Position, string Email, int VacationDaysRemaining);
 public record MeetingRoom(string Id, string Name, int Capacity, string[] Features);
 public record RoomBooking(string RoomId, string BookedBy, DateTime StartTime, DateTime EndTime, string Subject);
-

@@ -4,7 +4,7 @@ A shared utility library providing common functionality for all Learning Labs in
 
 ## Overview
 
-This project contains reusable utility classes that simplify console output formatting across all labs. It is referenced as a project dependency by each lab.
+This project contains reusable utility classes (console output, spinner, Azure OpenAI endpoint helper, MongoDB health check) shared by all labs. It is referenced as a project dependency by each lab.
 
 ## Features
 
@@ -50,6 +50,24 @@ ColoredConsole.WriteErrorLine("An error occurred!");
 // Success message
 ColoredConsole.WriteSuccessLine("Operation completed successfully!");
 ```
+
+### AzureOpenAIEndpoint
+
+Builds the Azure OpenAI **v1** endpoint expected by the official `OpenAI` SDK from the resource endpoint shown in the Azure portal.
+
+```csharp
+using CommonUtilities;
+using OpenAI;
+
+// https://my-resource.openai.azure.com/  ->  https://my-resource.openai.azure.com/openai/v1/
+OpenAIClientOptions options = new() { Endpoint = AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) };
+```
+
+Endpoints that already end with `/openai/v1` are returned unchanged.
+
+### ConsoleSpinner / WithSpinner
+
+Shows a loading animation while an async operation runs: `await agent.RunAsync("...").WithSpinner("Running agent");`
 
 ## Project Reference
 

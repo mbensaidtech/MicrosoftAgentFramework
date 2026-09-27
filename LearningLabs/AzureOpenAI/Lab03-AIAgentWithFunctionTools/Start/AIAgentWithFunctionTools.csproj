@@ -5,13 +5,22 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Shared by every lab: set your Azure OpenAI secrets once with `dotnet user-secrets`. -->
+    <UserSecretsId>microsoft-agent-framework-learninglabs</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageReference Include="Azure.Identity" Version="1.18.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251204.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <!-- Configuration: appsettings.json + user secrets + environment variables, bound to AzureOpenAISettings. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
+    <!-- ServiceCollection: the dependency injection container used by scenario 3 (tools that resolve services). -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

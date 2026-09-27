@@ -1,21 +1,23 @@
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Azure.Identity;
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using OpenAI;
 using OpenAI.Chat;
 using AIExtensions = Microsoft.Extensions.AI;
 using CommonUtilities;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 using AIAgentWithSO;
 using AIAgentWithSO.Models;
+using static AIAgentWithSO.RestaurantConsole;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2, 3];
+// Set to: [1], [2], [3], [4] or [1, 2, 3, 4] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2, 3, 4];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -27,89 +29,123 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
-// TODO 1: Create AzureOpenAIClient with managed identity authentication
-// Hint: Use DefaultAzureCredential for authentication
-// AzureOpenAIClient client = ...
+// TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
+// Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
+// OpenAIClientOptions clientOptions = ...
 
-// TODO 2: Get a ChatClient for the specific deployment
+// TODO 2: Create the OpenAIClient
+// - If settings.APIKey is set: authenticate with an ApiKeyCredential
+// - Otherwise: authenticate with Microsoft Entra ID using a BearerTokenPolicy built from
+//   DefaultAzureCredential and the scope "https://ai.azure.com/.default"
+// Note: the AuthenticationPolicy constructor is flagged experimental (OPENAI001), keep the pragma around it.
+#pragma warning disable OPENAI001
+// OpenAIClient client = ...
+#pragma warning restore OPENAI001
+
+// TODO 3: Get a ChatClient (Chat Completions API) for the deployment
 // ChatClient chatClient = ...
+
+// Provided: JSON options used to generate the schema (scenarios 3 and 4) and to deserialize the JSON text ourselves:
+// web defaults (camelCase, case-insensitive property names) + enums written as strings (e.g. "French")
+JsonSerializerOptions jsonOptions = new(JsonSerializerOptions.Web)
+{
+    Converters = { new JsonStringEnumConverter() }
+};
 
 #endregion
 
-#region Scenario 1: Manual Structured Output - Restaurant Information
+#region Scenario 1: Manual Structured Output - JSON format described in the instructions
 
 if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 3: Create an agent with JSON format instructions for Restaurant
-    // Hint: Use chatClient.CreateAIAgent() with instructions parameter
-    // ChatClientAgent restaurantAgent = ...
+    // TODO 4: Create an agent whose instructions describe the expected JSON format (see the README for the instructions)
+    // Hint: chatClient.AsAIAgent(instructions: "...", name: "RestaurantInfoAgent")
+    // AIAgent restaurantAgent = ...
 
-    // TODO 4: Run the agent with a restaurant question
-    // AgentRunResponse restaurantResponse = ...
+    // TODO 5: Run the agent with the restaurant question, asking for JSON only
+    // Hint: await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.").WithSpinner("Running agent")
+    // AgentResponse response = ...
 
-    ColoredConsole.WriteInfoLine("=== Scenario 1: Manually defined structured output - Restaurant Information ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 1: Manually defined structured output ===");
 
-    // TODO 5: Parse the JSON response and display restaurant information
-    // Hint: Use JsonSerializer.Deserialize<Restaurant>() with JsonSerializerOptions
-    // Restaurant restaurant = ...
+    // TODO 6: Parse the JSON text yourself and display the restaurant
+    // Hint: JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions) inside a try/catch (JsonException),
+    //       then WriteRestaurant(restaurant)
 
-    // TODO 6: Display token usage
-    // Hint: Use response.Usage property (InputTokenCount, OutputTokenCount, TotalTokenCount)
+    // TODO 7: Display token usage
+    // Hint: WriteTokenUsage(response)
 }
 
 #endregion
 
-#region Scenario 2: Automatically generated structured output (Recommended) - Restaurant Information
+#region Scenario 2: Automatic Structured Output with RunAsync<T> (Recommended)
 
 if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 7: Create an agent with simple instructions (no JSON format needed)
-    // ChatClientAgent restaurantAgentWithStructuredOutput = ...
+    // TODO 8: Create an agent with simple instructions - no JSON format needed
+    // AIAgent restaurantAgent = ...
 
-    ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output - Restaurant Information ===");
+    // TODO 9: Run the agent with RunAsync<Restaurant>: the framework generates the JSON schema and deserializes the answer
+    // AgentResponse<Restaurant> response = ...
 
-    // TODO 8: Run the agent with RunAsync<Restaurant> for automatic structured output
-    // Hint: Use await agent.RunAsync<Restaurant>(prompt) - no manual JSON parsing needed!
-    // AgentRunResponse<Restaurant> structuredRestaurantResponse = ...
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output with RunAsync<T> ===");
 
-    // TODO 9: Display the structured response
-    // Hint: Access properties via structuredRestaurantResponse.Result.PropertyName
+    // TODO 10: Display the strongly-typed result
+    // Hint: response.Result is already a Restaurant - WriteRestaurant(response.Result)
 
-    // TODO 10: Display token usage
-    // Hint: Use response.Usage property (InputTokenCount, OutputTokenCount, TotalTokenCount)
+    // TODO 11: Display token usage
+    // Hint: AgentResponse<T> is an AgentResponse - WriteTokenUsage(response)
 }
 
 #endregion
 
-#region Scenario 3: Automatically generated structured output using AIAgent and ChatOptions - Restaurant Information
+#region Scenario 3: Structured Output configured on the agent - ChatClientAgentOptions and ResponseFormat
 
 if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 11: Create a JSON schema for the Restaurant type
-    // Hint: Use AIJsonUtilities to create schema from type
+    // TODO 12: Create an agent with ChatClientAgentOptions whose ChatOptions define the instructions and the response format
+    // Hint: ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
+    // AIAgent restaurantAgent = ...
 
-    // TODO 12: Create ChatOptions with Instructions and ResponseFormat
-    // Hint: Set ResponseFormat using ChatResponseFormat.ForJsonSchema()
+    // TODO 13: Run the agent with the non-generic RunAsync
+    // AgentResponse response = ...
 
-    // TODO 13: Create an AIAgent using ChatClientAgentOptions
-    // Hint: Pass ChatOptions to the agent options
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Structured output configured on the agent ===");
 
-    ColoredConsole.WriteInfoLine("=== Scenario 3: Structured output using AIAgent and ChatOptions ===");
+    // TODO 14: Display the JSON text (response.Text), then deserialize it and display the restaurant
+    // Hint: JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)
 
-    // TODO 14: Run the agent and deserialize the response
-    // Hint: Use response.Deserialize<T>() to get typed result
+    // TODO 15: Display token usage
+}
 
-    // TODO 15: Display the structured response
-    // Hint: Access properties via restaurantInfo.PropertyName
+#endregion
 
-    // TODO 16: Display token usage
-    // Hint: Use response.Usage property (InputTokenCount, OutputTokenCount, TotalTokenCount)
+#region Scenario 4: Structured Output per run with AgentRunOptions - Streaming
+
+if (ShouldRunScenario(4))
+{
+    ColoredConsole.WriteDividerLine();
+
+    // TODO 16: Create an agent with simple instructions - no response format on the agent itself
+    // AIAgent restaurantAgent = ...
+
+    // TODO 17: Define the response format for this run only
+    // Hint: AgentRunOptions runOptions = new() { ResponseFormat = ... }
+
+    ColoredConsole.WriteInfoLine("=== Scenario 4: Structured output with AgentRunOptions and streaming ===");
+
+    // TODO 18: Stream the answer with RunStreamingAsync("Tell me about the restaurant 'Le Bernardin' in New York.", options: runOptions)
+    // Hint: write each update.Text with Console.Write and keep the updates in a List<AgentResponseUpdate>
+    //       (no .WithSpinner() here: the spinner would overwrite the streamed text)
+
+    // TODO 19: Combine the updates into one AgentResponse, deserialize its Text, display the restaurant and the token usage
+    // Hint: AgentResponse response = updates.ToAgentResponse();
 }
 
 #endregion

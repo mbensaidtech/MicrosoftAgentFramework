@@ -1,53 +1,83 @@
-using AIAgentWithThreads.Configuration;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace AIAgentWithThreads;
 
 /// <summary>
 /// Helper class for loading configuration.
+/// Sources, from lowest to highest priority: appsettings.json, user secrets, environment variables
+/// (e.g. <c>AzureOpenAI__APIKey</c>).
 /// </summary>
 public static class ConfigurationHelper
 {
     private static IConfiguration? _configuration;
-    private static IMongoDatabase? _mongoDatabase;
 
     public static IConfiguration Configuration => _configuration ??= BuildConfiguration();
 
     private static IConfiguration BuildConfiguration()
     {
-        var builder = Host.CreateApplicationBuilder();
-        return builder.Configuration;
+        return new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddUserSecrets<AzureOpenAISettings>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
     }
 
+    /// <summary>
+    /// Get the Azure OpenAI settings from the configuration.
+    /// </summary>
+    /// <returns>The Azure OpenAI settings.</returns>
     public static AzureOpenAISettings GetAzureOpenAISettings()
     {
-        return Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
-            ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing");
+        AzureOpenAISettings settings = Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
+            ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing.");
+
+        EnsureConfigured(settings.Endpoint, "AzureOpenAI:Endpoint");
+        EnsureConfigured(settings.ChatDeploymentName, "AzureOpenAI:ChatDeploymentName");
+
+        return settings;
     }
 
-    public static MongoDbConfiguration GetMongoDbConfiguration()
+    /// <summary>
+    /// Connect to the MongoDB database of the configuration and check that the server answers.
+    /// </summary>
+    /// <returns>The MongoDB database that stores the chat history.</returns>
+    public static async Task<IMongoDatabase> ConnectToMongoDbAsync(CancellationToken cancellationToken = default)
     {
-        return Configuration.GetSection("MongoDb").Get<MongoDbConfiguration>()
-            ?? throw new InvalidOperationException("MongoDb configuration section is missing");
+        MongoDbSettings settings = Configuration.GetSection("MongoDb").Get<MongoDbSettings>()
+            ?? throw new InvalidOperationException("MongoDb configuration section is missing.");
+
+        EnsureConfigured(settings.ConnectionString, "MongoDb:ConnectionString");
+        EnsureConfigured(settings.DatabaseName, "MongoDb:DatabaseName");
+
+        MongoClientSettings clientSettings = MongoClientSettings.FromConnectionString(settings.ConnectionString);
+        // Fail fast (instead of the 30 seconds default) when MongoDB is not started.
+        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+
+        IMongoDatabase database = new MongoClient(clientSettings).GetDatabase(settings.DatabaseName);
+        try
+        {
+            await database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new InvalidOperationException(
+                $"MongoDB is not reachable with the connection string of 'MongoDb:ConnectionString'. " +
+                "Start it with 'docker compose up -d' in the MongoDB folder of the lab.", exception);
+        }
+
+        return database;
     }
 
-    public static IMongoDatabase GetMongoDatabase()
+    private static void EnsureConfigured(string value, string key)
     {
-        if (_mongoDatabase is not null)
-            return _mongoDatabase;
-
-        var config = GetMongoDbConfiguration();
-        var client = new MongoClient(config.ConnectionString);
-        _mongoDatabase = client.GetDatabase(config.DatabaseName);
-
-        return _mongoDatabase;
-    }
-
-    public static AgentSettings GetAgent(string agentName)
-    {
-        return Configuration.GetSection($"AzureOpenAI:Agents:{agentName}").Get<AgentSettings>()
-            ?? throw new InvalidOperationException($"Agent '{agentName}' configuration is missing");
+        if (string.IsNullOrWhiteSpace(value) || value.Contains("YOUR-", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"'{key}' is not configured. Set it in appsettings.json, with 'dotnet user-secrets set \"{key}\" <value>', " +
+                $"or with the environment variable '{key.Replace(":", "__")}'.");
+        }
     }
 }

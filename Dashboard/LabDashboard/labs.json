@@ -1,0 +1,486 @@
+{
+  "labs": [
+    {
+      "id": "azureopenai-lab01",
+      "number": "01",
+      "track": "Azure OpenAI",
+      "title": "First Basic AI Agent",
+      "summary": "Create your first agent on Azure OpenAI, give it instructions, read token usage and stream a response.",
+      "level": "Beginner",
+      "objectives": [
+        "Connect to Azure OpenAI through the v1 API (API key or Microsoft Entra ID)",
+        "Turn a ChatClient into an AIAgent with AsAIAgent()",
+        "Give an agent instructions and a name",
+        "Run an agent with a prompt or with ChatMessages",
+        "Read token usage, including after a streamed run"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent",
+      "startProject": "Start/FirstBasicAIAgent.csproj",
+      "solutionProject": "Solution/FirstBasicAIAgent.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1",
+          "description": "Scenario 1 - the basic agent answered",
+          "pattern": "^=== Scenario 1:[^\\n]*===\\n\\S"
+        },
+        {
+          "id": "scenario2",
+          "description": "Scenario 2 - the agent with instructions answered",
+          "pattern": "^=== Scenario 2:[^\\n]*===\\n\\S"
+        },
+        {
+          "id": "scenario3",
+          "description": "Scenario 3 - the agent answered the ChatMessages",
+          "pattern": "^=== Scenario 3:[^\\n]*===\\n\\S"
+        },
+        {
+          "id": "scenario4",
+          "description": "Scenario 4 - token usage displayed",
+          "pattern": "(?is)=== Scenario 4:.*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario5",
+          "description": "Scenario 5 - the streamed answer was displayed",
+          "pattern": "^=== Scenario 5:[^\\n]*===\\n\\S"
+        },
+        {
+          "id": "scenario5-usage",
+          "description": "Scenario 5 - token usage of the streamed run displayed",
+          "pattern": "(?is)=== Scenario 5:.*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Premier agent IA",
+          "level": "Débutant",
+          "summary": "Créez votre premier agent sur Azure OpenAI, donnez-lui des instructions, lisez la consommation de tokens et diffusez une réponse en streaming.",
+          "objectives": [
+            "Se connecter à Azure OpenAI via l'API v1 (clé API ou Microsoft Entra ID)",
+            "Transformer un ChatClient en AIAgent avec AsAIAgent()",
+            "Donner des instructions et un nom à un agent",
+            "Exécuter un agent avec un prompt ou avec des ChatMessage",
+            "Lire la consommation de tokens, y compris après une exécution en streaming"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1": "Scénario 1 - l'agent de base a répondu",
+            "scenario2": "Scénario 2 - l'agent avec instructions a répondu",
+            "scenario3": "Scénario 3 - l'agent a répondu aux ChatMessage",
+            "scenario4": "Scénario 4 - consommation de tokens affichée",
+            "scenario5": "Scénario 5 - la réponse en streaming a été affichée",
+            "scenario5-usage": "Scénario 5 - consommation de tokens du streaming affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab02",
+      "number": "02",
+      "track": "Azure OpenAI",
+      "title": "AI Agent With Structured Output",
+      "summary": "Get answers as typed JSON: describe the format yourself, then use RunAsync<T>, a response format on the agent and a response format for a single streamed run.",
+      "level": "Beginner",
+      "objectives": [
+        "See why a JSON format described in the instructions is fragile",
+        "Get a strongly-typed result with RunAsync<T>() and AgentResponse<T>.Result",
+        "Generate a JSON schema from a .NET type with ChatResponseFormat.ForJsonSchema<T>()",
+        "Configure the response format of an agent with ChatClientAgentOptions",
+        "Set the response format of a single run with AgentRunOptions, including when streaming"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab02-AIAgentWithSO",
+      "startProject": "Start/AIAgentWithSO.csproj",
+      "solutionProject": "Solution/AIAgentWithSO.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1",
+          "description": "Scenario 1 - the JSON described in the instructions was parsed",
+          "pattern": "^=== Scenario 1:[^\\n]*===\\nSuccessfully parsed structured response:\\nName: \\S"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2",
+          "description": "Scenario 2 - RunAsync<T> returned a typed Restaurant",
+          "pattern": "^=== Scenario 2:[^\\n]*===\\nStructured response:\\nName: \\S"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3",
+          "description": "Scenario 3 - the agent returned JSON that was deserialized",
+          "pattern": "^=== Scenario 3:[^\\n]*===\\nJSON response:\\n\\{[^\\n]*\\}\\nDeserialized response:\\nName: \\S"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4",
+          "description": "Scenario 4 - the streamed JSON was deserialized",
+          "pattern": "^=== Scenario 4:[^\\n]*===\\n\\{[^\\n]*\\}\\nDeserialized response:\\nName: \\S"
+        },
+        {
+          "id": "scenario4-usage",
+          "description": "Scenario 4 - token usage of the streamed run displayed",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec sortie structurée",
+          "level": "Débutant",
+          "summary": "Obtenez des réponses en JSON typé : décrivez vous-même le format, puis utilisez RunAsync<T>, un format de réponse sur l'agent et un format de réponse pour une seule exécution en streaming.",
+          "objectives": [
+            "Comprendre pourquoi un format JSON décrit dans les instructions est fragile",
+            "Obtenir un résultat fortement typé avec RunAsync<T>() et AgentResponse<T>.Result",
+            "Générer un schéma JSON à partir d'un type .NET avec ChatResponseFormat.ForJsonSchema<T>()",
+            "Configurer le format de réponse d'un agent avec ChatClientAgentOptions",
+            "Définir le format de réponse d'une seule exécution avec AgentRunOptions, y compris en streaming"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1": "Scénario 1 - le JSON décrit dans les instructions a été analysé",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2": "Scénario 2 - RunAsync<T> a renvoyé un Restaurant typé",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "scenario3": "Scénario 3 - l'agent a renvoyé du JSON qui a été désérialisé",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
+            "scenario4": "Scénario 4 - le JSON reçu en streaming a été désérialisé",
+            "scenario4-usage": "Scénario 4 - consommation de tokens du streaming affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab03",
+      "number": "03",
+      "track": "Azure OpenAI",
+      "title": "AI Agent With Function Tools",
+      "summary": "Give an agent .NET methods it can call: register tools one by one, discover them with reflection, inject services into tools and trace every tool call with a middleware.",
+      "level": "Beginner",
+      "objectives": [
+        "Turn .NET methods into tools with AIFunctionFactory.Create() and describe them with [Description]",
+        "Give tools to an agent with AsAIAgent(..., tools: ...)",
+        "Discover tools with reflection",
+        "Let tools resolve services with an IServiceProvider parameter and AsAIAgent(..., services: ...)",
+        "Trace every tool call with a function calling middleware (AsBuilder().Use(...))"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab03-AIAgentWithFunctionTools",
+      "startProject": "Start/AIAgentWithFunctionTools.csproj",
+      "solutionProject": "Solution/AIAgentWithFunctionTools.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-tools",
+          "description": "Scenario 1 - every tool has the description taken from [Description]",
+          "pattern": "^Tools available to the agent:\\n- get_employee_info: Retrieves detailed information about an employee[^\\n]*\\n- get_meeting_rooms: \\S[^\\n]*\\n- book_meeting_room: \\S"
+        },
+        {
+          "id": "scenario1",
+          "description": "Scenario 1 - the agent answered with the data returned by get_employee_info",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?Mohammed BEN SAID"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-tools",
+          "description": "Scenario 2 - reflection found exactly the three public methods",
+          "pattern": "^Tools that will be available to the agent: GetEmployeeInfo, GetMeetingRooms, BookMeetingRoom\\s*$"
+        },
+        {
+          "id": "scenario2",
+          "description": "Scenario 2 - the agent listed the rooms and booked ROOM-A",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?Innovation Lab(?:(?!^=== Scenario).)*?\\b(?:booked|confirmed)\\b"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3",
+          "description": "Scenario 3 - the notification was stored and read back through the injected repository",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^[^\\n]*\\b[0-9a-f]{8}\\b[^\\n]*Meeting at 3pm tomorrow"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4-middleware",
+          "description": "Scenario 4 - the middleware traced the call of get_employee_info with its argument",
+          "pattern": "^\\[Middleware\\] Calling get_employee_info\\(employeeId: EMP003\\)"
+        },
+        {
+          "id": "scenario4-booking",
+          "description": "Scenario 4 - the middleware saw book_meeting_room confirm the booking",
+          "pattern": "^\\[Middleware\\] book_meeting_room returned: Booking confirmed!"
+        },
+        {
+          "id": "scenario4-usage",
+          "description": "Scenario 4 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec function tools",
+          "level": "Débutant",
+          "summary": "Donnez à un agent des méthodes .NET qu'il peut appeler : enregistrez les outils un par un, découvrez-les par réflexion, injectez des services dans les outils et tracez chaque appel d'outil avec un middleware.",
+          "objectives": [
+            "Transformer des méthodes .NET en outils avec AIFunctionFactory.Create() et les décrire avec [Description]",
+            "Donner des outils à un agent avec AsAIAgent(..., tools: ...)",
+            "Découvrir des outils par réflexion",
+            "Permettre aux outils de résoudre des services avec un paramètre IServiceProvider et AsAIAgent(..., services: ...)",
+            "Tracer chaque appel d'outil avec un middleware d'appel de fonction (AsBuilder().Use(...))"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-tools": "Scénario 1 - chaque outil a la description issue de [Description]",
+            "scenario1": "Scénario 1 - l'agent a répondu avec les données renvoyées par get_employee_info",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-tools": "Scénario 2 - la réflexion a trouvé exactement les trois méthodes publiques",
+            "scenario2": "Scénario 2 - l'agent a listé les salles et réservé ROOM-A",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "scenario3": "Scénario 3 - la notification a été enregistrée et relue via le repository injecté",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
+            "scenario4-middleware": "Scénario 4 - le middleware a tracé l'appel de get_employee_info avec son argument",
+            "scenario4-booking": "Scénario 4 - le middleware a vu book_meeting_room confirmer la réservation",
+            "scenario4-usage": "Scénario 4 - consommation de tokens affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab04",
+      "number": "04",
+      "track": "Azure OpenAI",
+      "title": "AI Agent With MCP Client",
+      "summary": "Connect to the remote Hugging Face MCP server, discover its tools, let an agent search the Hub with them and return a typed result, then give the agent only the tool it needs.",
+      "level": "Intermediate",
+      "objectives": [
+        "Connect to a remote MCP server with McpClient.CreateAsync() and the Streamable HTTP transport",
+        "Send an optional access token to an MCP server (AdditionalHeaders)",
+        "List the tools of an MCP server and give them to an agent (an McpClientTool is an AIFunction)",
+        "Configure an agent with ChatClientAgentOptions (instructions, tools, MaxOutputTokens, Temperature)",
+        "Combine MCP tools and structured output with RunAsync<T>() and list the tools the agent called",
+        "Reduce the token usage by giving the agent only the tools it needs"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab04-AIAgentWithMCPClient",
+      "startProject": "Start/AIAgentWithMCPClient.csproj",
+      "solutionProject": "Solution/AIAgentWithMCPClient.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded (Azure OpenAI and MCP server)",
+          "pattern": "(?s)^Endpoint: \\S+.*?^MCP Server: https://\\S+ \\((?:access token|anonymous)\\)"
+        },
+        {
+          "id": "scenario1-server",
+          "description": "Scenario 1 - connected to the MCP server (server information received)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Connected to: \\S+"
+        },
+        {
+          "id": "scenario1-tools",
+          "description": "Scenario 1 - the tools of the server were listed, including hub_repo_search",
+          "pattern": "^MCP tools available \\([1-9]\\d*\\): (?=[^\\n]*\\bhub_repo_search\\b)\\S"
+        },
+        {
+          "id": "scenario2",
+          "description": "Scenario 2 - structured result with models of the Hub (owner/name and link)",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Found [1-9]\\d* models:\\n[ \\t]+Name: [^\\s/]+/\\S+\\n[ \\t]+Task: [^\\n]*\\n[ \\t]+Library: [^\\n]*\\n[ \\t]+Link: https://(?:hf\\.co|huggingface\\.co)/\\S+"
+        },
+        {
+          "id": "scenario2-tool-calls",
+          "description": "Scenario 2 - the agent called at least one MCP tool",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^MCP tools called by the agent:\\n- \\w+\\("
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3-tools",
+          "description": "Scenario 3 - only hub_repo_search was given to the agent",
+          "pattern": "^Tools given to the agent: hub_repo_search\\s*$"
+        },
+        {
+          "id": "scenario3",
+          "description": "Scenario 3 - models found with the selected tool",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Found [1-9]\\d* models: [^\\s/,]+/\\S+"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec client MCP",
+          "level": "Intermédiaire",
+          "summary": "Connectez-vous au serveur MCP distant de Hugging Face, découvrez ses outils, laissez un agent chercher dans le Hub avec eux et renvoyer un résultat typé, puis ne donnez à l'agent que l'outil dont il a besoin.",
+          "objectives": [
+            "Se connecter à un serveur MCP distant avec McpClient.CreateAsync() et le transport Streamable HTTP",
+            "Envoyer un jeton d'accès facultatif à un serveur MCP (AdditionalHeaders)",
+            "Lister les outils d'un serveur MCP et les donner à un agent (un McpClientTool est une AIFunction)",
+            "Configurer un agent avec ChatClientAgentOptions (instructions, outils, MaxOutputTokens, Temperature)",
+            "Combiner outils MCP et sortie structurée avec RunAsync<T>() et lister les outils appelés par l'agent",
+            "Réduire la consommation de tokens en ne donnant à l'agent que les outils utiles"
+          ],
+          "checks": {
+            "config": "Configuration chargée (Azure OpenAI et serveur MCP)",
+            "scenario1-server": "Scénario 1 - connecté au serveur MCP (informations du serveur reçues)",
+            "scenario1-tools": "Scénario 1 - les outils du serveur ont été listés, dont hub_repo_search",
+            "scenario2": "Scénario 2 - résultat structuré avec des modèles du Hub (owner/name et lien)",
+            "scenario2-tool-calls": "Scénario 2 - l'agent a appelé au moins un outil MCP",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "scenario3-tools": "Scénario 3 - seul hub_repo_search a été donné à l'agent",
+            "scenario3": "Scénario 3 - modèles trouvés avec l'outil sélectionné",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab05",
+      "number": "05",
+      "track": "Azure OpenAI",
+      "title": "AI Agent with Sessions",
+      "summary": "Hold multi-turn conversations in an AgentSession, save them and resume them later: chat history in the session, in a vector store, then in MongoDB with a custom ChatHistoryProvider. Scenario 3 needs the lab's MongoDB container (docker compose up -d).",
+      "level": "Intermediate",
+      "objectives": [
+        "Create a session with CreateSessionAsync() and run the agent in it",
+        "Save and resume a session with SerializeSessionAsync() and DeserializeSessionAsync()",
+        "Read the chat history kept by the default InMemoryChatHistoryProvider",
+        "Plug a custom ChatHistoryProvider with ChatClientAgentOptions.ChatHistoryProvider",
+        "Keep the per-session state of a provider in AgentSession.StateBag (ProviderSessionState<T>)",
+        "Store the chat history in a vector store and in MongoDB"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab05-AIAgentWithThreads",
+      "startProject": "Start/AIAgentWithThreads.csproj",
+      "solutionProject": "Solution/AIAgentWithThreads.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-history",
+          "description": "Scenario 1 - the session keeps the two messages of the first run (user, assistant)",
+          "pattern": "^Messages in the session: 2 \\(user, assistant\\)\\s*$"
+        },
+        {
+          "id": "scenario1-serialized",
+          "description": "Scenario 1 - the serialized session contains the messages of the InMemoryChatHistoryProvider",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Serialized session:\\s*\\{\\s*\"stateBag\":\\s*\\{\\s*\"InMemoryChatHistoryProvider\":\\s*\\{\\s*\"messages\":\\s*\\["
+        },
+        {
+          "id": "scenario1-followup",
+          "description": "Scenario 1 - after the restore, the follow-up answer knows the city (Paris) and the name (Ada)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Restoring the session from the saved JSON\\.\\.\\.(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-key",
+          "description": "Scenario 2 - the serialized session only contains the key shown by the VectorChatHistoryProvider",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Chat history stored in the vector store under the key: ([0-9a-f]{32})\\s*^Serialized session:\\s*\\{\\s*\"stateBag\":\\s*\\{\\s*\"VectorChatHistoryProvider\":\\s*\\{\\s*\"sessionDbKey\":\\s*\"\\1\"\\s*\\}\\s*\\}\\s*\\}"
+        },
+        {
+          "id": "scenario2-followup",
+          "description": "Scenario 2 - the follow-up answer, reloaded from the vector store, knows Paris and Ada",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Restoring the session from the saved JSON\\.\\.\\.(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3-restart",
+          "description": "Scenario 3 - a new agent restored the session with the key saved in the serialized session",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?\"MongoChatHistoryProvider\":\\s*\\{\\s*\"sessionDbKey\":\\s*\"([0-9a-f]{32})\"(?:(?!^=== Scenario).)*?^Simulating a restart(?:(?!^=== Scenario).)*?^Restored session - chat history stored in MongoDB under the key: \\1\\s*$"
+        },
+        {
+          "id": "scenario3-followup",
+          "description": "Scenario 3 - the new agent, with the history from MongoDB, knows Paris and Ada",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Simulating a restart(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec sessions",
+          "level": "Intermédiaire",
+          "summary": "Menez des conversations multi-tours dans une AgentSession, sauvegardez-les et reprenez-les plus tard : historique dans la session, dans un vector store, puis dans MongoDB avec un ChatHistoryProvider personnalisé. Le scénario 3 nécessite le conteneur MongoDB du lab (docker compose up -d).",
+          "objectives": [
+            "Créer une session avec CreateSessionAsync() et y exécuter l'agent",
+            "Sauvegarder et reprendre une session avec SerializeSessionAsync() et DeserializeSessionAsync()",
+            "Lire l'historique conservé par l'InMemoryChatHistoryProvider par défaut",
+            "Brancher un ChatHistoryProvider personnalisé avec ChatClientAgentOptions.ChatHistoryProvider",
+            "Conserver l'état par session d'un provider dans AgentSession.StateBag (ProviderSessionState<T>)",
+            "Stocker l'historique dans un vector store et dans MongoDB"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-history": "Scénario 1 - la session contient les deux messages du premier run (user, assistant)",
+            "scenario1-serialized": "Scénario 1 - la session sérialisée contient les messages de l'InMemoryChatHistoryProvider",
+            "scenario1-followup": "Scénario 1 - après la restauration, la réponse de suivi connaît la ville (Paris) et le prénom (Ada)",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-key": "Scénario 2 - la session sérialisée ne contient que la clé affichée par le VectorChatHistoryProvider",
+            "scenario2-followup": "Scénario 2 - la réponse de suivi, rechargée depuis le vector store, connaît Paris et Ada",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "scenario3-restart": "Scénario 3 - un nouvel agent a restauré la session avec la clé enregistrée dans la session sérialisée",
+            "scenario3-followup": "Scénario 3 - le nouvel agent, avec l'historique venu de MongoDB, connaît Paris et Ada",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+          }
+        }
+      }
+    }
+  ]
+}

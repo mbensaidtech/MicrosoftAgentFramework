@@ -37,3 +37,12 @@ node_modules/
 
 # LearningLabs/EndToEndAppDemo - duplicate/leftover (moved to root EndToEndAppDemo)
 LearningLabs/EndToEndAppDemo/
+# graphify - generated knowledge graph, local only (it also reflects local working files)
+graphify-out/
+
+# Lab dashboard - local run history
+Dashboard/.data/
+
+# Local working files - never versioned
+**/Analyse-*-agent-framework-samples.md
+**/disco-architecture.html

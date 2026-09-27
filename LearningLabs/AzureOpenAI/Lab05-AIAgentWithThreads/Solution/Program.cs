@@ -1,29 +1,34 @@
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Text.Json;
 using Azure.Identity;
-using Azure.AI.OpenAI;
+using CommunityToolkit.VectorData.InMemory;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.OpenAI;
+using Microsoft.Extensions.VectorData;
+using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
-using Microsoft.SemanticKernel.Connectors.InMemory;
-using Microsoft.SemanticKernel.Connectors.MongoDB;
-using Microsoft.Extensions.VectorData;
-using Microsoft.Extensions.AI;
-using System.Text.Json;
-using System.ClientModel;
-
 using CommonUtilities;
+using AIExtensions = Microsoft.Extensions.AI;
+
 using AIAgentWithThreads;
 using AIAgentWithThreads.Stores;
-using AIAgentWithThreads.Models;
+using static AIAgentWithThreads.SessionConsole;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], or [1, 2] to run specific scenarios
-HashSet<int> scenariosToRun = [1,2];
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios (scenario 3 needs MongoDB, see the README)
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+
+// The same agent and the same conversation in every scenario: only the storage of the chat history changes.
+const string AgentName = "GlobalAgent";
+const string AgentInstructions = "You are a global agent that can answer questions about any topic. The response should be very short and concise.";
+const string FirstQuestion = "Hello, my name is Ada. What is the capital of France?";
+const string FollowUpQuestion = "What is the population of that city? And what is my name?";
 
 #region Setup: Configuration and Client Initialization
 
@@ -32,176 +37,165 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient (API key or DefaultAzureCredential)
-AzureOpenAIClient client = !string.IsNullOrEmpty(settings.APIKey)
-    ? new AzureOpenAIClient(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey))
-    : new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// Step 2: Create an OpenAIClient that targets the Azure OpenAI v1 endpoint (https://<resource>.openai.azure.com/openai/v1/)
+// - API key when one is configured
+// - otherwise Microsoft Entra ID: DefaultAzureCredential + BearerTokenPolicy (scope https://ai.azure.com/.default)
+// WARNING: DefaultAzureCredential is convenient for development. In production, prefer a specific credential
+// (e.g. ManagedIdentityCredential) to avoid latency and unintended credential probing.
+OpenAIClientOptions clientOptions = new() { Endpoint = AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) };
 
-// Step 3: Get a ChatClient for the specific deployment
+// The OpenAIClient(AuthenticationPolicy, ...) constructor is still flagged [Experimental] (OPENAI001) by the OpenAI SDK,
+// although it is the pattern documented by Microsoft for Entra ID with the Azure OpenAI v1 API.
+#pragma warning disable OPENAI001
+OpenAIClient client = !string.IsNullOrWhiteSpace(settings.APIKey)
+    ? new OpenAIClient(new ApiKeyCredential(settings.APIKey), clientOptions)
+    : new OpenAIClient(new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"), clientOptions);
+#pragma warning restore OPENAI001
+
+// Step 3: Get a ChatClient (Chat Completions API) for the deployment.
+// With Chat Completions, the service keeps no history: the agent sends it again at each run, from the session.
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 
-#region Scenario 1: Create an AI Agent with Threads using the InMemory vector store
+#region Scenario 1: Session with the default in-memory chat history
+
 if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
-    Console.WriteLine("=== Scenario 1: Create an AI Agent with Threads using the InMemory vector store ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 1: Session with the default in-memory chat history ===");
 
-    var inMemoryVectorStore = new InMemoryVectorStore();
-    var agentSettings = ConfigurationHelper.GetAgent("GlobalAgent");
+    // Step 1: Create the agent. Without a ChatHistoryProvider, it uses an InMemoryChatHistoryProvider
+    AIAgent agent = chatClient.AsAIAgent(instructions: AgentInstructions, name: AgentName);
 
-    var agentOptions = new ChatClientAgentOptions
-    {
-        Instructions = agentSettings.Instructions,
-        Name = agentSettings.Name,
-        ChatMessageStoreFactory = ctx => new InMemoryVectorChatMessageStore(
-            inMemoryVectorStore,
-            ctx.SerializedState,
-            ctx.JsonSerializerOptions)
-    };
+    // Step 2: Create a session and ask the first question in this session
+    AgentSession session = await agent.CreateSessionAsync();
+    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
+    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
 
-    var agent = chatClient.CreateAIAgent(agentOptions);
+    // Step 3: Look at the chat history: the InMemoryChatHistoryProvider keeps it inside the session
+    List<AIExtensions.ChatMessage> messages = agent.GetService<InMemoryChatHistoryProvider>()!.GetMessages(session);
+    ColoredConsole.WriteInfoLine($"Messages in the session: {messages.Count} ({string.Join(", ", messages.Select(message => message.Role))})");
 
-    await RunThreadConversationTestAsync(agent);
+    // Step 4: Serialize the session: the JSON contains the whole conversation
+    JsonElement serializedSession = await agent.SerializeSessionAsync(session);
+    WriteSerializedSession(serializedSession);
+
+    // Step 5: Save the session as text (a file, a database...), then restore it
+    string savedSession = JsonSerializer.Serialize(serializedSession);
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("Restoring the session from the saved JSON...");
+    AgentSession resumedSession = await agent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
+
+    // Step 6: Ask a follow-up question in the restored session: "that city" and "my name" come from the history
+    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
+    AgentResponse followUpResponse = await agent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
+
+    // Step 7: Display token usage
+    WriteTokenUsage(followUpResponse);
 }
+
 #endregion
 
-#region Scenario 2: Create an AI Agent with Threads using the MongoDB vector store
+#region Scenario 2: Custom ChatHistoryProvider - chat history in a vector store
 
 if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
-    Console.WriteLine("=== Scenario 2: Create an AI Agent with Threads using the MongoDB vector store ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===");
 
-    var mongoVectorStore = new MongoVectorStore(ConfigurationHelper.GetMongoDatabase());
-    var agentSettings = ConfigurationHelper.GetAgent("GlobalAgent");
+    // Step 1: Create the vector store that receives the messages (in memory: lost when the application stops)
+    VectorStore vectorStore = new InMemoryVectorStore();
 
-    var agentOptions = new ChatClientAgentOptions
+    // Step 2: Create the agent with ChatClientAgentOptions and the custom ChatHistoryProvider
+    AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Instructions = agentSettings.Instructions,
-        Name = agentSettings.Name,
-        ChatMessageStoreFactory = ctx => new MongoVectorChatMessageStore(
-            mongoVectorStore,
-            ctx.SerializedState,
-            ctx.JsonSerializerOptions)
-    };
+        Name = AgentName,
+        ChatOptions = new() { Instructions = AgentInstructions },
+        ChatHistoryProvider = new VectorChatHistoryProvider(vectorStore)
+    });
 
-    var agent = chatClient.CreateAIAgent(agentOptions);
+    // Step 3: Create a session and ask the first question
+    AgentSession session = await agent.CreateSessionAsync();
+    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
+    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
 
-    await RunThreadConversationTestAsync(agent);
+    // Step 4: Get the provider from the agent and display the key under which the messages are stored
+    VectorChatHistoryProvider chatHistoryProvider = agent.GetService<VectorChatHistoryProvider>()!;
+    ColoredConsole.WriteInfoLine($"Chat history stored in the vector store under the key: {chatHistoryProvider.GetSessionDbKey(session)}");
+
+    // Step 5: Serialize the session: the JSON only contains the key, the messages stay in the vector store
+    JsonElement serializedSession = await agent.SerializeSessionAsync(session);
+    WriteSerializedSession(serializedSession);
+
+    // Step 6: Save the session as text, then restore it
+    string savedSession = JsonSerializer.Serialize(serializedSession);
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("Restoring the session from the saved JSON...");
+    AgentSession resumedSession = await agent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
+
+    // Step 7: Ask the follow-up question: the provider reloads the history from the vector store
+    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
+    AgentResponse followUpResponse = await agent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
+
+    // Step 8: Display token usage
+    WriteTokenUsage(followUpResponse);
 }
+
 #endregion
 
-#region Helper Methods
+#region Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
 
-/// <summary>
-/// Runs a complete conversation test: asks a question, extracts thread ID, restores thread, and asks a follow-up.
-/// </summary>
-async Task RunThreadConversationTestAsync(AIAgent agent)
-{
-    // Step 1: Create a new thread and ask the first question
-    var thread = agent.GetNewThread();
-    await AskQuestionAsync(agent, "Hello, what is the capital of France?", thread, "First Question: What is the capital of France?");
-
-    // Step 2: Extract and display the thread ID
-    var extractedThreadId = ExtractAndDisplayThreadId(thread);
-
-    // Step 3: Restore thread and ask follow-up question
-    var restoredThread = RestoreThreadFromId(agent, extractedThreadId);
-    var followUpResponse = await AskQuestionAsync(agent, "What is the population of that city?", restoredThread, "Follow-up Question: What is the population of that city?");
-
-    // Step 4: Display token usage for the follow-up response
-    DisplayTokenUsage(followUpResponse, "Token Usage (Follow-up)");
-}
-
-/// <summary>
-/// Asks a question to the agent and displays the response.
-/// </summary>
-async Task<AgentRunResponse> AskQuestionAsync(AIAgent agent, string question, AgentThread thread, string questionLabel)
-{
-    ColoredConsole.WritePrimaryLogLine(questionLabel);
-    var response = await agent.RunAsync(question, thread);
-    ColoredConsole.WriteSecondaryLogLine($"Response: {response}");
-    return response;
-}
-
-/// <summary>
-/// Extracts the thread ID from the thread's serialized state and displays it.
-/// </summary>
-string? ExtractAndDisplayThreadId(AgentThread thread)
-{
-    var serializedState = thread.Serialize();
-    var extractedThreadId = ExtractThreadIdFromState(serializedState);
-    ColoredConsole.WriteInfoLine($"Extracted thread id: {extractedThreadId}");
-    return extractedThreadId;
-}
-
-/// <summary>
-/// Restores a thread from a thread ID using the agent's DeserializeThread method.
-/// </summary>
-AgentThread RestoreThreadFromId(AIAgent agent, string? threadId)
+if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("Restoring thread from thread id to test context preservation...");
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===");
 
-    var agentThreadState = new AgentThreadState { StoreState = threadId };
-    var threadStateElement = JsonSerializer.SerializeToElement(agentThreadState);
-    return agent.DeserializeThread(threadStateElement);
-}
+    // Step 1: Connect to MongoDB (started with docker compose, see the README)
+    IMongoDatabase database = await ConfigurationHelper.ConnectToMongoDbAsync();
 
-/// <summary>
-/// Displays the token usage from an agent response.
-/// </summary>
-void DisplayTokenUsage(AgentRunResponse response, string label)
-{
+    // Step 2: Write a function that creates the agent with a MongoChatHistoryProvider on a database
+    Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions
+    {
+        Name = AgentName,
+        ChatOptions = new() { Instructions = AgentInstructions },
+        ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase)
+    });
+
+    // Step 3: Create the agent and a session, and ask the first question
+    AIAgent agent = createAgent(database);
+    AgentSession session = await agent.CreateSessionAsync();
+    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
+    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
+
+    // Step 4: Serialize the session and save it as text
+    JsonElement serializedSession = await agent.SerializeSessionAsync(session);
+    WriteSerializedSession(serializedSession);
+    string savedSession = JsonSerializer.Serialize(serializedSession);
+
+    // Step 5: Simulate a restart of the application: new MongoDB connection, new provider, new agent.
+    // Nothing is shared in memory with the first agent: only the saved JSON and the documents in MongoDB.
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WritePrimaryLogLine($"{label}: ");
-    ColoredConsole.WriteSecondaryLogLine($"Input tokens: {response.Usage?.InputTokenCount}");
-    ColoredConsole.WriteSecondaryLogLine($"Output tokens: {response.Usage?.OutputTokenCount}");
-    ColoredConsole.WriteSecondaryLogLine($"Total tokens: {response.Usage?.TotalTokenCount}");
-}
+    ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...");
+    AIAgent restartedAgent = createAgent(await ConfigurationHelper.ConnectToMongoDbAsync());
+    AgentSession resumedSession = await restartedAgent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
 
-/// <summary>
-/// Extracts the thread ID from the serialized state JSON element.
-/// </summary>
-string? ExtractThreadIdFromState(JsonElement serializedState)
-{
-    if (serializedState.ValueKind == JsonValueKind.Object)
-    {
-        // Try direct property access first
-        if (serializedState.TryGetProperty("storeState", out var storeStateElement) &&
-            storeStateElement.ValueKind == JsonValueKind.String)
-        {
-            var threadId = storeStateElement.GetString();
-            if (!string.IsNullOrWhiteSpace(threadId))
-            {
-                return threadId;
-            }
-        }
+    // Step 6: Display the key of the restored session: the key of the documents in the chat_history collection
+    MongoChatHistoryProvider chatHistoryProvider = restartedAgent.GetService<MongoChatHistoryProvider>()!;
+    ColoredConsole.WriteInfoLine($"Restored session - chat history stored in MongoDB under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");
 
-        // Fall back to deserialization
-        try
-        {
-            var agentThreadState = JsonSerializer.Deserialize<AgentThreadState>(serializedState);
-            if (!string.IsNullOrWhiteSpace(agentThreadState?.StoreState))
-            {
-                return agentThreadState.StoreState;
-            }
-        }
-        catch (Exception ex)
-        {
-            ColoredConsole.WriteErrorLine("Failed to deserialize thread state as AgentThreadState.");
-            ColoredConsole.WriteErrorLine(ex.Message);
-        }
-    }
+    // Step 7: Ask the follow-up question to the new agent: the history comes from MongoDB
+    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
+    AgentResponse followUpResponse = await restartedAgent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
+    ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
 
-    if (serializedState.ValueKind == JsonValueKind.String)
-    {
-        return serializedState.GetString();
-    }
-
-    return null;
+    // Step 8: Display token usage
+    WriteTokenUsage(followUpResponse);
 }
 
 #endregion

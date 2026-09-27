@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Agent Framework Lab Bench</title>
+  <meta name="description" content="Local dashboard to run and follow the Microsoft Agent Framework labs.">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.2' fill='none' stroke='%232D6DB6' stroke-width='1.6'/%3E%3Ccircle cx='10' cy='10' r='3.2' fill='%232D6DB6'/%3E%3C/svg%3E">
+  <script>
+    // Apply the saved language before the first paint.
+    try {
+      var lang = localStorage.getItem("labbench.lang") || (navigator.language || "en").slice(0, 2);
+      document.documentElement.lang = lang === "fr" ? "fr" : "en";
+    } catch (e) { /* storage unavailable: English */ }
+  </script>
+  <link rel="stylesheet" href="css/dashboard.css">
+  <script type="module" src="js/dashboard.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.8A1.3 1.3 0 0 0 9.2 2.5H3.8a1.3 1.3 0 0 0-1.3 1.3v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 16 16"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><path d="M4.5 6.5l2 1.8-2 1.8M8.5 10.3h3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="6.8" rx="1.4"/><path d="M5.3 7V5.3a2.7 2.7 0 0 1 5.4 0V7"/></symbol>
+  </svg>
+
+  <header class="top">
+    <div class="wrap top-row">
+      <div class="brand">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.2" class="brand-ring"/><circle cx="10" cy="10" r="3.2" class="brand-core"/></svg>
+        <span data-i18n="app.product">Agent Framework</span>
+        <span class="brand-sub" data-i18n="app.name">Lab Bench</span>
+      </div>
+
+      <div class="top-actions">
+        <span class="status-chip" data-i18n-title="server.localTitle">
+          <i class="status-dot" id="server-dot" aria-hidden="true"></i>
+          <span id="server-state" data-i18n="server.connecting">Connecting…</span>
+          <span class="status-sep" aria-hidden="true">·</span>
+          <span class="mono">127.0.0.1</span>
+        </span>
+
+        <div class="seg seg-sm" id="lang-switch" role="group" data-i18n-aria="lang.aria">
+          <button type="button" data-lang="en" aria-pressed="true" title="English">EN</button>
+          <button type="button" data-lang="fr" aria-pressed="false" title="Français">FR</button>
+        </div>
+
+        <button class="config-chip" id="config-chip" type="button" aria-haspopup="dialog" aria-controls="settings" data-i18n-title="config.open">
+          <svg class="ico"><use href="#i-gear"/></svg>
+          <span class="config-label" data-i18n="config.label">Azure OpenAI</span>
+          <i class="status-dot" id="config-dot" aria-hidden="true"></i>
+          <span id="config-state" data-i18n="config.loading">…</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap shell">
+    <aside class="rail" aria-labelledby="rail-title">
+      <div class="rail-head">
+        <h2 id="rail-title" class="caps" data-i18n="rail.title">Labs</h2>
+        <span class="count mono" id="lab-count"></span>
+      </div>
+      <nav id="lab-list" class="lab-list"></nav>
+      <p class="rail-note" data-i18n="rail.note"></p>
+    </aside>
+
+    <main id="lab-view" class="lab-view" aria-live="polite">
+      <div class="placeholder"><span class="spinner" aria-hidden="true"></span><span data-i18n="boot.loading">Loading labs…</span></div>
+    </main>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- AZURE OPENAI SETTINGS (shared by the labs, saved in the user-secrets store) -->
+  <dialog id="settings" class="dialog" aria-labelledby="settings-title">
+    <form id="settings-form" novalidate>
+      <header class="dialog-head">
+        <h2 id="settings-title" data-i18n="settings.title"></h2>
+        <button class="term-btn dialog-close" type="button" data-action="close-settings" data-i18n-aria="settings.close" data-i18n-title="settings.close"><svg class="ico"><use href="#i-x"/></svg></button>
+      </header>
+
+      <div class="dialog-body">
+        <p class="hint" data-i18n="settings.intro"></p>
+        <p class="notice notice-bad" id="settings-store-error" role="alert" hidden></p>
+
+        <div class="field">
+          <label for="set-endpoint" data-i18n="settings.endpoint"></label>
+          <input id="set-endpoint" name="endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-resource.openai.azure.com/" aria-describedby="src-endpoint err-endpoint">
+          <p class="field-source" id="src-endpoint"></p>
+          <p class="field-error" id="err-endpoint" hidden></p>
+        </div>
+
+        <div class="field">
+          <label for="set-deployment" data-i18n="settings.deployment"></label>
+          <input id="set-deployment" name="chatDeploymentName" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" aria-describedby="hint-deployment src-deployment err-deployment">
+          <p class="field-hint" id="hint-deployment" data-i18n="settings.deploymentHint"></p>
+          <p class="field-source" id="src-deployment"></p>
+          <p class="field-error" id="err-deployment" hidden></p>
+        </div>
+
+        <div class="field">
+          <div class="field-label-row">
+            <label for="set-apikey" data-i18n="settings.apiKey"></label>
+            <span class="pill passed" id="apikey-stored" data-i18n="settings.apiKeyStored" hidden></span>
+          </div>
+          <div class="field-inline">
+            <input id="set-apikey" name="apiKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="hint-apikey src-apikey err-apikey">
+            <button class="btn" type="button" data-action="remove-key" hidden data-i18n="settings.removeKey"></button>
+          </div>
+          <p class="field-hint" id="hint-apikey" data-i18n="settings.apiKeyHint"></p>
+          <p class="field-source" id="src-apikey"></p>
+          <p class="field-error" id="err-apikey" hidden></p>
+        </div>
+
+        <p class="hint"><b data-i18n="settings.apiVersion"></b> <span data-i18n="settings.apiVersionHint"></span></p>
+        <p class="hint"><span data-i18n="settings.storage"></span> <code id="settings-file"></code></p>
+        <p class="hint" data-i18n="settings.precedence"></p>
+      </div>
+
+      <footer class="dialog-foot">
+        <button class="btn" type="button" data-action="close-settings" data-i18n="settings.cancel"></button>
+        <button class="btn btn-primary" type="submit" data-i18n="settings.save"></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <template id="lab-template">
+    <header class="hero">
+      <div class="hero-kicker">
+        <span class="mono hero-num" data-bind="kicker"></span>
+        <span class="tag" data-bind="track"></span>
+        <span class="tag" data-bind="level"></span>
+      </div>
+      <h1 data-bind="title"></h1>
+      <p class="lede" data-bind="summary"></p>
+    </header>
+
+    <section class="metrics" aria-label="Summary">
+      <div class="metric"><span class="metric-label" data-i18n="metrics.exercise"></span><span class="metric-value" data-bind="progress"></span></div>
+      <div class="metric"><span class="metric-label" data-i18n="metrics.lastResult"></span><span class="metric-value" data-bind="lastStatus"></span></div>
+      <div class="metric"><span class="metric-label" data-i18n="metrics.duration"></span><span class="metric-value num" data-bind="lastDuration"></span></div>
+      <div class="metric"><span class="metric-label" data-i18n="metrics.tokens"></span><span class="metric-value num" data-bind="lastTokens"></span></div>
+    </section>
+
+    <nav class="tabs" role="tablist" data-i18n-aria="tabs.aria">
+      <button role="tab" type="button" data-tab="run" aria-selected="true" data-i18n="tabs.run"></button>
+      <button role="tab" type="button" data-tab="instructions" aria-selected="false" data-i18n="tabs.instructions"></button>
+      <button role="tab" type="button" data-tab="history" aria-selected="false" data-i18n="tabs.history"></button>
+      <button role="tab" type="button" data-tab="about" aria-selected="false" data-i18n="tabs.about"></button>
+      <button role="tab" type="button" data-tab="solution" aria-selected="false"><svg class="ico ico-sm"><use href="#i-lock"/></svg><span data-i18n="tabs.solution"></span></button>
+    </nav>
+
+    <!-- RUN -->
+    <section class="panel" data-panel="run" role="tabpanel">
+      <div class="fig">
+        <div class="fig-bar">
+          <span class="fig-title" data-i18n="run.title"></span>
+          <div class="seg" role="group" data-i18n-aria="run.targetAria" data-bind="targetSwitch">
+            <button type="button" data-target="start" aria-pressed="true"><span data-i18n="target.start"></span><small class="mono" data-i18n="target.startShort"></small></button>
+            <button type="button" data-target="solution" aria-pressed="false"><span data-i18n="target.solution"></span><small class="mono" data-i18n="target.solutionShort"></small></button>
+          </div>
+          <div class="push btns">
+            <button class="btn" type="button" data-action="cancel" hidden><svg class="ico"><use href="#i-stop"/></svg><span data-i18n="run.cancel"></span></button>
+            <button class="btn btn-primary" type="button" data-action="run"><svg class="ico ico-fill"><use href="#i-play"/></svg><span data-i18n="run.run"></span></button>
+          </div>
+        </div>
+
+        <ol class="steps" aria-label="Phases">
+          <li class="step" data-phase="build"><span class="sn mono">01</span><b data-i18n="steps.build"></b><span class="st mono"></span></li>
+          <li class="step" data-phase="run"><span class="sn mono">02</span><b data-i18n="steps.run"></b><span class="st mono"></span></li>
+          <li class="step" data-phase="checks"><span class="sn mono">03</span><b data-i18n="steps.checks"></b><span class="st mono"></span></li>
+        </ol>
+
+        <div class="term">
+          <div class="term-head">
+            <svg class="ico"><use href="#i-terminal"/></svg>
+            <span class="term-title" data-bind="terminalTitle" data-i18n="term.output"></span>
+            <span class="term-progress" data-bind="progressLine"></span>
+            <button class="term-btn" type="button" data-action="copy" data-i18n-title="toast.copy" data-i18n-aria="toast.copy"><svg class="ico"><use href="#i-copy"/></svg></button>
+          </div>
+          <pre class="term-body" data-bind="terminal" tabindex="0" data-i18n-aria="term.aria"></pre>
+          <!-- Standard input of an interactive lab: shown only while its program runs. -->
+          <form class="term-input" data-bind="inputForm" novalidate hidden>
+            <div class="term-input-head">
+              <label for="run-input" data-i18n="input.label"></label>
+              <span class="term-input-badge" data-bind="inputBadge" hidden></span>
+            </div>
+            <div class="term-input-row">
+              <span class="term-input-caret mono" aria-hidden="true">›</span>
+              <input id="run-input" data-bind="inputField" type="text" maxlength="4096" autocomplete="off" autocapitalize="off" spellcheck="false"
+                     data-i18n-placeholder="input.placeholder" aria-describedby="run-input-hint run-input-error">
+              <div class="btns">
+                <button class="btn btn-primary" type="submit" data-bind="inputSend"><span data-i18n="input.send"></span></button>
+                <button class="btn" type="button" data-action="close-input" data-i18n-title="input.closeHint"><span data-i18n="input.close"></span></button>
+              </div>
+            </div>
+            <p class="term-input-hint" id="run-input-hint" data-bind="inputHint" data-i18n="input.hint"></p>
+            <p class="term-input-error" id="run-input-error" data-bind="inputError" hidden></p>
+            <p class="sr-only" data-bind="inputLive" aria-live="polite"></p>
+          </form>
+        </div>
+
+        <p class="fig-cap">
+          <span class="k"><span data-i18n="cap.cli"></span> <kbd>dotnet build</kbd> → <kbd>dotnet run --no-build</kbd></span>
+          <span class="k"><span data-i18n="cap.elapsed"></span> <b class="mono" data-bind="clock">00:00</b></span>
+        </p>
+      </div>
+
+      <div class="results" data-bind="results" hidden>
+        <div class="verdict" data-bind="verdict"></div>
+        <div class="grid-2">
+          <article class="fig">
+            <div class="fig-bar"><span class="fig-title" data-i18n="checks.title"></span><span class="push mono fig-count" data-bind="checksCount"></span></div>
+            <ul class="checks" data-bind="checks"></ul>
+          </article>
+          <article class="fig">
+            <div class="fig-bar"><span class="fig-title" data-i18n="tokens.title"></span></div>
+            <div class="fig-body" data-bind="tokens"></div>
+          </article>
+        </div>
+        <article class="fig fig-bad" data-bind="errorsCard" hidden>
+          <div class="fig-bar"><span class="fig-title" data-i18n="errors.title"></span></div>
+          <pre class="errors" data-bind="errors"></pre>
+          <div class="fig-cap" data-bind="errorsFixBar"><button class="btn" type="button" data-bind="errorsFix" data-action="open-settings" hidden></button></div>
+        </article>
+        <details class="fig" data-bind="warningsCard" hidden>
+          <summary class="fig-bar"><span class="fig-title" data-i18n="warnings.title"></span><span class="push mono fig-count warn" data-bind="warningsCount"></span></summary>
+          <ul class="warnings" data-bind="warnings"></ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- INSTRUCTIONS -->
+    <section class="panel" data-panel="instructions" role="tabpanel" hidden>
+      <p class="notice" data-bind="readmeNotice" hidden></p>
+      <article class="fig fig-doc"><div class="markdown" data-bind="readme"></div></article>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="panel" data-panel="history" role="tabpanel" hidden>
+      <div class="fig">
+        <div class="fig-bar"><span class="fig-title" data-i18n="history.title"></span><span class="push mono fig-count" data-bind="historyCount"></span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr>
+              <th data-i18n="history.run"></th><th data-i18n="history.project"></th><th data-i18n="history.result"></th>
+              <th data-i18n="history.date"></th><th class="r" data-i18n="history.duration"></th><th class="r" data-i18n="history.tokens"></th><th data-i18n="history.summary"></th>
+            </tr></thead>
+            <tbody data-bind="history"></tbody>
+          </table>
+        </div>
+        <p class="fig-cap"><span data-i18n="history.storage"></span></p>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="panel" data-panel="about" role="tabpanel" hidden>
+      <div class="grid-2">
+        <article class="fig">
+          <div class="fig-bar"><span class="fig-title" data-i18n="about.learn"></span></div>
+          <ul class="list" data-bind="objectives"></ul>
+        </article>
+        <article class="fig">
+          <div class="fig-bar"><span class="fig-title" data-i18n="about.cli"></span></div>
+          <div class="fig-body">
+            <p class="hint" data-i18n="about.cliHint"></p>
+            <pre class="code" data-bind="commandStart"></pre>
+            <pre class="code" data-bind="commandSolution"></pre>
+            <p class="hint"><span data-i18n="about.folder"></span> <code data-bind="folder"></code></p>
+          </div>
+        </article>
+        <article class="fig">
+          <div class="fig-bar"><span class="fig-title" data-i18n="about.packages"></span></div>
+          <ul class="list mono" data-bind="packages"></ul>
+        </article>
+        <article class="fig">
+          <div class="fig-bar"><span class="fig-title" data-i18n="about.judge"></span></div>
+          <div class="fig-body"><p class="hint" data-i18n="about.judgeHint"></p><p class="hint" data-bind="interactiveNote" hidden></p></div>
+          <ul class="list" data-bind="checkList"></ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- SOLUTION -->
+    <section class="panel" data-panel="solution" role="tabpanel" hidden>
+      <div class="gate" data-bind="gate">
+        <svg class="ico ico-lg"><use href="#i-lock"/></svg>
+        <h3 data-i18n="solution.gateTitle"></h3>
+        <p data-i18n="solution.gateText"></p>
+        <button class="btn" type="button" data-action="reveal" data-i18n="solution.reveal"></button>
+      </div>
+      <div data-bind="solution" hidden></div>
+    </section>
+  </template>
+</body>
+</html>

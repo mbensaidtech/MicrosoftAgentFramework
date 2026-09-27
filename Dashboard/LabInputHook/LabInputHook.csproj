@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    .NET startup hook loaded into the lab process only by the dashboard (DOTNET_STARTUP_HOOKS + LAB_DASHBOARD_RUN=1),
+    for the labs declared "interactive" in labs.json. It is never referenced by a lab: `dotnet run` in a terminal loads nothing.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

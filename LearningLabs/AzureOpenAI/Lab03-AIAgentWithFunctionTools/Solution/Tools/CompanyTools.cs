@@ -1,11 +1,13 @@
 using System.ComponentModel;
-using Microsoft.Extensions.AI;
 
 namespace AIAgentWithFunctionTools.Tools;
 
 /// <summary>
 /// Internal company tools that provide real-time data the LLM cannot know from training.
 /// These tools give the agent access to internal systems: employees, meeting rooms, vacations, etc.
+/// The [Description] attributes on the methods and their parameters are sent to the model with the tool
+/// (function description and JSON schema of the parameters): they tell the model when and how to call each tool.
+/// Only the public methods are exposed in scenario 2 (reflection); the private ones stay internal helpers.
 /// </summary>
 public class CompanyTools
 {
@@ -155,12 +157,12 @@ public class CompanyTools
             .Any();
 
         if (conflicts)
-            return $" Cannot book: Room {roomId} is already booked during this time.";
+            return $"Cannot book: Room {roomId} is already booked during this time.";
 
         _bookings.Add(new RoomBooking(roomId, employeeId, start, end, subject));
         var room = _meetingRooms[roomId];
         
-        return $"✅ Booking confirmed!\n" +
+        return $"Booking confirmed!\n" +
                $"- Room: {room.Name} ({roomId})\n" +
                $"- Date: {date}\n" +
                $"- Time: {startTime} - {endTime}\n" +
