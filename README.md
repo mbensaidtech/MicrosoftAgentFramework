@@ -46,7 +46,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer** and **AzureOpenAI/Lab06_A2AClient**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -132,7 +132,8 @@ dotnet run --project LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Solution
 The first `dotnet run` restores the NuGet packages and builds the project (including the shared `CommonUtilities` project).
 To only check that your code compiles: `dotnet build LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start`.
 
-> **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal, then `Lab06_A2AClient` in another.
+> **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal (it listens on `http://localhost:5000` until `Ctrl+C`), then `Lab06_A2AClient` in another.
+> Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.22.0): a migrated client cannot call an old v0.3 server.
 
 #### 3. Read the result
 
@@ -217,7 +218,8 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab05): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab06): run the other labs with the CLI.
+- Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
 
@@ -301,15 +303,23 @@ This part focuses on building **individual AI agents** with various capabilities
 
 ### Lab 06 - Agent-to-Agent Communication (A2A)
 
-**Learn how to build multi-agent systems where agents communicate with each other**
+**Learn how agents call each other over HTTP with the Agent-to-Agent protocol (A2A v1)**
 
-This lab is split into two parts:
+This lab is split into two parts: start the server, then run the client.
 
 #### Lab 06 - A2A Server
-Build an agent that exposes its capabilities as a service.
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Host two agents in ASP.NET Core (`AddA2AServer`): an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings (`MapA2AJsonRpc`, `MapA2AHttpJson`) and described by their agent cards (`MapWellKnownAgentCard`) |
 
 #### Lab 06 - A2A Client
-Build an agent that consumes remote agent services.
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Discover the AuthAgent from its agent card (`A2ACardResolver.GetAgentCardAsync`, `AgentCard.AsAIAgent`), then generate an API key and validate it (and a tampered copy) |
+| Scenario 2 | Connect to the CustomerToneAgent by URL, without an agent card (`A2AClient.AsAIAgent`) |
+| Scenario 3 | Give the remote AuthAgent to a local Azure OpenAI agent as a function tool (`AsAIFunction`) |
 
 ---
 

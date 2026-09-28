@@ -657,4 +657,190 @@ public class OutputAnalyzerTests
         Assert.Equal(["NU1903: Package 'Snappier' 1.0.0 has a known high severity vulnerability"], OutputAnalyzer.BuildDiagnostics(build, "warning"));
         Assert.Equal(["CS1002: ; expected"], OutputAnalyzer.BuildDiagnostics(build, "error"));
     }
+
+    // Standard output of the Lab06 client solution (real run from the dashboard, companion server on port 5071).
+    private static readonly string[] Lab06ClientSolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Discover a remote agent from its agent card ===",
+        "Agent card: AuthAgent (version 1.0.0)",
+        "  Description: An authentication agent specialized in generating and validating API keys. Only handles authentication-related tasks.",
+        "  Skill: GenerateAPIKey - Generates a new random API key that starts with 'Meknes'. The key includes a cryptographic signature for validation.",
+        "  Skill: ValidateAPIKey - Validates an API key by checking if it starts with 'Meknes' and verifying its cryptographic signature.",
+        "  Interface: JSONRPC (A2A 1.0) at http://localhost:5071/a2a/authAgent",
+        "  Interface: HTTP+JSON (A2A 1.0) at http://localhost:5071/a2a/authAgent",
+        "Generated API key: MeknesF_4sPEHMGX1nrxDzl9TZTNqb5nIbohNdRSWpAq9jqVY.TR8qmEPNvgwNU4MCIqs1IFMGveXeYGITgWXXulZlOM8",
+        "Validation of the generated key: The API key is valid.",
+        "Validation of a tampered key: The API key you provided is not valid. It either does not start with \"Meknes\" or its cryptographic signature could not be verified. Please check the key and try again.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Connect to a remote agent by URL (direct configuration) ===",
+        "Remote agent: CustomerToneAgent at http://localhost:5071/a2a/customerToneAgent",
+        "Customer message: I have been waiting for my order for two weeks and nobody answers my emails!",
+        "Tone: Frustrated. The customer expresses dissatisfaction with the wait time for their order and the lack of communication, indicating their growing impatience.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: A remote agent as a function tool of a local agent ===",
+        "Tool called: AuthAgent",
+        "Tool called: AuthAgent",
+        "Assistant: Your generated API key is:",
+        "",
+        "```",
+        "MeknesvWeX7Q6ddCCBJdgP4vM5sTX2GFHQtHOrtMozrbbruvs.SHWK8IlFNiwtYFGTfkiAhs6Qk3aL4-s-lsbx-sE1uvE",
+        "```",
+        "",
+        "The result of the validation check is: **The API key is valid.**",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 612",
+        "  Output tokens: 181",
+        "  Total tokens: 793",
+    ];
+
+    // Standard output of the Lab06 client exercise as delivered (TODOs not done yet), with the companion server running.
+    private static readonly string[] Lab06ClientStartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Discover a remote agent from its agent card ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Connect to a remote agent by URL (direct configuration) ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: A remote agent as a function tool of a local agent ===",
+    ];
+
+    // What the checks of the Lab06 server read: the output of the server solution, then of the companion client (real run).
+    private static readonly string[] Lab06ServerSolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A2A server with two agents ===",
+        "APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops.",
+        "AuthAgent:         http://localhost:5071/a2a/authAgent",
+        "  Agent card:      http://localhost:5071/a2a/authAgent/.well-known/agent-card.json",
+        "CustomerToneAgent: http://localhost:5071/a2a/customerToneAgent",
+        "  Agent card:      http://localhost:5071/a2a/customerToneAgent/.well-known/agent-card.json",
+        "Press Ctrl+C to stop the server.",
+        "info: Microsoft.Hosting.Lifetime[14]",
+        "      Now listening on: http://localhost:5071",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Application started. Press Ctrl+C to shut down.",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Hosting environment: Production",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Content root path: /repo/LearningLabs/AzureOpenAI/Lab06_A2AServer/Solution",
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Discover a remote agent from its agent card ===",
+        "Agent card: AuthAgent (version 1.0.0)",
+        "  Description: An authentication agent specialized in generating and validating API keys. Only handles authentication-related tasks.",
+        "  Skill: GenerateAPIKey - Generates a new random API key that starts with 'Meknes'. The key includes a cryptographic signature for validation.",
+        "  Skill: ValidateAPIKey - Validates an API key by checking if it starts with 'Meknes' and verifying its cryptographic signature.",
+        "  Interface: JSONRPC (A2A 1.0) at http://localhost:5071/a2a/authAgent",
+        "  Interface: HTTP+JSON (A2A 1.0) at http://localhost:5071/a2a/authAgent",
+        "Generated API key: MekneshRpAhFKNbxHIdqCIU-4wvacQBaNBpOJbMlktaZ0oOkM.bjF3nhsoYdWh27lI-JBgDBs7YBcavOCfDC22Dkl_18U",
+        "Validation of the generated key: The API key is valid.",
+        "Validation of a tampered key: The API key is not valid. It does not start with \"Meknes\" as required.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Connect to a remote agent by URL (direct configuration) ===",
+        "Remote agent: CustomerToneAgent at http://localhost:5071/a2a/customerToneAgent",
+        "Customer message: I have been waiting for my order for two weeks and nobody answers my emails!",
+        "Tone: Frustrated. The customer expresses dissatisfaction due to the delay in receiving their order and the lack of response to their emails, indicating a feeling of irritation and urgency.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: A remote agent as a function tool of a local agent ===",
+        "Tool called: AuthAgent",
+        "Tool called: AuthAgent",
+        "Assistant: Here is your generated API key:",
+        "",
+        "```",
+        "Mekneska0nOpeJodhBwz2_dTcVAtd0GzSQpC--3BIymJGKRG8.V5giRUpLuc0_mjYdk8m0Nm7Va6U4w6Qg_kwPlkKAKgc",
+        "```",
+        "",
+        "The API key is valid.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 675",
+        "  Output tokens: 172",
+        "  Total tokens: 847",
+    ];
+
+    // Standard output of the Lab06 server exercise as delivered: it exits before listening, so the companion client never runs.
+    private static readonly string[] Lab06ServerStartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A2A server with two agents ===",
+        "AuthAgent:         http://localhost:5071/a2a/authAgent",
+        "  Agent card:      http://localhost:5071/a2a/authAgent/.well-known/agent-card.json",
+        "CustomerToneAgent: http://localhost:5071/a2a/customerToneAgent",
+        "  Agent card:      http://localhost:5071/a2a/customerToneAgent/.well-known/agent-card.json",
+        "Press Ctrl+C to stop the server.",
+    ];
+
+    [Theory]
+    [InlineData("azureopenai-lab06-client")]
+    [InlineData("azureopenai-lab06-server")]
+    public void Every_lab06_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise(string labId)
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find(labId)!;
+        (string[] solution, string[] start) = labId.EndsWith("client", StringComparison.Ordinal)
+            ? (Lab06ClientSolutionOutput, Lab06ClientStartOutput)
+            : (Lab06ServerSolutionOutput, Lab06ServerStartOutput);
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab.Expectations, solution), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab.Expectations, start).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab06_checks_fail_when_the_answers_do_not_come_from_the_tools_of_the_remote_agent()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab06-client")!;
+        string[] output = [.. Lab06ClientSolutionOutput.Select(line => line
+            .Replace("Validation of the generated key: The API key is valid.", "Validation of the generated key: The API key is not valid.")
+            .Replace("Validation of a tampered key: The API key you provided is not valid.", "Validation of a tampered key: The API key is valid.")
+            .Replace("  Interface: HTTP+JSON (A2A 1.0)", "  Interface: HTTP+JSON (A2A 0.3)"))
+            .Where(line => !line.StartsWith("Tool called:", StringComparison.Ordinal) && !line.StartsWith("Meknes", StringComparison.Ordinal))];
+
+        Assert.Equal(
+            ["scenario1-card", "scenario1-valid", "scenario1-tampered", "scenario3-tool", "scenario3-key"],
+            OutputAnalyzer.EvaluateExpectations(lab.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Labels_the_lab06_token_usage_with_scenario_3()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab06ServerSolutionOutput));
+        Assert.Equal("Scenario 3 · Token Usage", Assert.Single(usage.Reports).Label);
+        Assert.Equal(675, usage.Input);
+    }
 }

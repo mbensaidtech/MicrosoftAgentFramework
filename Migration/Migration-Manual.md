@@ -24,7 +24,7 @@
 
 | Package | Dernière version | Labs concernés | Décision |
 |---|---|---|---|
-| `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A(.AspNetCore)`, `Microsoft.Agents.AI.Hosting` | `1.22.0-preview.260918.1` | Lab06 (client/serveur) | Aucune version stable n'existe : utiliser la préversion **alignée** sur 1.22.0 et le signaler dans le README du lab. |
+| `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A(.AspNetCore)`, `Microsoft.Agents.AI.Hosting` | `1.22.0-preview.260918.1` | Lab06 (client/serveur) | Aucune version stable n'existe : utiliser la préversion **alignée** sur 1.22.0 et le signaler dans le README du lab. **Appliqué (Lab06)** : le client référence `Microsoft.Agents.AI.A2A`, le serveur `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (qui apporte `.Hosting.A2A`, `.Hosting`, `.Hosting.AspNetCore`, `A2A.AspNetCore` et `Microsoft.Extensions.Configuration.*` 10.0.12). |
 | `A2A` (SDK) | `1.0.0-preview2` | Lab06 | Idem (dépendance du précédent). |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | `1.74.0-preview` | Lab05, Lab07 | **Remplacés** (Lab05, cf. §4.11) : `CommunityToolkit.VectorData.InMemory` 1.0.1 (stable, samples officiels) et, pour MongoDB, un `ChatHistoryProvider` sur le driver officiel `MongoDB.Driver` 3.12.0 (aucun connecteur `VectorData` MongoDB stable). Lab07 (recherche vectorielle) : à trancher. |
 | `Microsoft.Agents.AI.Foundry` | stable 1.5.0 seulement ; 1.22.0 en `-preview` | aucun aujourd'hui | Non utilisé : le lab cible Azure OpenAI, pas Foundry Agent Service. |
@@ -75,7 +75,8 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | 1.0.0 | Suppression de `OpenAIAssistantClientExtensions` ; `Microsoft.Agents.AI.AzureAI` → `Microsoft.Agents.AI.Foundry` | #5058, #5042 | aucun |
 | 1.19.0 | Support MCP long-running tasks migré | #7774 | aucun (Lab04 n'utilise pas l'extension Tasks ; cité dans « Going further ») |
 | **1.21.0** | **Suppression de la dépendance `Azure.AI.OpenAI`** : tous les samples Azure OpenAI utilisent `OpenAIClient` + endpoint `/openai/v1/` | #7986 | **tous** |
-| 1.21.0 | Clarification des modes d'exécution de l'agent A2A | #8032 | Lab06 |
+| 1.21.0 | Clarification des modes d'exécution de l'agent A2A | #8032 | Lab06 (défaut `AgentRunMode.ReturnMessage` : réponse = un `Message` A2A) |
+| preview → 1.x (A2A SDK v1) | **Protocole A2A v0.3 → v1** : SDK `A2A` 1.0.0-preview2, hébergement `AddA2AServer` + `MapA2AJsonRpc`/`MapA2AHttpJson` + `MapWellKnownAgentCard`, `AgentCard.SupportedInterfaces`, `GetAIAgent` → `AsAIAgent`. **Client v1 et serveur v0.3 incompatibles** (vérifié : *"'method' field is not a valid A2A method"*) | guide Learn « A2A SDK v1 Migration Guide » | Lab06 (client **et** serveur, migrés ensemble) |
 | 1.22.0 | Sessions MCP adossées à un provider scoppées par invocation | #8425 | aucun — ne concerne que `Microsoft.Agents.AI.Workflows.Declarative.Mcp` (`DefaultMcpToolHandler`), vérifié sur la PR ; Lab04 utilise `McpClient` directement |
 
 ---
@@ -325,6 +326,46 @@ Points découverts :
 - **Chat reducers** (`MessageCountingChatReducer`, `InMemoryChatHistoryProviderOptions.ChatReducer`) : encore `[Experimental]` **`MEAI001`** (vérifié à la compilation) → cités dans « Going further » de Lab05, pas enseignés.
 - **`ConversationId` et `ChatHistoryProvider` sont exclusifs** : avec un service qui stocke l'historique (Responses API avec réponses stockées), `ChatClientAgent` lève `Only ConversationId or ChatHistoryProvider may be used…` — raison de plus pour Chat Completions (règle 5).
 
+### 4.12 A2A v1 : client et serveur (validé sur Lab06)
+
+**Ancienne approche**
+```csharp
+// Client (A2A 0.3)
+AIAgent remote = new A2A.A2AClient(new Uri(url)).GetAIAgent();
+// Serveur (A2A 0.3)
+app.MapA2A(agent, path: "/a2a/authAgent", agentCard: card, taskManager => app.MapWellKnownAgentCard(taskManager, "/a2a/authAgent"));
+new AgentCard { Name = "...", Url = "http://localhost:5000/a2a/authAgent", ... };
+```
+
+**Nouvelle approche**
+```csharp
+// Client : découverte (well-known URI), configuration directe, agent distant comme outil
+AgentCard card = await new A2ACardResolver(new Uri($"{agentUrl}/")).GetAgentCardAsync();   // '/' final requis
+AIAgent remote = card.AsAIAgent();                                    // ou await resolver.GetAIAgentAsync()
+using A2A.A2AClient client = new(new Uri(url));                        // JSON-RPC, sans carte
+AIAgent direct = client.AsAIAgent(name: "...", description: "...");
+AIAgent local = chatClient.AsAIAgent(instructions: "...", tools: [remote.AsAIFunction()]);
+
+// Serveur : enregistrement, deux liaisons, carte par agent
+builder.AddA2AServer(agent);                                           // Microsoft.Extensions.DependencyInjection
+var app = builder.Build();
+app.MapA2AJsonRpc(agent, "/a2a/authAgent");
+app.MapA2AHttpJson(agent, "/a2a/authAgent");
+app.MapWellKnownAgentCard(new AgentCard { ..., SupportedInterfaces = [new AgentInterface { Url = url, ProtocolBinding = ProtocolBindingNames.JsonRpc, ProtocolVersion = "1.0" }, ...] }, "/a2a/authAgent");
+await app.RunAsync(baseUrl);
+```
+
+**Explication** — Le SDK A2A passe en v1 (`1.0.0-preview2`) : nouvelles méthodes JSON-RPC (`SendMessage`), liaison HTTP+JSON (`POST …/message:send`), `AgentCard.Url` remplacé par `SupportedInterfaces` (URL + liaison + version). Côté serveur, `MapA2A` est éclaté en `AddA2AServer` (gestionnaire A2A + task store, **clé = nom de l'agent**), `MapA2AJsonRpc` / `MapA2AHttpJson` et `MapWellKnownAgentCard` (paquet `A2A.AspNetCore`). Côté client, `GetAIAgent` devient `AsAIAgent` (`A2AClientExtensions`, `A2AAgentCardExtensions`) ; `A2ACardResolver.GetAIAgentAsync` est conservé. `AsAIFunction()` (Microsoft.Agents.AI, stable) transforme un agent distant en outil (sample `A2AAgent_AsFunctionTool`). Références : samples `Agent_With_A2A`, `A2AAgent_AsFunctionTool`, `A2AAgent_ProtocolSelection`, `A2AAgent_Skills`, `05-end-to-end/A2AClientServer` ; page Learn « A2A SDK v1 Migration Guide ».
+
+Points découverts :
+- **Incompatibilité v0.3 ↔ v1** : aucun mode de compatibilité dans le SDK v1 ; client et serveur doivent être migrés et testés ensemble.
+- **`MapWellKnownAgentCard(card, path)`** sert la carte à `<path>/.well-known/agent-card.json` : une carte par agent sur un même hôte (le guide Learn dit « une carte par hôte » pour la racine seulement). `A2ACardResolver(baseUrl)` ajoute `.well-known/agent-card.json` **relativement** à l'URL : sans `/` final, 404.
+- **Liaison par défaut** : avec une carte qui liste JSON-RPC puis HTTP+JSON, `AsAIAgent()` a utilisé **JSON-RPC** (vérifié dans les journaux du serveur), alors que le guide Learn annonce « HTTP+JSON preferred ». `A2AClientOptions { PreferredBindings = [ProtocolBindingNames.HttpJson] }` force HTTP+JSON (vérifié).
+- **Nom de type ambigu** : `A2A.AgentSkill` et `Microsoft.Agents.AI.AgentSkill` coexistent ; un projet nommé `A2AClient` masque le type `A2A.A2AClient` (écrire le nom complet).
+- **Sessions côté serveur** : par défaut, aucune session n'est conservée entre requêtes (sample : `AddKeyedSingleton<AgentSessionStore>(name, new InMemoryAgentSessionStore())`) ; `A2AServerRegistrationOptions` (`AgentRunMode`) est `[Experimental]`.
+- **L'hébergement A2A appelle toujours `RunStreamingAsync`** : il est touché par la régression streaming Azure (§8) → contournement temporaire dans Lab06_A2AServer.
+- `Microsoft.Agents.Hosting.AspNetCore` (1.4.9-beta, SDK « Agents » M365) et `Microsoft.Extensions.Hosting` étaient inutiles : supprimés.
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -345,6 +386,9 @@ Points découverts :
 | `UserInputRequests` | Supprimé | Compilation | contenu d'approbation dans les messages de réponse (cf. `Agent_Step01_UsingFunctionToolsWithApprovals`) | Lab09 |
 | `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02/03 (à vérifier) |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) | Lab05 ✅, Lab07 |
+| `A2AClient.GetAIAgent()` | Renommé (A2A SDK v1) | Compilation | `IA2AClient.AsAIAgent(name, description)` ; `AgentCard.AsAIAgent()` ; `A2ACardResolver.GetAIAgentAsync()` inchangé (§4.12) | Lab06 ✅ |
+| `app.MapA2A(agent, path, agentCard, taskManager => …)`, `ITaskManager`, `AgentCard.Url` | Supprimés (A2A SDK v1) | Compilation + protocole | `AddA2AServer` + `MapA2AJsonRpc` / `MapA2AHttpJson` + `MapWellKnownAgentCard(card, path)` ; `AgentCard.SupportedInterfaces` (§4.12) | Lab06 ✅ |
+| `Microsoft.Agents.Hosting.AspNetCore` 1.4.9-beta | Inutile (SDK M365 Agents) | Dépendance en préversion | — (supprimé) | Lab06 ✅ |
 | `Microsoft.Extensions.Hosting` (usage « config seulement ») | Surdimensionné | Dépendance inutile | `Microsoft.Extensions.Configuration.Json/UserSecrets/EnvironmentVariables/Binder` | tous les labs console |
 | `Azure.Identity 1.18.0-beta.2` | Préversion | Règle « stable » | `Azure.Identity 1.21.0` | tous |
 | `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | `MongoDB.Driver 3.12.0` — Lab05 le référence directement (son graphe n'a plus de package vulnérable) ; la montée de CommonUtilities reste à faire avec Lab07/Lab12 (cf. §8) | tous (warnings), Lab07/12 (code) |
@@ -396,6 +440,8 @@ Points découverts :
 - **Collision `ChatMessage`** : `OpenAI.Chat.ChatMessage` et `Microsoft.Extensions.AI.ChatMessage` coexistent dès qu'on importe `OpenAI.Chat` (nécessaire pour `ChatClient` et `AsAIAgent`). Conserver l'alias `AIExtensions` enseigné depuis Lab01.
 - **Cadence de release** : MAF publie ~1 version/semaine avec des `[BREAKING]` dans les zones Skills, Harness, Hosting, A2A, MCP. Figer 1.22.0 pour toute la migration ; ne pas monter de version en cours de route.
 - **Lab06 (A2A)** : packages uniquement en préversion → exception à la règle « stable ».
+- **Régression streaming Azure OpenAI (constatée le 2026-09-28)** : Azure envoie désormais, en streaming Chat Completions, des annotations de filtre de contenu **sans `delta`** ; `Microsoft.Extensions.AI.OpenAI` 10.10.0 (et 10.10.1, dernière version) lève `InvalidOperationException: The requested operation requires an element of type 'Object', but the target element has type 'Null'` dans `OpenAIChatClient.TryGetReasoningDelta` ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790), ouvert). Impact : **tout `RunStreamingAsync`** — Lab01 scénario 5 et Lab02 (streaming) échouent aujourd'hui alors qu'ils étaient validés le 2026-09-26/27 (non corrigés : hors périmètre), et l'hébergement A2A (qui exécute toujours en streaming) renvoie *"Agent handler did not produce any response events"*. Lab06_A2AServer contient un contournement **temporaire** (`StreamingWorkaround.WithNonStreamingResponses()`, middleware `ChatClientBuilder.Use` qui sert les requêtes streaming par un appel non streaming). À retirer, et à re-tester Lab01/Lab02, dès qu'une version corrigée de `Microsoft.Extensions.AI.OpenAI` est publiée.
+- **Port 5000 sur macOS** : le récepteur AirPlay écoute sur `*:5000` ; Kestrel peut quand même se lier à `localhost:5000`, mais quand le serveur du lab ne tourne pas, un client reçoit `403 Forbidden` d'AirPlay. Documenté dans les README Lab06 ; le dashboard utilise un port dédié (5071).
 - **Lab05 / Lab07** : connecteurs Semantic Kernel en préversion et API mémoire/historique profondément refondues → refonte conceptuelle, pas une adaptation syntaxique.
 - **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab07/Lab12, qui référencent 2.30.0 directement. Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab07/Lab12.
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).

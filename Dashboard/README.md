@@ -3,7 +3,8 @@
 An optional, local web UI to follow the labs and run them without typing `dotnet` commands.
 It is a convenience layer: **every lab keeps working exactly the same with the CLI**, and no lab depends on the dashboard.
 
-> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient` and `Lab05-AIAgentWithThreads` (the migrated labs).
+> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer` and `Lab06_A2AClient` (the migrated labs).
+> The two Lab06 labs are run in pairs: each run of one starts the reference solution of the other as its **companion** (see [Labs run in pairs](#labs-run-in-pairs-companion)), on port 5071.
 > Scenario 3 of Lab05 needs its MongoDB container (`docker compose up -d` in the lab's `MongoDB/` folder): without it, the Solution run fails with *"MongoDB is not reachable"*.
 
 ## Start it
@@ -44,6 +45,7 @@ To configure them without a terminal, use the **Azure OpenAI settings** (see bel
 | Solution | the solution files that differ from the exercise, behind a "try it first" gate |
 | Cancel / timeout | kills the whole process tree |
 | Interactive labs (`Console.ReadLine`) | labs with `"interactive": true` keep stdin open: an input box under the output shows *Waiting for input #n* exactly when the program reads, sends the line, echoes it, and **End input** closes stdin (`ReadLine` returns `null`). Waiting does not count against the lab timeout — see [Interactive labs](#interactive-labs) |
+| Labs run in pairs (companion) | a lab can declare a `companion` project (the reference solution of another lab): a server started before the lab and stopped after it, or a client run against the lab once it is ready. Its output is shown as `companion` lines — see [Labs run in pairs](#labs-run-in-pairs-companion) |
 | Azure OpenAI settings | top-bar button (status: *API key* / *Microsoft Entra ID* / *Not configured*) opening a form for the endpoint, the chat deployment and the API key shared by every migrated lab — see [Azure OpenAI settings](#azure-openai-settings) |
 
 ## Architecture
@@ -124,6 +126,23 @@ The labs themselves are not modified, and **`dotnet run` in a terminal is unchan
 
 Not supported: `Console.ReadKey` (it throws when stdin is redirected) and programs that read `Console.OpenStandardInput()` directly or replace `Console.In` themselves (input reaches them, but no prompt is detected).
 
+## Labs run in pairs (companion)
+
+An A2A client needs a running server, and a server never exits: `Lab06_A2AClient` and `Lab06_A2AServer` declare a `companion` in `labs.json`.
+The labs are not modified, and **`dotnet run` in a terminal is unchanged**.
+
+| `role` | Run |
+|---|---|
+| `server` (Lab06_A2AClient) | build the lab and the companion → start the companion (`dotnet run --project <companion> --no-build`) → wait for a stdout line matching `readyPattern` (at most `readyTimeoutSeconds`) → run the lab → stop the companion (process tree killed). The checks and the token usage read the output of the lab. |
+| `client` (Lab06_A2AServer) | build both → start the lab → wait for `readyPattern` in the output of the lab → run the companion client to the end → stop the lab. The checks and the token usage read the output of the lab **then** of the companion (the server itself prints no model answer). |
+
+| Question | Answer |
+|---|---|
+| Which companion? | Always a project of the repository (validated like the lab projects), here the `Solution` of the other lab: your `Start` is checked against the reference. |
+| Ports | `environment` sets variables on **both** processes of the run (`A2AServer__BaseUrl`, `RemoteAgents__*__Url` = `http://localhost:5071`): no conflict with a server you started yourself on port 5000 (or with the macOS AirPlay Receiver, which also listens on 5000). They are shown in the log. |
+| Verdict | *Failed* at the run step when the companion server is not ready (*"The companion failed"*), when the lab (a server) exits or times out before it is ready (*"The lab (a server) never became ready"*, e.g. the delivered `Start`), or when the companion client exits with an error. |
+| Not supported | A companion for an interactive lab. |
+
 ## Add a lab
 
 No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureopenai-lab02`, `azureopenai-lab03` or `azureopenai-lab04` for complete examples), then add its id to the catalog test (`LabCatalogTests`):
@@ -151,6 +170,7 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
 Write each check so that it fails on the delivered exercise (`Start`) and passes on the `Solution`. To check the token usage of one scenario only,
 stop at the next header: `(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\s*\d+`.
 For labs with tools, check data that only a tool can produce (a value of the tool's data set, an id generated by the tool, a line written by a middleware), not only the presence of an answer.
+For labs that call a remote agent, check what only the remote tools can give (a signed key accepted, a tampered one rejected, see `azureopenai-lab06-client`).
 For labs with memory or sessions, check what only the history can give (a name given in an earlier turn), and use a backreference to check that a value printed twice is the same (e.g. the key of a restored session, see `azureopenai-lab05`).
 
 ## Tests
@@ -161,16 +181,17 @@ dotnet test
 ```
 
 Unit tests cover the console decoder (spinner, streaming, CRLF split across reads), the token usage parser,
-the checks (including the real Lab02, Lab03, Lab04 and Lab05 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, and a Lab05 conversation that lost its history), the build diagnostics,
-the catalog path validation, the French check descriptions, the localized README lookup, the Azure OpenAI settings store
+the checks (including the real Lab02, Lab03, Lab04, Lab05 and Lab06 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, a Lab05 conversation that lost its history, and Lab06 answers that do not come from the remote tools), the build diagnostics,
+the catalog path and companion validation, the French check descriptions, the localized README lookup, the Azure OpenAI settings store
 (format, preserved entries, precedence, validation, permissions — always in a temporary folder, never the real user-secrets file)
 and the masking of the API key, including an end-to-end run of a throwaway project that prints it;
 the interactive input: signal parsing (split signals, mixed stderr), numbering, type-ahead, validation, end of input, the paused lab timeout,
+the companions: end-to-end runs of throwaway server and client projects (a server ready before the lab and stopped after it, a lab that is a server checked with its client, a lab or a companion server that exits before it is ready);
 and end-to-end runs of a throwaway project answering three `ReadLine` calls (non-ASCII text, masked secret), closing the input, timing out without an answer, and running unchanged when the lab is not interactive.
 
 ## Limitations
 
 - Token usage is only what the exercise prints; model calls whose usage is not printed are not counted. No cost estimate.
-- One run at a time (the labs share `CommonUtilities`, parallel builds would conflict).
+- One run at a time (the labs share `CommonUtilities`, parallel builds would conflict). A companion is part of the run, not a second run.
 - Interactive labs must be declared `"interactive": true`; `Console.ReadKey` is not supported (see [Interactive labs](#interactive-labs)).
 - Colors of `ColoredConsole` are lost: .NET does not emit them when the output is redirected.

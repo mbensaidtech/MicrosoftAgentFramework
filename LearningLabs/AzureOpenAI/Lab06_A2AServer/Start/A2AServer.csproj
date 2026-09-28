@@ -5,17 +5,18 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>MEAI001</NoWarn>
+    <!-- Shared by every lab: set your Azure OpenAI secrets once with `dotnet user-secrets`. -->
+    <UserSecretsId>microsoft-agent-framework-learninglabs</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageReference Include="Azure.Identity" Version="1.18.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI.A2A" Version="1.0.0-preview.251219.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.0.0-preview.251219.1" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251204.1" />
-    <PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.4.9-beta" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <!-- A2A hosting for ASP.NET Core: AddA2AServer, MapA2AJsonRpc, MapA2AHttpJson (brings the A2A SDK v1, A2A.AspNetCore
+         and Microsoft.Extensions.Configuration.* 10.0.12 transitively). No stable version exists yet: the preview aligned on 1.22.0 is used. -->
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.22.0-preview.260918.1" />
+    <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
   </ItemGroup>
 
   <ItemGroup>

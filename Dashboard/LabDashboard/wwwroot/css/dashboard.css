@@ -184,6 +184,7 @@ details.fig:not([open]) > summary { border-bottom: 0; }
 .term-line { display: block; min-height: 1.65em; }
 .term-line.stderr { color: #F08A94; }
 .term-line.system { color: #7FB6F0; }
+.term-line.companion { color: #B9A8E0; }
 .term-line.build { color: var(--term-dim); }
 .term-line.note { color: var(--term-dim); font-style: italic; }
 .term-line.stdin, .term-echo { color: #9FD8B4; }

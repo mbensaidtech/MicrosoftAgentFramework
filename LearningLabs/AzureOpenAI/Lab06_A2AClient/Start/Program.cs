@@ -1,18 +1,21 @@
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using A2A;
 using Azure.Identity;
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.OpenAI;
 using OpenAI;
 using OpenAI.Chat;
 using CommonUtilities;
+
 using A2AClient;
-using A2A;
+using static A2AClient.AgentConsole;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], or [1, 2] to run specific scenarios
-HashSet<int> scenariosToRun = [1];
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
+// All scenarios need the A2A server of Lab06_A2AServer (http://localhost:5000)
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -21,99 +24,93 @@ bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosTo
 
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
-var remoteAuthAgentSettings = ConfigurationHelper.GetRemoteAuthAgentSettings();
-
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
-Console.WriteLine($"Remote Auth Agent: {remoteAuthAgentSettings.Name}");
-Console.WriteLine($"Remote Auth Agent Description: {remoteAuthAgentSettings.Description}");
-Console.WriteLine($"Remote Auth Agent URL: {remoteAuthAgentSettings.Url}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
+// Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
+// OpenAIClientOptions clientOptions = ...
 
-// Step 3: Get a ChatClient for the specific deployment
-ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
+// TODO 2: Create the OpenAIClient
+// - If settings.APIKey is set: authenticate with an ApiKeyCredential
+// - Otherwise: authenticate with Microsoft Entra ID using a BearerTokenPolicy built from
+//   DefaultAzureCredential and the scope "https://ai.azure.com/.default"
+// Note: the AuthenticationPolicy constructor is flagged experimental (OPENAI001), keep the pragma around it.
+#pragma warning disable OPENAI001
+// OpenAIClient client = ...
+#pragma warning restore OPENAI001
+
+// TODO 3: Get a ChatClient (Chat Completions API) for the deployment
+// (used by scenario 3 only: scenarios 1 and 2 talk to remote agents, whose models run on the A2A server)
+// ChatClient chatClient = ...
 
 #endregion
 
-ColoredConsole.WriteDividerLine();
+// The remote agents hosted by Lab06_A2AServer
+RemoteAgentSettings authAgentSettings = ConfigurationHelper.GetRemoteAgentSettings("AuthAgent");
+RemoteAgentSettings customerToneAgentSettings = ConfigurationHelper.GetRemoteAgentSettings("CustomerToneAgent");
 
-#region Scenario 1: Connect to A2A Server and interact with remote agent
+#region Scenario 1: Discover a remote agent from its agent card and call it
 
 if (ShouldRunScenario(1))
 {
-    // =====================================================
-    // TODO 1: Create a remote agent using the A2AClient
-    // Hint: Call CreateRemoteAgentUsingUrlAsync(remoteAuthAgentSettings)
-    // Store the result in: AIAgent remoteAuthAgent = ...
-    // =====================================================
-    
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 1: Discover a remote agent from its agent card ===");
 
-    // =====================================================
-    // TODO 2: Display the remote agent name
-    // Hint: Use ColoredConsole.WriteInfoLine($"Remote Auth Agent: {remoteAuthAgent.Name}");
-    // =====================================================
-    
+    // TODO 4: Read the agent card published at <agent URL>/.well-known/agent-card.json and display it
+    // Hint: new A2ACardResolver(new Uri($"{authAgentSettings.Url}/")), then await cardResolver.GetAgentCardAsync().WithSpinner("Reading the agent card")
+    //       and WriteAgentCard(authAgentCard) (provided in AgentConsole.cs)
+    // AgentCard authAgentCard = ...
 
-    // =====================================================
-    // TODO 3: Generate an API key using the remote agent
-    // Hint: Call GenerateApiKeyAsync(remoteAuthAgent) and store the result
-    // Store in: string apiKey = ...
-    // =====================================================
-    
+    // TODO 5: Create an AIAgent for the remote agent: name, description and protocol binding come from the card
+    // AIAgent authAgent = ...
 
-    // =====================================================
-    // TODO 4: Validate the generated API key
-    // Hint: Call ValidateApiKeyAsync(remoteAuthAgent, apiKey)
-    // =====================================================
-    
+    // TODO 6: Ask the remote agent for a new API key ("Generate a new API key"), find the key in its answer and display it
+    // Hint: FindApiKey(generateResponse.Text) (provided in AgentConsole.cs) extracts the key from the natural-language answer
+    // string apiKey = ...
+
+    // TODO 7: Ask the remote agent to validate the key, then a tampered copy of it, and display both answers
+    // Hint: $"Validate this API key: {apiKey}"; a tampered copy: apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A')
 }
 
 #endregion
 
-#region Helper Methods - Provided (Do Not Modify)
+#region Scenario 2: Connect to a remote agent by URL, without an agent card
 
-// This method creates a remote agent using the A2AClient with direct URL
-async Task<AIAgent> CreateRemoteAgentUsingUrlAsync(RemoteAuthAgentSettings remoteAuthAgentSettings)
+if (ShouldRunScenario(2))
 {
-    var a2aClient = new A2A.A2AClient(new Uri(remoteAuthAgentSettings.Url));
-    return a2aClient.GetAIAgent();
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Connect to a remote agent by URL (direct configuration) ===");
+
+    // TODO 8: Create an A2A client for the URL of the CustomerToneAgent, then an AIAgent from it, and display its name
+    // Hint: A2A.A2AClient is written in full because the namespace of this project is also called A2AClient; dispose it ("using").
+    //       The client gives the agent its name and description: customerToneAgentSettings.Name and .Description
+    // using A2A.A2AClient toneClient = ...
+    // AIAgent customerToneAgent = ...
+
+    // TODO 9: Send a customer message to the remote agent and display the tone
+    // Hint: $"What is the tone of this customer message: \"{CustomerMessage}\"" with the message of the README
 }
 
-// This method creates a remote agent using the A2ACardResolver (Alternative approach)
-async Task<AIAgent> CreateRemoteAgentUsingResolverAsync(RemoteAuthAgentSettings remoteAuthAgentSettings)
-{
-    var agentCardResolver = new A2ACardResolver(new Uri(remoteAuthAgentSettings.Url), new HttpClient
-    {
-        Timeout = TimeSpan.FromSeconds(60)
-    });
-    return await agentCardResolver.GetAIAgentAsync();
-}
+#endregion
 
-// This method generates an API key using the remote agent
-static async Task<string> GenerateApiKeyAsync(AIAgent remoteAuthAgent)
-{
-    ColoredConsole.WriteSecondaryLogLine($"Scenario 1: Generate an API key using the remote agent");
-    var agentRunResponse = await remoteAuthAgent.RunAsync("Generate a new API key");
-    string apiKey = agentRunResponse.Messages
-        .Where(m => !string.IsNullOrWhiteSpace(m.Text))
-        .Last()
-        .Text;
-    ColoredConsole.WriteAssistantLine($"Generated API Key: {apiKey}");
-    
-    return apiKey;
-}
+#region Scenario 3: Use a remote agent as a function tool of a local agent
 
-// This method validates an API key using the remote agent
-static async Task ValidateApiKeyAsync(AIAgent remoteAuthAgent, string apiKey)
+if (ShouldRunScenario(3))
 {
-    ColoredConsole.WriteSecondaryLogLine($"Scenario 2: Validate the API key using the remote agent");
-    var agentRunResponse = await remoteAuthAgent.RunAsync($"Validate this API key: {apiKey}");
-    foreach (var chatMessage in agentRunResponse.Messages.Where(m => !string.IsNullOrWhiteSpace(m.Text)))
-    {
-        ColoredConsole.WriteAssistantLine($"Validated API Key: {chatMessage.Text}");
-    }
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 3: A remote agent as a function tool of a local agent ===");
+
+    // TODO 10: Create the remote AuthAgent from its agent card in one call
+    // Hint: GetAIAgentAsync() on an A2ACardResolver reads the card and creates the agent
+    // AIAgent authAgent = ...
+
+    // TODO 11: Create a local agent (Azure OpenAI) that can call the remote agent as a tool
+    // Hint: chatClient.AsAIAgent(instructions: ..., name: "Assistant", tools: [authAgent.AsAIFunction()])
+    // AIAgent assistant = ...
+
+    // TODO 12: Run the local agent, then display the tools it called, its answer and the token usage
+    // Hint: WriteToolCalls(response) and WriteTokenUsage(response) are provided in AgentConsole.cs
 }
 
 #endregion

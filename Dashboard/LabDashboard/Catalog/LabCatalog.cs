@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace LabDashboard.Catalog;
@@ -25,6 +26,37 @@ public sealed record LabTranslation
     public IReadOnlyDictionary<string, string>? Checks { get; init; }
 }
 
+/// <summary>How a companion process takes part in a run (see <see cref="LabCompanion"/>).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<CompanionRole>))]
+public enum CompanionRole
+{
+    /// <summary>The companion is a server the lab calls: started (and ready) before the lab, stopped after it.</summary>
+    Server,
+
+    /// <summary>The lab is a server: it is started first, the companion runs once the lab is ready, then the lab is stopped.</summary>
+    Client
+}
+
+/// <summary>
+/// A second project run next to the lab, for labs that only make sense in pairs (an A2A client and its server).
+/// The companion is always the reference solution of the other lab, built and run with the same commands as a lab.
+/// </summary>
+public sealed record LabCompanion
+{
+    public required CompanionRole Role { get; init; }
+
+    /// <summary>The companion project, relative to the repository root.</summary>
+    public required string Project { get; init; }
+
+    /// <summary>A line of the server (the companion for <see cref="CompanionRole.Server"/>, the lab for <see cref="CompanionRole.Client"/>) that says it is ready.</summary>
+    public required string ReadyPattern { get; init; }
+
+    public int ReadyTimeoutSeconds { get; init; } = 60;
+
+    /// <summary>Environment variables set on both processes of the run (for example a dedicated port), shown in the log.</summary>
+    public IReadOnlyDictionary<string, string> Environment { get; init; } = new Dictionary<string, string>();
+}
+
 /// <summary>One lab as declared in labs.json. Paths are relative to the repository root.</summary>
 public sealed record LabDefinition
 {
@@ -46,6 +78,9 @@ public sealed record LabDefinition
 
     /// <summary>An interactive run whose prompt stays unanswered this long times out. The lab timeout is paused while it waits.</summary>
     public int InputIdleTimeoutSeconds { get; init; } = 600;
+
+    /// <summary>Optional second project of the run (see <see cref="LabCompanion"/>).</summary>
+    public LabCompanion? Companion { get; init; }
     public IReadOnlyList<LabExpectation> Expectations { get; init; } = [];
     public IReadOnlyDictionary<string, LabTranslation> Translations { get; init; } = new Dictionary<string, LabTranslation>();
 
@@ -55,7 +90,7 @@ public sealed record LabDefinition
 /// <summary>
 /// The whitelist of runnable labs. Only the projects declared here can ever be built or run by the dashboard.
 /// </summary>
-public sealed class LabCatalog
+public sealed partial class LabCatalog
 {
     private readonly Dictionary<string, LabDefinition> _labs;
 
@@ -75,6 +110,8 @@ public sealed class LabCatalog
     public string LabDirectory(LabDefinition lab) => Resolve(lab.Path);
 
     public string ProjectPath(LabDefinition lab, RunTarget target) => Resolve(System.IO.Path.Combine(lab.Path, lab.ProjectFor(target)));
+
+    public string? CompanionProjectPath(LabDefinition lab) => lab.Companion is null ? null : Resolve(lab.Companion.Project);
 
     public string ReadmePath(LabDefinition lab) => Resolve(System.IO.Path.Combine(lab.Path, lab.Readme));
 
@@ -121,6 +158,11 @@ public sealed class LabCatalog
             }
         }
 
+        if (lab.Companion is { } companion)
+        {
+            ValidateCompanion(lab, companion);
+        }
+
         foreach (LabExpectation expectation in lab.Expectations)
         {
             try
@@ -133,6 +175,45 @@ public sealed class LabCatalog
             }
         }
     }
+
+    private void ValidateCompanion(LabDefinition lab, LabCompanion companion)
+    {
+        if (!Enum.IsDefined(companion.Role) || companion.ReadyTimeoutSeconds <= 0)
+        {
+            throw new InvalidOperationException($"Lab '{lab.Id}': invalid companion role or ready timeout.");
+        }
+
+        if (lab.Interactive)
+        {
+            throw new InvalidOperationException($"Lab '{lab.Id}': an interactive lab cannot have a companion.");
+        }
+
+        string project = Resolve(companion.Project);
+        if (!project.EndsWith(".csproj", StringComparison.Ordinal) || !File.Exists(project))
+        {
+            throw new InvalidOperationException($"Lab '{lab.Id}': companion project '{project}' not found.");
+        }
+
+        try
+        {
+            _ = new Regex(companion.ReadyPattern);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException($"Lab '{lab.Id}': invalid companion ready pattern.", ex);
+        }
+
+        foreach (string name in companion.Environment.Keys)
+        {
+            if (!EnvironmentVariableName().IsMatch(name))
+            {
+                throw new InvalidOperationException($"Lab '{lab.Id}': invalid companion environment variable name '{name}'.");
+            }
+        }
+    }
+
+    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
+    private static partial Regex EnvironmentVariableName();
 
     /// <summary>Resolves a catalog path and refuses anything that escapes the repository root.</summary>
     private string Resolve(string relativePath)

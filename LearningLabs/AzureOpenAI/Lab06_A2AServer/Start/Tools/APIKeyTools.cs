@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 
 namespace A2AServer.Tools;
 
@@ -19,21 +18,23 @@ public class APIKeyTools
     /// <summary>
     /// Initializes a new instance of the <see cref="APIKeyTools"/> class.
     /// </summary>
-    /// <param name="configuration">The configuration instance to read the secret key from.</param>
+    /// <param name="apiKeySettings">The settings holding the optional signing secret.</param>
     public APIKeyTools(APIKeySettings apiKeySettings)
     {
-        if (apiKeySettings == null)
-        {
-            throw new ArgumentNullException(nameof(apiKeySettings));
-        }
+        ArgumentNullException.ThrowIfNull(apiKeySettings);
 
-        _secretKey = apiKeySettings.SecretKey;
-        
-        if (string.IsNullOrWhiteSpace(_secretKey))
-        {
-            throw new InvalidOperationException("APIKeySettings:SecretKey cannot be empty");
-        }
+        IsSecretConfigured = !string.IsNullOrWhiteSpace(apiKeySettings.SecretKey);
+
+        // Without a configured secret, sign with a random one: the keys stay valid until the server stops.
+        _secretKey = IsSecretConfigured
+            ? apiKeySettings.SecretKey!
+            : Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the signing secret comes from the configuration (<c>true</c>) or was generated at startup.
+    /// </summary>
+    public bool IsSecretConfigured { get; }
 
     /// <summary>
     /// Generates a random API key that starts with "Meknes" and includes a cryptographic signature.

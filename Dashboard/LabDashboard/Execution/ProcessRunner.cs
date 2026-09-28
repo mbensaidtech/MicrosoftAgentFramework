@@ -44,7 +44,8 @@ public static class ProcessRunner
         string workingDirectory,
         IProcessOutputObserver observer,
         CancellationToken cancellationToken,
-        InteractiveInput? interactive = null)
+        InteractiveInput? interactive = null,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         ProcessStartInfo startInfo = new(fileName)
         {
@@ -64,6 +65,10 @@ public static class ProcessRunner
         }
 
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
+        foreach ((string name, string value) in environment ?? new Dictionary<string, string>())
+        {
+            startInfo.Environment[name] = value;
+        }
 
         if (interactive is not null)
         {

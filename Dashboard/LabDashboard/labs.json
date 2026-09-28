@@ -481,6 +481,216 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab06-server",
+      "number": "06",
+      "track": "Azure OpenAI",
+      "title": "A2A Server (Agent-to-Agent)",
+      "summary": "Host two agents with the A2A protocol v1 in ASP.NET Core: an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings and described by their agent cards. The dashboard checks your server with the reference client.",
+      "level": "Intermediate",
+      "objectives": [
+        "Host agents in ASP.NET Core with builder.AddA2AServer(agent)",
+        "Expose an agent with both A2A v1 bindings: MapA2AJsonRpc() and MapA2AHttpJson()",
+        "Describe an agent with an AgentCard (skills, SupportedInterfaces) and publish it with MapWellKnownAgentCard()",
+        "Give a hosted agent function tools: the model and the tools run on the server"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab06_A2AServer",
+      "startProject": "Start/A2AServer.csproj",
+      "solutionProject": "Solution/A2AServer.csproj",
+      "timeoutSeconds": 240,
+      "companion": {
+        "role": "client",
+        "project": "LearningLabs/AzureOpenAI/Lab06_A2AClient/Solution/A2AClient.csproj",
+        "readyPattern": "Now listening on: http://localhost:5071",
+        "readyTimeoutSeconds": 60,
+        "environment": {
+          "A2AServer__BaseUrl": "http://localhost:5071",
+          "RemoteAgents__AuthAgent__Url": "http://localhost:5071/a2a/authAgent",
+          "RemoteAgents__CustomerToneAgent__Url": "http://localhost:5071/a2a/customerToneAgent"
+        }
+      },
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded (Azure OpenAI)",
+          "pattern": "(?s)^Endpoint: \\S+.*?^Deployment: \\S+"
+        },
+        {
+          "id": "server-listening",
+          "description": "The A2A server listens on the configured address",
+          "pattern": "^\\s*Now listening on: http://localhost:\\d+\\s*$"
+        },
+        {
+          "id": "scenario1-card",
+          "description": "Scenario 1 - agent card of the AuthAgent read: its skills and both A2A 1.0 interfaces (JSON-RPC and HTTP+JSON)",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n(?:(?!^=== Scenario).)*?^\\s+Skill: GenerateAPIKey - (?:(?!^=== Scenario).)*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
+        },
+        {
+          "id": "scenario1-key",
+          "description": "Scenario 1 - the remote agent generated a signed API key (Meknes<random>.<signature>)",
+          "pattern": "^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
+        },
+        {
+          "id": "scenario1-valid",
+          "description": "Scenario 1 - the remote agent (its tool) validated the generated key",
+          "pattern": "(?i)^Validation of the generated key: (?![^\\n]*\\b(?:not|isn't|is not)\\s+(?:a\\s+)?valid|[^\\n]*\\binvalid\\b)[^\\n]*\\bvalid\\b"
+        },
+        {
+          "id": "scenario1-tampered",
+          "description": "Scenario 1 - the remote agent rejected the tampered key (only the signature check of the server can tell)",
+          "pattern": "(?i)^Validation of a tampered key: [^\\n]*(?:\\binvalid\\b|\\b(?:not|isn't)\\s+(?:a\\s+)?valid\\b)"
+        },
+        {
+          "id": "scenario2-tone",
+          "description": "Scenario 2 - the CustomerToneAgent, reached by URL, detected a negative tone",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Remote agent: CustomerToneAgent at http\\S+/a2a/customerToneAgent\\s*$\\n(?:(?!^=== Scenario).)*?^Tone: [^\\n]*\\b(?:frustrat|angr|upset|annoy|irritat|dissatisf|negative|impatien|disappoint)"
+        },
+        {
+          "id": "scenario3-tool",
+          "description": "Scenario 3 - the local agent called the remote AuthAgent as a function tool",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: AuthAgent\\s*$"
+        },
+        {
+          "id": "scenario3-key",
+          "description": "Scenario 3 - the answer of the local agent contains a signed API key",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Assistant: (?:(?!^=== Scenario|^Token Usage:).)*?Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage of the local agent displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Serveur A2A (Agent-to-Agent)",
+          "level": "Intermédiaire",
+          "summary": "Hébergez deux agents avec le protocole A2A v1 dans ASP.NET Core : un AuthAgent avec des outils de clés d'API et un CustomerToneAgent, exposés avec les liaisons JSON-RPC et HTTP+JSON et décrits par leurs cartes d'agent. Le dashboard vérifie votre serveur avec le client de référence.",
+          "objectives": [
+            "Héberger des agents dans ASP.NET Core avec builder.AddA2AServer(agent)",
+            "Exposer un agent avec les deux liaisons d'A2A v1 : MapA2AJsonRpc() et MapA2AHttpJson()",
+            "Décrire un agent avec une AgentCard (compétences, SupportedInterfaces) et la publier avec MapWellKnownAgentCard()",
+            "Donner des outils à un agent hébergé : le modèle et les outils s'exécutent sur le serveur"
+          ],
+          "checks": {
+            "config": "Configuration chargée (Azure OpenAI)",
+            "server-listening": "Le serveur A2A écoute à l'adresse configurée",
+            "scenario1-card": "Scénario 1 - carte d'agent de l'AuthAgent lue : ses compétences et ses deux interfaces A2A 1.0 (JSON-RPC et HTTP+JSON)",
+            "scenario1-key": "Scénario 1 - l'agent distant a généré une clé d'API signée (Meknes<aléatoire>.<signature>)",
+            "scenario1-valid": "Scénario 1 - l'agent distant (son outil) a validé la clé générée",
+            "scenario1-tampered": "Scénario 1 - l'agent distant a rejeté la clé modifiée (seule la vérification de signature du serveur peut le savoir)",
+            "scenario2-tone": "Scénario 2 - le CustomerToneAgent, joint par son URL, a détecté un ton négatif",
+            "scenario3-tool": "Scénario 3 - l'agent local a appelé l'AuthAgent distant comme outil",
+            "scenario3-key": "Scénario 3 - la réponse de l'agent local contient une clé d'API signée",
+            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab06-client",
+      "number": "06",
+      "track": "Azure OpenAI",
+      "title": "A2A Client (Agent-to-Agent)",
+      "summary": "Call the agents of the A2A server: discover the AuthAgent from its agent card, reach the CustomerToneAgent by URL, then give the remote AuthAgent to a local Azure OpenAI agent as a function tool. The dashboard starts the reference server for you.",
+      "level": "Intermediate",
+      "objectives": [
+        "Read an agent card with A2ACardResolver.GetAgentCardAsync(): skills and supported interfaces",
+        "Create an AIAgent for a remote agent with AgentCard.AsAIAgent() or A2ACardResolver.GetAIAgentAsync()",
+        "Connect to an agent by URL (direct configuration) with A2AClient.AsAIAgent()",
+        "Call a remote agent with RunAsync(), like a local agent",
+        "Use a remote agent as a function tool of a local agent with AsAIFunction()"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab06_A2AClient",
+      "startProject": "Start/A2AClient.csproj",
+      "solutionProject": "Solution/A2AClient.csproj",
+      "timeoutSeconds": 240,
+      "companion": {
+        "role": "server",
+        "project": "LearningLabs/AzureOpenAI/Lab06_A2AServer/Solution/A2AServer.csproj",
+        "readyPattern": "Now listening on: http://localhost:5071",
+        "readyTimeoutSeconds": 60,
+        "environment": {
+          "A2AServer__BaseUrl": "http://localhost:5071",
+          "RemoteAgents__AuthAgent__Url": "http://localhost:5071/a2a/authAgent",
+          "RemoteAgents__CustomerToneAgent__Url": "http://localhost:5071/a2a/customerToneAgent"
+        }
+      },
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded (Azure OpenAI)",
+          "pattern": "(?s)^Endpoint: \\S+.*?^Deployment: \\S+"
+        },
+        {
+          "id": "scenario1-card",
+          "description": "Scenario 1 - agent card of the AuthAgent read: its skills and both A2A 1.0 interfaces (JSON-RPC and HTTP+JSON)",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n(?:(?!^=== Scenario).)*?^\\s+Skill: GenerateAPIKey - (?:(?!^=== Scenario).)*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
+        },
+        {
+          "id": "scenario1-key",
+          "description": "Scenario 1 - the remote agent generated a signed API key (Meknes<random>.<signature>)",
+          "pattern": "^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
+        },
+        {
+          "id": "scenario1-valid",
+          "description": "Scenario 1 - the remote agent (its tool) validated the generated key",
+          "pattern": "(?i)^Validation of the generated key: (?![^\\n]*\\b(?:not|isn't|is not)\\s+(?:a\\s+)?valid|[^\\n]*\\binvalid\\b)[^\\n]*\\bvalid\\b"
+        },
+        {
+          "id": "scenario1-tampered",
+          "description": "Scenario 1 - the remote agent rejected the tampered key (only the signature check of the server can tell)",
+          "pattern": "(?i)^Validation of a tampered key: [^\\n]*(?:\\binvalid\\b|\\b(?:not|isn't)\\s+(?:a\\s+)?valid\\b)"
+        },
+        {
+          "id": "scenario2-tone",
+          "description": "Scenario 2 - the CustomerToneAgent, reached by URL, detected a negative tone",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Remote agent: CustomerToneAgent at http\\S+/a2a/customerToneAgent\\s*$\\n(?:(?!^=== Scenario).)*?^Tone: [^\\n]*\\b(?:frustrat|angr|upset|annoy|irritat|dissatisf|negative|impatien|disappoint)"
+        },
+        {
+          "id": "scenario3-tool",
+          "description": "Scenario 3 - the local agent called the remote AuthAgent as a function tool",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: AuthAgent\\s*$"
+        },
+        {
+          "id": "scenario3-key",
+          "description": "Scenario 3 - the answer of the local agent contains a signed API key",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Assistant: (?:(?!^=== Scenario|^Token Usage:).)*?Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage of the local agent displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Client A2A (Agent-to-Agent)",
+          "level": "Intermédiaire",
+          "summary": "Appelez les agents du serveur A2A : découvrez l'AuthAgent par sa carte d'agent, joignez le CustomerToneAgent par son URL, puis donnez l'AuthAgent distant comme outil à un agent Azure OpenAI local. Le dashboard démarre le serveur de référence pour vous.",
+          "objectives": [
+            "Lire une carte d'agent avec A2ACardResolver.GetAgentCardAsync() : compétences et interfaces prises en charge",
+            "Créer un AIAgent pour un agent distant avec AgentCard.AsAIAgent() ou A2ACardResolver.GetAIAgentAsync()",
+            "Se connecter à un agent par son URL (configuration directe) avec A2AClient.AsAIAgent()",
+            "Appeler un agent distant avec RunAsync(), comme un agent local",
+            "Utiliser un agent distant comme outil d'un agent local avec AsAIFunction()"
+          ],
+          "checks": {
+            "config": "Configuration chargée (Azure OpenAI)",
+            "scenario1-card": "Scénario 1 - carte d'agent de l'AuthAgent lue : ses compétences et ses deux interfaces A2A 1.0 (JSON-RPC et HTTP+JSON)",
+            "scenario1-key": "Scénario 1 - l'agent distant a généré une clé d'API signée (Meknes<aléatoire>.<signature>)",
+            "scenario1-valid": "Scénario 1 - l'agent distant (son outil) a validé la clé générée",
+            "scenario1-tampered": "Scénario 1 - l'agent distant a rejeté la clé modifiée (seule la vérification de signature du serveur peut le savoir)",
+            "scenario2-tone": "Scénario 2 - le CustomerToneAgent, joint par son URL, a détecté un ton négatif",
+            "scenario3-tool": "Scénario 3 - l'agent local a appelé l'AuthAgent distant comme outil",
+            "scenario3-key": "Scénario 3 - la réponse de l'agent local contient une clé d'API signée",
+            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée"
+          }
+        }
+      }
     }
   ]
 }

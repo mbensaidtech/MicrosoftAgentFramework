@@ -104,6 +104,11 @@ function summarize(record, lab) {
         return reason ? `${t("summary.run", { code: record.exitCode })} — ${reason}` : t("summary.run", { code: record.exitCode });
       }
       if (record.failureStage === "checks") return t("summary.checks", { failed, count: checks.length });
+      if (record.failureStage === "ready" || record.failureStage === "companion") {
+        const reason = record.errors[0];
+        const text = t(record.failureStage === "ready" ? "summary.notReady" : "summary.companion");
+        return reason ? `${text} — ${reason}` : text;
+      }
       return t("summary.dashboard");
   }
 }
@@ -252,8 +257,11 @@ function renderAbout() {
   $(main, "commandSolution").textContent = `${t("about.cmdSolution")}\n${details.commands.solution}`;
   $(main, "folder").textContent = details.folder;
   const note = $(main, "interactiveNote");
-  note.hidden = !details.lab.interactive;
-  note.textContent = t("about.interactive", { timeout: details.lab.timeoutSeconds, idle: details.lab.inputIdleTimeoutSeconds });
+  const companion = details.lab.companion;
+  note.hidden = !details.lab.interactive && !companion;
+  note.textContent = companion
+    ? t(companion.role === "client" ? "about.companionClient" : "about.companionServer", { project: companion.project })
+    : t("about.interactive", { timeout: details.lab.timeoutSeconds, idle: details.lab.inputIdleTimeoutSeconds });
 }
 
 function renderHistory() {
@@ -612,7 +620,7 @@ function showRecordedRun(record) {
 function showRecordedPhases(record) {
   const phases = [
     ["build", record.buildDurationMs, record.failureStage === "build"],
-    ["run", record.runDurationMs, record.failureStage === "run"],
+    ["run", record.runDurationMs, ["run", "ready", "companion"].includes(record.failureStage)],
     ["checks", record.checks.length ? 0 : null, record.failureStage === "checks"],
   ];
   for (const [phase, ms, failed] of phases) {

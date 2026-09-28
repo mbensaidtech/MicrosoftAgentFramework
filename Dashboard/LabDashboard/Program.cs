@@ -266,6 +266,7 @@ internal sealed record LabSummary(
     int TimeoutSeconds,
     bool Interactive,
     int InputIdleTimeoutSeconds,
+    LabCompanion? Companion,
     IReadOnlyDictionary<string, LabTranslation> Translations,
     string Progress,
     RunRecord? LastStartRun,
@@ -284,7 +285,7 @@ internal sealed record LabSummary(
 
         return new LabSummary(
             lab.Id, lab.Number, lab.Track, lab.Title, lab.Summary, lab.Level, lab.TimeoutSeconds,
-            lab.Interactive, lab.InputIdleTimeoutSeconds, lab.Translations, progress,
+            lab.Interactive, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress,
             lastStart is null ? null : lastStart with { Log = [] },
             lastSolution is null ? null : lastSolution with { Log = [] },
             activeRun?.Lab.Id == lab.Id ? activeRun.Id : null);
