@@ -5,18 +5,22 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>MEAI001</NoWarn>
+    <!-- Shared by every lab: set your Azure OpenAI secrets once with `dotnet user-secrets`. -->
+    <UserSecretsId>microsoft-agent-framework-learninglabs</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageReference Include="Azure.Identity" Version="1.18.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251204.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.67.1-preview" />
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.MongoDB" Version="1.66.0-preview" />
-    <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" Version="9.7.0" />
-    <PackageReference Include="MongoDB.Driver" Version="2.30.0" />
+    <!-- Agent Framework + OpenAI integration (brings OpenAI, Microsoft.Extensions.AI and Microsoft.Extensions.VectorData.Abstractions transitively). -->
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <!-- Configuration: appsettings.json + user secrets + environment variables, bound to AzureOpenAISettings. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
+    <!-- InMemoryVectorStore: the vector store of the official RAG sample AgentWithRAG_Step01_BasicTextRAG. -->
+    <PackageReference Include="CommunityToolkit.VectorData.InMemory" Version="1.0.1" />
   </ItemGroup>
 
   <ItemGroup>

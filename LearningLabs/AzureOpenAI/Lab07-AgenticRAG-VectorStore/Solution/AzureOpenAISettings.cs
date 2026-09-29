@@ -1,4 +1,4 @@
-namespace AgenticRAG.Configuration;
+namespace AgenticRAG;
 
 /// <summary>
 /// Configuration settings for Azure OpenAI.
@@ -11,17 +11,17 @@ public class AzureOpenAISettings
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the Azure OpenAI deployment name.
+    /// Gets or sets the Azure OpenAI chat deployment name.
     /// </summary>
     public string ChatDeploymentName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the Azure OpenAI embedding deployment name.
+    /// Gets or sets the Azure OpenAI embedding deployment name (for example text-embedding-3-small).
     /// </summary>
     public string EmbeddingDeploymentName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the API key. If not set, DefaultAzureCredential is used.
+    /// Gets or sets the API key. If not set, DefaultAzureCredential (Microsoft Entra ID) is used.
     /// </summary>
     public string? APIKey { get; set; }
 }

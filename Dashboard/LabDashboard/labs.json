@@ -691,6 +691,118 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab07",
+      "number": "07",
+      "track": "Azure OpenAI",
+      "title": "Agentic RAG with a Vector Store",
+      "summary": "Answer customer questions from a FAQ instead of the model's knowledge: embed the FAQ into an in-memory vector store, search it by meaning, then give the search to an agent as a function tool (agentic RAG) and as a TextSearchProvider that runs before every model call.",
+      "level": "Intermediate",
+      "objectives": [
+        "Get an IEmbeddingGenerator from an Azure OpenAI embedding deployment",
+        "Describe vector store records with [VectorStoreKey], [VectorStoreData] and [VectorStoreVector], and let the store embed them",
+        "Fill and search a VectorStoreCollection (UpsertAsync, SearchAsync, VectorSearchResult<T>)",
+        "Expose a semantic search as a function tool of an agent (agentic RAG)",
+        "Add RAG to an agent with TextSearchProvider and ChatClientAgentOptions.AIContextProviders",
+        "Compare both approaches: tool calls, injected context, token usage"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab07-AgenticRAG-VectorStore",
+      "startProject": "Start/AgenticRAG.csproj",
+      "solutionProject": "Solution/AgenticRAG.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-indexed",
+          "description": "Scenario 1 - the 20 FAQ entries were loaded and indexed in the vector store",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Loaded 20 FAQ entries from Data/sav-faq\\.json\\s*$(?:(?!^=== Scenario).)*?^Vector store ready: 20 FAQ entries indexed in the collection 'sav-faq'\\s*$"
+        },
+        {
+          "id": "scenario2-top-result",
+          "description": "Scenario 2 - the semantic search ranks the 'contact customer support' entry (faq-010) first for a question that shares no word with it",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^1\\. faq-010 \\(score -?\\d+\\.\\d+\\): How do I contact customer support\\?"
+        },
+        {
+          "id": "scenario2-results",
+          "description": "Scenario 2 - three results were displayed with their scores",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^2\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\)(?:(?!^=== Scenario).)*?^3\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\)"
+        },
+        {
+          "id": "scenario3-tool",
+          "description": "Scenario 3 - the agent called the search_faq tool with a question",
+          "pattern": "^Tool called: search_faq\\(question: \\S"
+        },
+        {
+          "id": "scenario3-answer",
+          "description": "Scenario 3 - the answer gives the 48-hour deadline that only the FAQ entry faq-005 contains",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b48\\s*hours\\b"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4-search",
+          "description": "Scenario 4 - the TextSearchProvider searched the first question and found the 'return a product' entry (faq-001)",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^\\[TextSearchProvider\\] Search input: I want to send back a jacket[^\\n]*$\\s*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-001\\b"
+        },
+        {
+          "id": "scenario4-answer",
+          "description": "Scenario 4 - the first answer gives the 30-day return window that only faq-001 contains",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b30\\s*days\\b"
+        },
+        {
+          "id": "scenario4-followup-search",
+          "description": "Scenario 4 - the follow-up question was searched together with the first one (RecentMessageMemoryLimit) and found the refund entry (faq-002)",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^\\[TextSearchProvider\\] Search input: I want to send back a jacket[^\\n]*\\| And how long until I get my money back\\?\\s*$\\s*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-002\\b"
+        },
+        {
+          "id": "scenario4-followup-answer",
+          "description": "Scenario 4 - the follow-up answer gives the 5-7 business days of faq-002",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?money back\\?(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b5\\s*(?:-|–|to)\\s*7\\s+business days\\b"
+        },
+        {
+          "id": "scenario4-usage",
+          "description": "Scenario 4 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "RAG agentique avec un vector store",
+          "level": "Intermédiaire",
+          "summary": "Répondez aux questions des clients à partir d'une FAQ plutôt que des connaissances du modèle : vectorisez la FAQ dans un vector store en mémoire, cherchez-y par le sens, puis donnez la recherche à un agent comme function tool (RAG agentique) et comme TextSearchProvider exécuté avant chaque appel du modèle.",
+          "objectives": [
+            "Obtenir un IEmbeddingGenerator à partir d'un déploiement d'embedding Azure OpenAI",
+            "Décrire les enregistrements d'un vector store avec [VectorStoreKey], [VectorStoreData] et [VectorStoreVector], et laisser le store les vectoriser",
+            "Remplir et interroger une VectorStoreCollection (UpsertAsync, SearchAsync, VectorSearchResult<T>)",
+            "Exposer une recherche sémantique comme function tool d'un agent (RAG agentique)",
+            "Ajouter du RAG à un agent avec TextSearchProvider et ChatClientAgentOptions.AIContextProviders",
+            "Comparer les deux approches : appels d'outil, contexte injecté, consommation de tokens"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-indexed": "Scénario 1 - les 20 entrées de la FAQ ont été chargées et indexées dans le vector store",
+            "scenario2-top-result": "Scénario 2 - la recherche sémantique classe en premier l'entrée « contacter le support » (faq-010) pour une question qui n'a aucun mot en commun avec elle",
+            "scenario2-results": "Scénario 2 - trois résultats affichés avec leur score",
+            "scenario3-tool": "Scénario 3 - l'agent a appelé l'outil search_faq avec une question",
+            "scenario3-answer": "Scénario 3 - la réponse donne le délai de 48 heures que seule l'entrée faq-005 contient",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
+            "scenario4-search": "Scénario 4 - le TextSearchProvider a cherché la première question et trouvé l'entrée « retourner un produit » (faq-001)",
+            "scenario4-answer": "Scénario 4 - la première réponse donne le délai de retour de 30 jours que seule faq-001 contient",
+            "scenario4-followup-search": "Scénario 4 - la question de suivi a été cherchée avec la première (RecentMessageMemoryLimit) et a trouvé l'entrée sur le remboursement (faq-002)",
+            "scenario4-followup-answer": "Scénario 4 - la réponse de suivi donne les 5 à 7 jours ouvrés de faq-002",
+            "scenario4-usage": "Scénario 4 - consommation de tokens affichée"
+          }
+        }
+      }
     }
   ]
 }

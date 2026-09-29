@@ -3,43 +3,39 @@ using Microsoft.Extensions.VectorData;
 namespace AgenticRAG.Models;
 
 /// <summary>
-/// Represents a FAQ entry for the vector store.
-/// Also used for JSON deserialization from sav-faq.json.
+/// A FAQ entry, as stored in the vector store (the attributes describe the storage schema).
+/// The same class is used to read <c>Data/sav-faq.json</c>.
 /// </summary>
-public class FaqRecord
+public sealed class FaqRecord
 {
     /// <summary>
-    /// Unique identifier for the FAQ entry.
+    /// Size of the vectors stored for each entry. Metadata of the collection: the embedding model decides the real size
+    /// (1536 for text-embedding-3-small and text-embedding-ada-002, 3072 for text-embedding-3-large).
+    /// </summary>
+    public const int EmbeddingDimensions = 1536;
+
+    /// <summary>
+    /// Unique identifier of the FAQ entry (the key of the record).
     /// </summary>
     [VectorStoreKey]
     public string Id { get; set; } = string.Empty;
 
     /// <summary>
-    /// The FAQ question.
+    /// The question of the FAQ entry.
     /// </summary>
-    [VectorStoreData(IsIndexed = true)]
+    [VectorStoreData]
     public string Question { get; set; } = string.Empty;
 
     /// <summary>
-    /// The FAQ answer/response.
+    /// The answer of the FAQ entry.
     /// </summary>
     [VectorStoreData]
     public string Answer { get; set; } = string.Empty;
 
     /// <summary>
-    /// Text to be embedded (auto-generated from Question + Answer).
-    /// The embedding generator will automatically convert this to a vector.
+    /// The text that is embedded (question + answer). Because the property is a <c>string</c>, the vector store
+    /// generates the vector itself with its <c>EmbeddingGenerator</c> when the record is upserted.
     /// </summary>
-    [VectorStoreVector(Dimensions: 1536, DistanceFunction = DistanceFunction.CosineSimilarity)]
+    [VectorStoreVector(EmbeddingDimensions, DistanceFunction = DistanceFunction.CosineSimilarity)]
     public string Embedding => $"Question: {Question}\nAnswer: {Answer}";
-
-    /// <summary>
-    /// Returns a formatted string with the question and answer.
-    /// </summary>
-    public override string ToString() => $"Q: {Question}\nA: {Answer}";
-
-    /// <summary>
-    /// Returns a formatted string with the question, answer, and score.
-    /// </summary>
-    public string ToString(double? score) => $"Q: {Question}\nA: {Answer}\nScore: {score:F4}";
 }

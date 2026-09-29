@@ -26,7 +26,7 @@
 |---|---|---|---|
 | `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A(.AspNetCore)`, `Microsoft.Agents.AI.Hosting` | `1.22.0-preview.260918.1` | Lab06 (client/serveur) | Aucune version stable n'existe : utiliser la préversion **alignée** sur 1.22.0 et le signaler dans le README du lab. **Appliqué (Lab06)** : le client référence `Microsoft.Agents.AI.A2A`, le serveur `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (qui apporte `.Hosting.A2A`, `.Hosting`, `.Hosting.AspNetCore`, `A2A.AspNetCore` et `Microsoft.Extensions.Configuration.*` 10.0.12). |
 | `A2A` (SDK) | `1.0.0-preview2` | Lab06 | Idem (dépendance du précédent). |
-| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | `1.74.0-preview` | Lab05, Lab07 | **Remplacés** (Lab05, cf. §4.11) : `CommunityToolkit.VectorData.InMemory` 1.0.1 (stable, samples officiels) et, pour MongoDB, un `ChatHistoryProvider` sur le driver officiel `MongoDB.Driver` 3.12.0 (aucun connecteur `VectorData` MongoDB stable). Lab07 (recherche vectorielle) : à trancher. |
+| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | `1.74.0-preview` | Lab05, Lab07 | **Remplacés** (Lab05, cf. §4.11) : `CommunityToolkit.VectorData.InMemory` 1.0.1 (stable, samples officiels) et, pour MongoDB, un `ChatHistoryProvider` sur le driver officiel `MongoDB.Driver` 3.12.0 (aucun connecteur `VectorData` MongoDB stable). **Lab07 (recherche vectorielle) : `InMemoryVectorStore`** (cf. §4.13) — le vector store des samples RAG officiels ; MongoDB Atlas abandonné (aucun connecteur `VectorData` MongoDB stable, et le lab reste exécutable avec la seule CLI `dotnet`). |
 | `Microsoft.Agents.AI.Foundry` | stable 1.5.0 seulement ; 1.22.0 en `-preview` | aucun aujourd'hui | Non utilisé : le lab cible Azure OpenAI, pas Foundry Agent Service. |
 
 ---
@@ -366,6 +366,50 @@ Points découverts :
 - **L'hébergement A2A appelle toujours `RunStreamingAsync`** : il est touché par la régression streaming Azure (§8) → contournement temporaire dans Lab06_A2AServer.
 - `Microsoft.Agents.Hosting.AspNetCore` (1.4.9-beta, SDK « Agents » M365) et `Microsoft.Extensions.Hosting` étaient inutiles : supprimés.
 
+### 4.13 RAG : vector store, embeddings et `TextSearchProvider` (validé sur Lab07)
+
+**Ancienne approche**
+```csharp
+// Microsoft.SemanticKernel.Connectors.MongoDB 1.66.0-preview + Azure.AI.OpenAI
+IEmbeddingGenerator<string, Embedding<float>> gen = azureClient.GetEmbeddingClient(dep).AsIEmbeddingGenerator();
+var store = new MongoVectorStore(mongoDatabase, new MongoVectorStoreOptions { EmbeddingGenerator = gen });
+var collection = store.GetCollection<string, FaqRecord>("sav-faq");
+var results = await collection.SearchAsync(query, topK, new VectorSearchOptions<FaqRecord> { IncludeVectors = false }).ToListAsync();
+ChatClientAgent agent = chatClient.CreateAIAgent(instructions: "...", tools: [AIFunctionFactory.Create(tools.SearchFaqAsync, "search_faq")]);
+```
+
+**Nouvelle approche**
+```csharp
+// CommunityToolkit.VectorData.InMemory 1.0.1 (stable) + OpenAI SDK (endpoint v1) ; Microsoft.Extensions.VectorData.Abstractions 10.10.0 en transitif
+IEmbeddingGenerator<string, Embedding<float>> gen = client.GetEmbeddingClient(settings.EmbeddingDeploymentName).AsIEmbeddingGenerator();
+VectorStore store = new InMemoryVectorStore(new InMemoryVectorStoreOptions { EmbeddingGenerator = gen });
+VectorStoreCollection<string, FaqRecord> collection = store.GetCollection<string, FaqRecord>("sav-faq");
+await collection.EnsureCollectionExistsAsync();
+await collection.UpsertAsync(records);                                   // le store vectorise la propriété string [VectorStoreVector]
+await foreach (VectorSearchResult<FaqRecord> r in collection.SearchAsync(question, top: 3)) { r.Record; r.Score; }
+
+// RAG agentique : la recherche est un function tool (inchangé, Lab03)
+AIAgent faqAgent = chatClient.AsAIAgent(instructions: "...", name: "FaqAgent", tools: [AIFunctionFactory.Create(tool.SearchFaqAsync, "search_faq")]);
+
+// RAG « classique » : TextSearchProvider (Microsoft.Agents.AI), recherche avant chaque appel du modèle
+async Task<IEnumerable<TextSearchProvider.TextSearchResult>> SearchAsync(string text, CancellationToken ct) => ...; // adaptateur
+AIAgent ragAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = new() { Instructions = "..." },
+    AIContextProviders = [new TextSearchProvider(SearchAsync, new TextSearchProviderOptions { SearchTime = BeforeAIInvoke, RecentMessageMemoryLimit = 2 })],
+    ChatHistoryProvider = new InMemoryChatHistoryProvider(new() { StorageInputRequestMessageFilter = m => m.Where(x =>
+        x.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.AIContextProvider && x.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.ChatHistory) })
+});
+```
+
+**Explication** — Le connecteur MongoDB de Semantic Kernel n'a toujours pas de version stable, et aucun connecteur `Microsoft.Extensions.VectorData` MongoDB stable n'existe (`CommunityToolkit.VectorData.CosmosMongoDB` cible Azure Cosmos DB). Les samples RAG officiels (`02-agents/AgentWithRAG/*`) utilisent `InMemoryVectorStore` (`CommunityToolkit.VectorData.InMemory`, Step01) ou Qdrant (Step02) : Lab07 passe sur `InMemoryVectorStore`, avec la même API `VectorStore` / `VectorStoreCollection` / `SearchAsync`, ce qui le rend exécutable sans base de données. L'API `VectorData` 10.10 n'a pas changé pour ce cas (attributs `[VectorStoreKey]`/`[VectorStoreData]`/`[VectorStoreVector]`, propriété vectorielle `string` vectorisée par le store, `SearchAsync(value, top)` → `IAsyncEnumerable<VectorSearchResult<T>>`, `IncludeVectors` faux par défaut). **Changement conceptuel** : MAF 1.22.0 fournit un composant RAG intégré, **`TextSearchProvider`** (`MessageAIContextProvider`, stable, dans `PublicAPI.Shipped.txt` de `Microsoft.Agents.AI`), branché par `ChatClientAgentOptions.AIContextProviders` ; il appelle une fonction de recherche avant chaque appel du modèle (`BeforeAIInvoke`) et injecte les résultats sous forme de message (`ContextPrompt`, `CitationsPrompt`), ou expose la recherche comme outil (`OnDemandFunctionCalling`, l'équivalent intégré du RAG agentique). `RecentMessageMemoryLimit` ajoute les derniers messages utilisateur de la session à l'entrée de recherche (état dans `AgentSession.StateBag`, clé `TextSearchProvider`). Les samples filtrent l'historique (`InMemoryChatHistoryProviderOptions.StorageInputRequestMessageFilter` + `GetAgentRequestMessageSourceType()`) pour ne pas stocker les messages produits par le provider. Références : samples `AgentWithRAG_Step01_BasicTextRAG`, `AgentWithRAG_Step02_CustomVectorStoreRAG`, `AgentWithRAG_Step03_CustomRAGDataSource` ; sources `TextSearchProvider.cs` / `TextSearchProviderOptions.cs` au tag.
+
+Points découverts :
+- **`Dimensions` de `[VectorStoreVector]` n'est pas transmis au générateur d'embeddings** (vérifié dans `VectorPropertyModel.GenerateEmbeddingsCoreAsync`, MEVD 10.10) : la taille réelle du vecteur est celle du modèle de déploiement ; la valeur de l'attribut n'est qu'une métadonnée pour les stores qui créent un index. Lab07 la garde en constante (`FaqRecord.EmbeddingDimensions = 1536`) et le documente.
+- **`AsIEmbeddingGenerator()`** (`Microsoft.Extensions.AI.OpenAI` 10.10.0) s'applique à l'`EmbeddingClient` du SDK `OpenAI` obtenu par `OpenAIClient.GetEmbeddingClient(deployment)` : même client v1 que pour le chat, pas de dépendance supplémentaire.
+- Le `TextSearchProvider` **avale les exceptions** de la fonction de recherche (journalisées, résultat vide) : sans logger, une recherche qui échoue passe inaperçue → afficher les résultats depuis l'adaptateur (Lab07) ou passer un `ILoggerFactory`.
+- Un lab RAG a besoin d'un **déploiement d'embedding** : nouvelle propriété `AzureOpenAISettings.EmbeddingDeploymentName` (validée au démarrage), hors du formulaire du dashboard.
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -385,13 +429,16 @@ Points découverts :
 | `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab qui construit un `ServiceCollection` : Lab10, MAS) |
 | `UserInputRequests` | Supprimé | Compilation | contenu d'approbation dans les messages de réponse (cf. `Agent_Step01_UsingFunctionToolsWithApprovals`) | Lab09 |
 | `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02/03 (à vérifier) |
-| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) | Lab05 ✅, Lab07 |
+| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) ; recherche vectorielle : `InMemoryVectorStore` (Lab07, §4.13) | Lab05 ✅, Lab07 ✅ |
+| `MongoVectorStore` (SK) + MongoDB Atlas Vector Search | Préversion, service externe | Lab07 non exécutable sans compte Atlas | `InMemoryVectorStore` ; tout connecteur `Microsoft.Extensions.VectorData` stable en « Going further » (§4.13) | Lab07 ✅ |
+| `Microsoft.Extensions.VectorData.Abstractions` 9.7.0 (référence explicite) | Remplacé | Version | 10.10.0 transitif via MAF 1.22.0 | Lab05 ✅, Lab07 ✅ |
+| `VectorSearchOptions<T> { IncludeVectors = false }` + `SearchAsync(...).ToListAsync()` | Toujours disponible mais inutile | Pédagogie | `await foreach (VectorSearchResult<T> r in collection.SearchAsync(value, top))` (vecteurs exclus par défaut) | Lab07 ✅ |
 | `A2AClient.GetAIAgent()` | Renommé (A2A SDK v1) | Compilation | `IA2AClient.AsAIAgent(name, description)` ; `AgentCard.AsAIAgent()` ; `A2ACardResolver.GetAIAgentAsync()` inchangé (§4.12) | Lab06 ✅ |
 | `app.MapA2A(agent, path, agentCard, taskManager => …)`, `ITaskManager`, `AgentCard.Url` | Supprimés (A2A SDK v1) | Compilation + protocole | `AddA2AServer` + `MapA2AJsonRpc` / `MapA2AHttpJson` + `MapWellKnownAgentCard(card, path)` ; `AgentCard.SupportedInterfaces` (§4.12) | Lab06 ✅ |
 | `Microsoft.Agents.Hosting.AspNetCore` 1.4.9-beta | Inutile (SDK M365 Agents) | Dépendance en préversion | — (supprimé) | Lab06 ✅ |
 | `Microsoft.Extensions.Hosting` (usage « config seulement ») | Surdimensionné | Dépendance inutile | `Microsoft.Extensions.Configuration.Json/UserSecrets/EnvironmentVariables/Binder` | tous les labs console |
 | `Azure.Identity 1.18.0-beta.2` | Préversion | Règle « stable » | `Azure.Identity 1.21.0` | tous |
-| `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | `MongoDB.Driver 3.12.0` — Lab05 le référence directement (son graphe n'a plus de package vulnérable) ; la montée de CommonUtilities reste à faire avec Lab07/Lab12 (cf. §8) | tous (warnings), Lab07/12 (code) |
+| `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | `MongoDB.Driver 3.12.0` — Lab05 le référence directement (son graphe n'a plus de package vulnérable) ; Lab07 ne référence plus MongoDB ; la montée de CommonUtilities reste à faire avec Lab12 (dernier lab à référencer 2.30.0 en direct, cf. §8) | tous (warnings), Lab12 (code) |
 
 ---
 
@@ -442,7 +489,8 @@ Points découverts :
 - **Lab06 (A2A)** : packages uniquement en préversion → exception à la règle « stable ».
 - **Régression streaming Azure OpenAI (constatée le 2026-09-28)** : Azure envoie désormais, en streaming Chat Completions, des annotations de filtre de contenu **sans `delta`** ; `Microsoft.Extensions.AI.OpenAI` 10.10.0 (et 10.10.1, dernière version) lève `InvalidOperationException: The requested operation requires an element of type 'Object', but the target element has type 'Null'` dans `OpenAIChatClient.TryGetReasoningDelta` ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790), ouvert). Impact : **tout `RunStreamingAsync`** — Lab01 scénario 5 et Lab02 (streaming) échouent aujourd'hui alors qu'ils étaient validés le 2026-09-26/27 (non corrigés : hors périmètre), et l'hébergement A2A (qui exécute toujours en streaming) renvoie *"Agent handler did not produce any response events"*. Lab06_A2AServer contient un contournement **temporaire** (`StreamingWorkaround.WithNonStreamingResponses()`, middleware `ChatClientBuilder.Use` qui sert les requêtes streaming par un appel non streaming). À retirer, et à re-tester Lab01/Lab02, dès qu'une version corrigée de `Microsoft.Extensions.AI.OpenAI` est publiée.
 - **Port 5000 sur macOS** : le récepteur AirPlay écoute sur `*:5000` ; Kestrel peut quand même se lier à `localhost:5000`, mais quand le serveur du lab ne tourne pas, un client reçoit `403 Forbidden` d'AirPlay. Documenté dans les README Lab06 ; le dashboard utilise un port dédié (5071).
-- **Lab05 / Lab07** : connecteurs Semantic Kernel en préversion et API mémoire/historique profondément refondues → refonte conceptuelle, pas une adaptation syntaxique.
-- **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab07/Lab12, qui référencent 2.30.0 directement. Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab07/Lab12.
+- **Lab05 / Lab07** : connecteurs Semantic Kernel en préversion et API mémoire/historique profondément refondues → refonte conceptuelle, pas une adaptation syntaxique (Lab05 ✅ §4.11, Lab07 ✅ §4.13).
+- **Identifiants Azure OpenAI de l'environnement de migration (constaté le 2026-09-29)** : la clé API des variables `AzureOpenAI__*` renvoie `401 Access denied due to invalid subscription key` sur tous les chemins (v1 et `api-version`), et Entra ID (`az login`, même tenant, ressource présente et `Succeeded`, RP `Microsoft.CognitiveServices` enregistré, `disableLocalAuth = false`) renvoie `400 SubscriptionNotRegistered` — alors que les deux voies fonctionnaient le 2026-09-28 (Lab06). Cause hors dépôt (clé régénérée ? incident côté Azure ?) : à corriger avant tout test d'exécution (Lab07 §5 du rapport).
+- **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab12.
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
 - **Analyse graphify** : l'extracteur AST échoue sur 5 `Program.cs` à top-level statements (Lab01/02/03/04/07 Solution) ; sans impact sur la compilation, mais ces fichiers sont sous-représentés dans la carte.

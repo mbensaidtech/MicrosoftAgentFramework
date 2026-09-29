@@ -1,47 +1,51 @@
-using AgenticRAG.Configuration;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using MongoDB.Driver;
 
 namespace AgenticRAG;
 
 /// <summary>
 /// Helper class for loading configuration.
+/// Sources, from lowest to highest priority: appsettings.json, user secrets, environment variables
+/// (e.g. <c>AzureOpenAI__APIKey</c>).
 /// </summary>
 public static class ConfigurationHelper
 {
     private static IConfiguration? _configuration;
-    private static IMongoDatabase? _mongoDatabase;
 
     public static IConfiguration Configuration => _configuration ??= BuildConfiguration();
 
     private static IConfiguration BuildConfiguration()
     {
-        var builder = Host.CreateApplicationBuilder();
-        return builder.Configuration;
+        return new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddUserSecrets<AzureOpenAISettings>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
     }
 
+    /// <summary>
+    /// Get the Azure OpenAI settings from the configuration.
+    /// </summary>
+    /// <returns>The Azure OpenAI settings.</returns>
     public static AzureOpenAISettings GetAzureOpenAISettings()
     {
-        return Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
-            ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing");
+        AzureOpenAISettings settings = Configuration.GetSection("AzureOpenAI").Get<AzureOpenAISettings>()
+            ?? throw new InvalidOperationException("AzureOpenAI configuration section is missing.");
+
+        EnsureConfigured(settings.Endpoint, "AzureOpenAI:Endpoint");
+        EnsureConfigured(settings.ChatDeploymentName, "AzureOpenAI:ChatDeploymentName");
+        EnsureConfigured(settings.EmbeddingDeploymentName, "AzureOpenAI:EmbeddingDeploymentName");
+
+        return settings;
     }
 
-    public static MongoDbConfiguration GetMongoDbConfiguration()
+    private static void EnsureConfigured(string value, string key)
     {
-        return Configuration.GetSection("MongoDb").Get<MongoDbConfiguration>()
-            ?? throw new InvalidOperationException("MongoDb configuration section is missing");
-    }
-
-    public static IMongoDatabase GetMongoDatabase()
-    {
-        if (_mongoDatabase is not null)
-            return _mongoDatabase;
-
-        var config = GetMongoDbConfiguration();
-        var client = new MongoClient(config.ConnectionString);
-        _mongoDatabase = client.GetDatabase(config.DatabaseName);
-        
-        return _mongoDatabase;
+        if (string.IsNullOrWhiteSpace(value) || value.Contains("YOUR-", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"'{key}' is not configured. Set it in appsettings.json, with 'dotnet user-secrets set \"{key}\" <value>', " +
+                $"or with the environment variable '{key.Replace(":", "__")}'.");
+        }
     }
 }

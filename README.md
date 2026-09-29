@@ -40,13 +40,13 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | **.NET 10 SDK** or newer | CLI and Dashboard | All labs and the dashboard target `net10.0`. Check with `dotnet --version`. |
 | **Azure OpenAI resource** with a chat deployment | Every lab | You need the endpoint URL and the **deployment name** (not the model name). |
 | **Authentication** | Every lab | Either the resource **API key**, or **Microsoft Entra ID**: `az login` + the *Cognitive Services OpenAI User* role on the resource (used automatically when no key is set). |
-| Embedding deployment | Lab07+ | e.g. `text-embedding-ada-002` |
+| Embedding deployment | Lab07+ | e.g. `text-embedding-3-small`. Lab07 reads it from `AzureOpenAI:EmbeddingDeploymentName` (`appsettings.json`, user secret or `AzureOpenAI__EmbeddingDeploymentName`). |
 | MongoDB | Lab05, Lab12 | e.g. `mongodb://localhost:27017`. Lab05 provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). |
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer** and **AzureOpenAI/Lab06_A2AClient**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient** and **AzureOpenAI/Lab07**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -218,7 +218,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab06): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab07): run the other labs with the CLI.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
@@ -323,15 +323,16 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 07 - Agentic RAG with Vector Store
+### Lab 07 - Agentic RAG with a Vector Store
 
-**Learn how to build agents that retrieve and reason over your own data**
+**Learn how to build agents that answer from your own data (RAG): embeddings, vector store, search tool and `TextSearchProvider`**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Initialize vector store with FAQ data |
-| Scenario 2 | Direct vector search without agent |
-| Scenario 3 | Agentic RAG with search tool |
+| Scenario 1 | Fill an in-memory vector store (`InMemoryVectorStore`, `Microsoft.Extensions.VectorData`) with a FAQ: the store embeds the entries with an Azure OpenAI embedding deployment |
+| Scenario 2 | Semantic search without an agent (`SearchAsync`, `VectorSearchResult<T>` with scores) |
+| Scenario 3 | Agentic RAG: the search is a function tool (`AIFunctionFactory.Create`), the agent decides when to call it; tool calls and token usage displayed |
+| Scenario 4 | RAG with `TextSearchProvider` (`ChatClientAgentOptions.AIContextProviders`): the FAQ is searched before every model call, with a follow-up question in a session |
 
 ---
 
@@ -468,7 +469,7 @@ Instead of editing each `appsettings.json` file in every lab, you can set enviro
 | `AzureOpenAI__Endpoint` | Your Azure OpenAI endpoint URL | `https://my-resource.openai.azure.com/` |
 | `AzureOpenAI__ChatDeploymentName` | Your chat model deployment name | `gpt-4o` |
 | `AzureOpenAI__APIKey` | Optional API key (if unset, `DefaultAzureCredential` is used) | `<your-api-key>` |
-| `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-ada-002` |
+| `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-3-small` |
 | `MongoDB__ConnectionString` | MongoDB connection string (Lab05, Lab12) | `mongodb://localhost:27017` |
 
 ### Linux / macOS

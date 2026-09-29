@@ -843,4 +843,144 @@ public class OutputAnalyzerTests
         Assert.Equal("Scenario 3 · Token Usage", Assert.Single(usage.Reports).Label);
         Assert.Equal(675, usage.Input);
     }
+
+    // Standard output of the Lab07 solution, as decoded by the dashboard (spinner lines removed).
+    private static readonly string[] Lab07SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Chat deployment: gpt-4o-mini",
+        "Embedding deployment: text-embedding-3-small",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Fill the vector store with the FAQ ===",
+        "Loaded 20 FAQ entries from Data/sav-faq.json",
+        "Vector store ready: 20 FAQ entries indexed in the collection 'sav-faq'",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Semantic search - without an agent ===",
+        "Question: Is there a phone number I can call for help?",
+        "1. faq-010 (score 0.5412): How do I contact customer support?",
+        "   You can reach our customer support via email at support@example.com, by phone at +33 1 23 45 67 89 (Mon-Fri 9am-6pm), or through live chat on our website. Average response time is under 2 hours during business hours.",
+        "2. faq-004 (score 0.3980): Can I change or cancel my order after placing it?",
+        "   You can modify or cancel your order within 1 hour of placing it by contacting our customer service. After this window, or once the order has been shipped, changes or cancellations are no longer possible. You may return the item after delivery instead.",
+        "3. faq-005 (score 0.3671): What should I do if I receive a damaged product?",
+        "   If you receive a damaged product, please contact our customer service within 48 hours of delivery with photos of the damage. We will arrange a free return pickup and send you a replacement or process a full refund, including shipping costs.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Agentic RAG - the agent searches the FAQ with a function tool ===",
+        "Question: I received a broken item yesterday. What should I do?",
+        "Tool called: search_faq(question: received a broken item, top: 3)",
+        "Agent: If you received a damaged product, contact our customer service within 48 hours of delivery with photos of the damage. We will arrange a free return pickup and send you a replacement or process a full refund, including shipping costs (faq-005).",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 612",
+        "  Output tokens: 71",
+        "  Total tokens: 683",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: RAG with TextSearchProvider - the FAQ is searched before every model call ===",
+        "Question: I want to send back a jacket I bought last week. How does it work?",
+        "[TextSearchProvider] Search input: I want to send back a jacket I bought last week. How does it work?",
+        "[TextSearchProvider] Results: faq-001, faq-008",
+        "Agent: Go to 'My Orders' in your account, select the order and click 'Request Return'. You have 30 days from the delivery date, and the jacket must be unused and in its original packaging (faq-001).",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (first question):",
+        "  Input tokens: 331",
+        "  Output tokens: 52",
+        "  Total tokens: 383",
+        "Question: And how long until I get my money back?",
+        "[TextSearchProvider] Search input: I want to send back a jacket I bought last week. How does it work? | And how long until I get my money back?",
+        "[TextSearchProvider] Results: faq-002, faq-001",
+        "Agent: Refunds are processed within 5-7 business days after we receive and inspect the returned item, to your original payment method (faq-002).",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (follow-up):",
+        "  Input tokens: 402",
+        "  Output tokens: 38",
+        "  Total tokens: 440",
+    ];
+
+    // Standard output of the Lab07 exercise as delivered (TODOs not done yet).
+    private static readonly string[] Lab07StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Chat deployment: gpt-4o-mini",
+        "Embedding deployment: text-embedding-3-small",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Fill the vector store with the FAQ ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Semantic search - without an agent ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Agentic RAG - the agent searches the FAQ with a function tool ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: RAG with TextSearchProvider - the FAQ is searched before every model call ===",
+    ];
+
+    [Fact]
+    public void Every_lab07_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab07 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab07")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab07.Expectations, Lab07SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab07.Expectations, Lab07StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab07_checks_fail_when_the_answers_do_not_come_from_the_faq()
+    {
+        LabDefinition lab07 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab07")!;
+        // Only 3 entries indexed, the search ranks another entry first, the agent answered without the tool and without the FAQ facts,
+        // and the provider searched the follow-up question alone.
+        string[] output =
+        [
+            "=== Scenario 1: Fill the vector store with the FAQ ===",
+            "Loaded 3 FAQ entries from Data/sav-faq.json",
+            "Vector store ready: 3 FAQ entries indexed in the collection 'sav-faq'",
+            "=== Scenario 2: Semantic search - without an agent ===",
+            "1. faq-004 (score 0.4001): Can I change or cancel my order after placing it?",
+            "2. faq-010 (score 0.3900): How do I contact customer support?",
+            "=== Scenario 3: Agentic RAG - the agent searches the FAQ with a function tool ===",
+            "Tool called: (none)",
+            "Agent: I'm sorry to hear that. Please contact the seller as soon as possible.",
+            "=== Scenario 4: RAG with TextSearchProvider - the FAQ is searched before every model call ===",
+            "[TextSearchProvider] Search input: I want to send back a jacket I bought last week. How does it work?",
+            "[TextSearchProvider] Results: faq-008, faq-015",
+            "Agent: Returns are usually accepted within a few weeks.",
+            "[TextSearchProvider] Search input: And how long until I get my money back?",
+            "[TextSearchProvider] Results: faq-002, faq-018",
+            "Agent: Refunds usually take a couple of weeks.",
+        ];
+
+        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab07.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Labels_the_three_lab07_token_usage_blocks_with_their_scenario()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab07SolutionOutput));
+
+        Assert.Equal(
+            ["Scenario 3 · Token Usage", "Scenario 4 · Token Usage (first question)", "Scenario 4 · Token Usage (follow-up)"],
+            usage.Reports.Select(r => r.Label));
+        Assert.Equal(1506L, usage.Total!.Value); // 683 + 383 + 440
+    }
 }
