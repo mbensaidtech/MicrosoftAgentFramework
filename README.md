@@ -46,7 +46,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient** and **AzureOpenAI/Lab07**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07** and **AzureOpenAI/Lab08**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -218,7 +218,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab07): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab08): run the other labs with the CLI.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
@@ -338,11 +338,13 @@ This lab is split into two parts: start the server, then run the client.
 
 ### Lab 08 - Data Format Comparison
 
-**Learn how to optimize data formats for AI agent interactions**
+**Learn how the format of the data exchanged with the model (tool results and answers) changes the token usage**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Compare JSON vs other data formats for agent tools |
+| Scenario 1 | JSON: the tool returns objects (serialized as JSON by the framework) and the agent answers with structured output (`RunAsync<List<Hotel>>`); tool calls, tool result size and token usage displayed |
+| Scenario 2 | CSV: the tool returns CSV text and the instructions ask for a CSV answer, parsed back into objects (`FormatException` when the format is not respected) |
+| Comparison | Tool result size, input, output and total tokens of both runs side by side |
 
 ---
 

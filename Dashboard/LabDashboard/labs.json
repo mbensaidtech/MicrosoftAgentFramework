@@ -803,6 +803,110 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab08",
+      "number": "08",
+      "track": "Azure OpenAI",
+      "title": "Data Format Comparison",
+      "summary": "Measure how the format of the data exchanged with the model changes the token usage: the same hotel question answered from a tool that returns JSON objects with structured output, then from a tool that returns CSV text with a CSV answer, and a side-by-side comparison of the tool result sizes and tokens.",
+      "level": "Intermediate",
+      "objectives": [
+        "See what the model receives when a function tool returns objects or text (FunctionResultContent)",
+        "Combine function tools with structured output (RunAsync<T> on an agent with tools)",
+        "Ask for a compact text format (CSV) in the instructions and parse the answer defensively",
+        "Read the tool calls, the tool result size and the token usage of a run from AgentResponse",
+        "Choose between structured JSON and a compact format from measured token usage"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab08-DataFormatComparison",
+      "startProject": "Start/DataFormatComparison.csproj",
+      "solutionProject": "Solution/DataFormatComparison.csproj",
+      "timeoutSeconds": 240,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-tool",
+          "description": "Scenario 1 - the agent called get_all_hotels and the tool result (JSON objects) was measured",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d{4,} characters"
+        },
+        {
+          "id": "scenario1-hotels",
+          "description": "Scenario 1 - the structured output lists the hotels under 100 USD with the cheapest one (Backpacker Hostel, 25 USD) first",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Hotels returned by the agent: [1-9]\\d*\\s*$\\s*^\\s*Backpacker Hostel \\(Bangkok\\) - 25 USD/night"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-tool",
+          "description": "Scenario 2 - the agent called get_all_hotels and the tool result (CSV text) was measured",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d+ characters"
+        },
+        {
+          "id": "scenario2-csv",
+          "description": "Scenario 2 - the answer is CSV with the expected header and the cheapest hotel first",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Agent answer \\(CSV\\):\\s*$\\s*^Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating\\s*$\\s*^Backpacker Hostel,Bangkok,\\d,25,USD,"
+        },
+        {
+          "id": "scenario2-parsed",
+          "description": "Scenario 2 - the CSV answer was parsed back into hotels",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Parsed back [1-9]\\d* hotels from the CSV answer"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "comparison-tool-result",
+          "description": "Comparison - the CSV tool result is smaller than the JSON one",
+          "pattern": "^Tool result \\(chars\\)\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
+        },
+        {
+          "id": "comparison-input",
+          "description": "Comparison - the CSV run used fewer input tokens than the JSON run",
+          "pattern": "^Input tokens\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
+        },
+        {
+          "id": "comparison-output",
+          "description": "Comparison - the CSV run used fewer output tokens than the JSON run",
+          "pattern": "^Output tokens\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Comparaison de formats de données",
+          "level": "Intermédiaire",
+          "summary": "Mesurez comment le format des données échangées avec le modèle change la consommation de tokens : la même question sur des hôtels, répondue depuis un outil qui renvoie des objets JSON avec une sortie structurée, puis depuis un outil qui renvoie du CSV avec une réponse en CSV, et une comparaison côte à côte des tailles de résultats d'outil et des tokens.",
+          "objectives": [
+            "Voir ce que le modèle reçoit quand un function tool renvoie des objets ou du texte (FunctionResultContent)",
+            "Combiner function tools et sortie structurée (RunAsync<T> sur un agent avec outils)",
+            "Demander un format texte compact (CSV) dans les instructions et analyser la réponse de façon défensive",
+            "Lire les appels d'outil, la taille du résultat d'outil et la consommation de tokens d'un run depuis AgentResponse",
+            "Choisir entre JSON structuré et format compact à partir de la consommation mesurée"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-tool": "Scénario 1 - l'agent a appelé get_all_hotels et le résultat d'outil (objets JSON) a été mesuré",
+            "scenario1-hotels": "Scénario 1 - la sortie structurée liste les hôtels à moins de 100 USD avec le moins cher (Backpacker Hostel, 25 USD) en premier",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-tool": "Scénario 2 - l'agent a appelé get_all_hotels et le résultat d'outil (texte CSV) a été mesuré",
+            "scenario2-csv": "Scénario 2 - la réponse est du CSV avec l'en-tête attendu et l'hôtel le moins cher en premier",
+            "scenario2-parsed": "Scénario 2 - la réponse CSV a été relue en objets hôtel",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "comparison-tool-result": "Comparaison - le résultat d'outil CSV est plus petit que le JSON",
+            "comparison-input": "Comparaison - le run CSV a consommé moins de tokens d'entrée que le run JSON",
+            "comparison-output": "Comparaison - le run CSV a consommé moins de tokens de sortie que le run JSON"
+          }
+        }
+      }
     }
   ]
 }

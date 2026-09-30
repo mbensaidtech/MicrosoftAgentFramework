@@ -12,7 +12,7 @@ public class LabCatalogTests
     {
         LabCatalog catalog = LoadRealCatalog();
 
-        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab07"],
+        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab07", "azureopenai-lab08"],
             catalog.Labs.Select(lab => lab.Id));
         foreach (LabDefinition lab in catalog.Labs)
         {

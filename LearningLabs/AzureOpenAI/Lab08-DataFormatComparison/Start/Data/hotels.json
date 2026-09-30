@@ -50,4 +50,3 @@
   { "name": "Pyramid View Hotel", "city": "Cairo", "stars": 4, "price_per_night": 70, "currency": "USD", "rooms": 150, "has_pool": true, "has_wifi": true, "rating": 4.3 },
   { "name": "Cherry Blossom Inn", "city": "Seoul", "stars": 4, "price_per_night": 78, "currency": "USD", "rooms": 90, "has_pool": false, "has_wifi": true, "rating": 4.6 }
 ]
-

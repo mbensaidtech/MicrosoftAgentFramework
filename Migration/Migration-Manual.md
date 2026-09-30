@@ -410,6 +410,35 @@ Points découverts :
 - Le `TextSearchProvider` **avale les exceptions** de la fonction de recherche (journalisées, résultat vide) : sans logger, une recherche qui échoue passe inaperçue → afficher les résultats depuis l'adaptateur (Lab07) ou passer un `ILoggerFactory`.
 - Un lab RAG a besoin d'un **déploiement d'embedding** : nouvelle propriété `AzureOpenAISettings.EmbeddingDeploymentName` (validée au démarrage), hors du formulaire du dashboard.
 
+### 4.14 Formats de données et résultats d'outils (validé sur Lab08)
+
+**Ancienne approche**
+```csharp
+// Packages tiers ToonNet 1.0.4 (Solution) / ToonNetSerializer 1.0.0 (Start, introuvable sur NuGet : le Start ne restaurait plus)
+public static string GetAllHotelsUsingJsonFormat() => File.ReadAllText(HotelsFilePath);          // texte brut du fichier JSON
+public static string GetAllHotelsUsingToonFormat() => ToonNetSerializer.ToonNet.Encode(hotels);  // « Toon », en fait du CSV dans les instructions
+AgentRunResponse<List<Hotel>> r = await agent.RunAsync<List<Hotel>>("...");                      // ChatClientAgent seulement
+```
+
+**Nouvelle approche**
+```csharp
+// Aucun package de sérialisation : l'outil renvoie des objets (JSON par le framework) ou du texte (CSV encodé par un helper fourni)
+public IReadOnlyList<Hotel> GetAllHotelsAsJson() => hotels;                 // sérialisé en JSON (indenté, camelCase) par AIFunctionFactory
+public string GetAllHotelsAsCsv() => HotelCsv.Serialize(hotels);            // envoyé tel quel (comme chaîne JSON)
+AgentResponse<List<Hotel>> json = await jsonAgent.RunAsync<List<Hotel>>(question);   // tout AIAgent ; schéma non-objet enveloppé automatiquement
+AgentResponse csv = await csvAgent.RunAsync(question);                               // format demandé dans les instructions, HotelCsv.Deserialize + FormatException
+int sent = response.Messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>()          // ce que le modèle a reçu
+    .Sum(r => (r.Result as string ?? JsonSerializer.Serialize(r.Result, AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(object)))).Length);
+```
+
+**Explication** — Le lab comparait JSON et « Toon » avec des packages tiers non officiels, différents entre Start et Solution, dont l'un n'existe plus sur NuGet (règle 12 : aucune bibliothèque tierce non nécessaire). Le concept enseigné — le coût en tokens du format des données échangées avec le modèle — ne dépend d'aucune bibliothèque : le lab compare désormais **JSON** (objets renvoyés par l'outil, sortie structurée `RunAsync<List<Hotel>>`) et **CSV** (texte renvoyé par l'outil, réponse en CSV demandée dans les instructions et relue par un helper fourni de quelques lignes). Ce que le modèle reçoit est mesuré et non supposé : `AIFunctionFactory` transforme **toujours** la valeur de retour d'un outil en `JsonElement` (vérifié avec MEAI 10.10.0), puis `OpenAIChatClient` envoie une chaîne telle quelle et tout autre résultat sérialisé avec `AIJsonUtilities.DefaultOptions` (source `OpenAIChatClient.ToOpenAIChatMessages`, vérifié empiriquement avec `AsOpenAIChatMessages()`) : une liste d'objets devient du **JSON indenté** (10 348 caractères pour 50 hôtels), une chaîne devient une **chaîne JSON** (guillemets, `\n` échappés : 2 765 caractères). `RunAsync<T>` fonctionne avec des outils (le format de réponse s'applique au run entier) et accepte `List<T>` : `StructuredOutputSchemaUtilities.WrapNonObjectSchema` enveloppe le schéma non-objet pour le service (`AIAgentStructuredOutput.cs`, 1.22.0) — ce que `ChatResponseFormat.ForJsonSchema<T>()` ne fait pas (Lab02). Références : samples `Agent_Step02_StructuredOutput`, `01-get-started/02_add_tools` ; sources MEAI `AIFunctionFactory` (marshalling du retour) et `OpenAIChatClient` ; page Learn « Using function tools with an agent ».
+
+Points découverts :
+- **`AIFunctionFactoryOptions.SerializerOptions`** change le sérialiseur du résultat d'outil (p. ex. `WriteIndented = false`) : cité dans « Going further » de Lab08, non enseigné.
+- **Culture** : l'affichage des `decimal`/`double` (`{hotel.PricePerNight}`) suit la culture du poste (`25,5` en fr-FR). Les helpers d'affichage utilisent `string.Create(CultureInfo.InvariantCulture, $"...")` pour que les checks du dashboard (`25 USD/night`) soient portables ; `System.Text.Json` est déjà invariant.
+- **Le format demandé par instructions n'est pas garanti** : `HotelCsv.Deserialize` tolère les clôtures de code Markdown, mais lève `FormatException` (attrapée et affichée) sur un en-tête ou un nombre de colonnes différent — l'équivalent du scénario 1 de Lab02.
+- **Ordre des scénarios et comparaison** : un bloc de comparaison affiché après le dernier scénario ne doit pas écrire de lignes `Input tokens: N` (le dashboard les lirait comme un usage) ; Lab08 écrit un tableau sans deux-points (`Input tokens  3180  1421  -55%`).
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -438,6 +467,7 @@ Points découverts :
 | `Microsoft.Agents.Hosting.AspNetCore` 1.4.9-beta | Inutile (SDK M365 Agents) | Dépendance en préversion | — (supprimé) | Lab06 ✅ |
 | `Microsoft.Extensions.Hosting` (usage « config seulement ») | Surdimensionné | Dépendance inutile | `Microsoft.Extensions.Configuration.Json/UserSecrets/EnvironmentVariables/Binder` | tous les labs console |
 | `Azure.Identity 1.18.0-beta.2` | Préversion | Règle « stable » | `Azure.Identity 1.21.0` | tous |
+| `ToonNet` 1.0.4 / `ToonNetSerializer` 1.0.0 (packages tiers « TOON », Lab08) | Non officiels ; `ToonNetSerializer` n'existe plus sur NuGet (`NU1101`, le Start ne restaurait plus) | Restauration du Start impossible ; règle 12 | Aucun package : outil renvoyant des objets (JSON par le framework) ou du CSV encodé par `HotelCsv.cs` fourni (§4.14) | Lab08 ✅ |
 | `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | `MongoDB.Driver 3.12.0` — Lab05 le référence directement (son graphe n'a plus de package vulnérable) ; Lab07 ne référence plus MongoDB ; la montée de CommonUtilities reste à faire avec Lab12 (dernier lab à référencer 2.30.0 en direct, cf. §8) | tous (warnings), Lab12 (code) |
 
 ---
@@ -493,4 +523,5 @@ Points découverts :
 - **Identifiants Azure OpenAI de l'environnement de migration (constaté le 2026-09-29)** : la clé API des variables `AzureOpenAI__*` renvoie `401 Access denied due to invalid subscription key` sur tous les chemins (v1 et `api-version`), et Entra ID (`az login`, même tenant, ressource présente et `Succeeded`, RP `Microsoft.CognitiveServices` enregistré, `disableLocalAuth = false`) renvoie `400 SubscriptionNotRegistered` — alors que les deux voies fonctionnaient le 2026-09-28 (Lab06). Cause hors dépôt (clé régénérée ? incident côté Azure ?) : à corriger avant tout test d'exécution (Lab07 §5 du rapport).
 - **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab12.
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
+- **Culture du poste** : les nombres interpolés dans les chaînes (`decimal`, `double`) suivent la culture courante (fr-FR sur le poste de migration : `55,5`). Tout affichage attendu par les README et les checks du dashboard passe par `CultureInfo.InvariantCulture` (Lab08 `FormatConsole`) ; à vérifier dans les labs suivants qui affichent des montants ou des scores.
 - **Analyse graphify** : l'extracteur AST échoue sur 5 `Program.cs` à top-level statements (Lab01/02/03/04/07 Solution) ; sans impact sur la compilation, mais ces fichiers sont sous-représentés dans la carte.

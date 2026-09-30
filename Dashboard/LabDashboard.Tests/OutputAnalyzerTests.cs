@@ -983,4 +983,128 @@ public class OutputAnalyzerTests
             usage.Reports.Select(r => r.Label));
         Assert.Equal(1506L, usage.Total!.Value); // 683 + 383 + 440
     }
+
+    // Standard output of the Lab08 solution, as decoded by the dashboard (spinner lines removed).
+    private static readonly string[] Lab08SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Loaded 50 hotels from Data/hotels.json",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: JSON - the tool returns objects, the agent answers with structured output ===",
+        "Question: Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.",
+        "Tool called: get_all_hotels()",
+        "Tool result sent to the model: 10348 characters",
+        "Hotels returned by the agent: 43",
+        "  Backpacker Hostel (Bangkok) - 25 USD/night - stars: 1 - rating: 3.8",
+        "  Budget Stay Express (Chicago) - 35 USD/night - stars: 2 - rating: 3.5",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (JSON):",
+        "  Input tokens: 3180",
+        "  Output tokens: 1902",
+        "  Total tokens: 5082",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: CSV - the tool returns text, the agent answers in CSV ===",
+        "Question: Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.",
+        "Tool called: get_all_hotels()",
+        "Tool result sent to the model: 2765 characters",
+        "Agent answer (CSV):",
+        "Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating",
+        "Backpacker Hostel,Bangkok,1,25,USD,40,false,true,3.8",
+        "Budget Stay Express,Chicago,2,35,USD,60,false,true,3.5",
+        "Parsed back 43 hotels from the CSV answer",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (CSV):",
+        "  Input tokens: 1421",
+        "  Output tokens: 698",
+        "  Total tokens: 2119",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Comparison: JSON vs CSV ===",
+        "                            JSON       CSV   CSV vs JSON",
+        "Tool result (chars)        10348      2765          -73%",
+        "Input tokens                3180      1421          -55%",
+        "Output tokens               1902       698          -63%",
+        "Total tokens                5082      2119          -58%",
+    ];
+
+    // Standard output of the Lab08 exercise as delivered (TODOs not done yet).
+    private static readonly string[] Lab08StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Loaded 50 hotels from Data/hotels.json",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: JSON - the tool returns objects, the agent answers with structured output ===",
+        "Question: Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: CSV - the tool returns text, the agent answers in CSV ===",
+        "Question: Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.",
+    ];
+
+    [Fact]
+    public void Every_lab08_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab08 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab08")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab08.Expectations, Lab08SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab08.Expectations, Lab08StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab08_checks_fail_when_the_formats_or_the_savings_are_not_there()
+    {
+        LabDefinition lab08 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab08")!;
+        // No tool call in scenario 1 and a small (text) tool result, hotels not ordered by price, a CSV answer wrapped in code fences
+        // with a different header that could not be parsed, and a comparison where CSV costs more than JSON.
+        string[] output =
+        [
+            "=== Scenario 1: JSON - the tool returns objects, the agent answers with structured output ===",
+            "Tool called: (none)",
+            "Tool result sent to the model: 512 characters",
+            "Hotels returned by the agent: 43",
+            "  Grand Plaza Hotel (Paris) - 75 USD/night - stars: 4 - rating: 4.5",
+            "  Backpacker Hostel (Bangkok) - 25 USD/night - stars: 1 - rating: 3.8",
+            "=== Scenario 2: CSV - the tool returns text, the agent answers in CSV ===",
+            "Tool called: get_all_hotels(format: csv)",
+            "Agent answer (CSV):",
+            "```csv",
+            "Name,PricePerNight,Currency",
+            "Backpacker Hostel,25,USD",
+            "```",
+            "The answer is not the expected CSV: The first line must be the header 'Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating', got: 'Name,PricePerNight,Currency'.",
+            "=== Comparison: JSON vs CSV ===",
+            "Tool result (chars)         2765     10348         +274%",
+            "Input tokens                1421      3180         +124%",
+            "Output tokens                698      1902         +172%",
+            "Total tokens                2119      5082         +140%",
+        ];
+
+        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab08.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Labels_the_two_lab08_token_usage_blocks_with_their_scenario_and_ignores_the_comparison_rows()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab08SolutionOutput));
+
+        // The "Input tokens ... -55%" rows of the comparison table have no colon: they are not token usage blocks.
+        Assert.Equal(["Scenario 1 · Token Usage (JSON)", "Scenario 2 · Token Usage (CSV)"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(7201L, usage.Total!.Value); // 5082 + 2119
+    }
 }
