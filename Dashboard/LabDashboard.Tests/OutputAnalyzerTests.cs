@@ -1107,4 +1107,136 @@ public class OutputAnalyzerTests
         Assert.Equal(["Scenario 1 · Token Usage (JSON)", "Scenario 2 · Token Usage (CSV)"], usage.Reports.Select(r => r.Label));
         Assert.Equal(7201L, usage.Total!.Value); // 5082 + 2119
     }
+
+    // Standard output of the Lab09 solution, as decoded by the dashboard (spinner lines removed), with "Y" typed at the prompt.
+    private static readonly string[] Lab09SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Agent instructions: You are an HR assistant. Use the tools to look up employees and to delete employee data when asked. Only report a deletion as done when the delete_employee_data tool confirmed it; if a deletion was rejected, say so and give the reason.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Human approval at the console ===",
+        "User: Delete all the data of the employee with the ID EMP001.",
+        "Agent run paused: 1 approval request(s) pending",
+        "APPROVAL REQUIRED",
+        "The agent would like to invoke the following sensitive function:",
+        "  Function: delete_employee_data",
+        "  Arguments: employeeId=EMP001",
+        "Please reply Y to approve, or anything else to reject:",
+        "Function call approved by user.",
+        "Tool results:",
+        "Tool result (delete_employee_data): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted. This action cannot be undone.",
+        "Agent answer:",
+        "All data for the employee with ID EMP001 has been permanently deleted. This action cannot be undone.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (2 runs):",
+        "  Input tokens: 317",
+        "  Output tokens: 38",
+        "  Total tokens: 355",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Several approval requests decided by a policy ===",
+        "User: The employees EMP001 and EMP002 asked us to erase their data. Look up both employees, then delete the data of each of them.",
+        "Agent run paused: 2 approval request(s) pending",
+        "Approval requested for delete_employee_data(employeeId=EMP001)",
+        "Policy decision: approved - EMP001 (Alice Martin) left the company on 2025-12-31.",
+        "Approval requested for delete_employee_data(employeeId=EMP002)",
+        "Policy decision: rejected - EMP002 (Bob Lee) is still employed: only the data of former employees can be deleted.",
+        "Tool results:",
+        "Tool result (get_employee_info): Employee EMP001: Alice Martin, Engineering, left the company on 2025-12-31.",
+        "Tool result (get_employee_info): Employee EMP002: Bob Lee, Finance, currently employed.",
+        "Tool result (delete_employee_data): Tool call invocation rejected. EMP002 (Bob Lee) is still employed: only the data of former employees can be deleted.",
+        "Tool result (delete_employee_data): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted. This action cannot be undone.",
+        "Agent answer:",
+        "I found the following information:",
+        "- **EMP001**: Alice Martin, Engineering, left the company on 2025-12-31. (Data has been successfully deleted.)",
+        "- **EMP002**: Bob Lee, Finance, is currently employed. (Deletion was rejected because only former employees can have their data deleted.)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (2 runs):",
+        "  Input tokens: 879",
+        "  Output tokens: 175",
+        "  Total tokens: 1054",
+    ];
+
+    // Standard output of the Lab09 exercise as delivered (TODOs not done yet): no prompt, no approval, no tool.
+    private static readonly string[] Lab09StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Agent instructions: You are an HR assistant. Use the tools to look up employees and to delete employee data when asked. Only report a deletion as done when the delete_employee_data tool confirmed it; if a deletion was rejected, say so and give the reason.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Human approval at the console ===",
+        "User: Delete all the data of the employee with the ID EMP001.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Several approval requests decided by a policy ===",
+        "User: The employees EMP001 and EMP002 asked us to erase their data. Look up both employees, then delete the data of each of them.",
+    ];
+
+    [Fact]
+    public void Every_lab09_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab09 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab09")!;
+
+        Assert.True(lab09.Interactive);
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab09.Expectations, Lab09SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab09.Expectations, Lab09StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab09_checks_fail_when_the_approvals_are_not_honored()
+    {
+        LabDefinition lab09 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab09")!;
+        // Scenario 1: the user approved but the tool never ran (the approval was sent without the session).
+        // Scenario 2: the harmless tool was surfaced as an approval request, the policy decisions are inverted,
+        // and the deletion of EMP002 was executed although it was rejected.
+        string[] output =
+        [
+            "=== Scenario 1: Human approval at the console ===",
+            "Agent run paused: 1 approval request(s) pending",
+            "APPROVAL REQUIRED",
+            "  Function: delete_employee_data",
+            "  Arguments: employeeId=EMP002",
+            "Function call approved by user.",
+            "Tool results: none (no tool was executed)",
+            "Agent answer:",
+            "I could not delete the data.",
+            "=== Scenario 2: Several approval requests decided by a policy ===",
+            "Agent run paused: 4 approval request(s) pending",
+            "Approval requested for get_employee_info(employeeId=EMP001)",
+            "Policy decision: rejected - The employee ID is missing from the call.",
+            "Approval requested for delete_employee_data(employeeId=EMP001)",
+            "Policy decision: rejected - EMP001 (Alice Martin) is still employed: only the data of former employees can be deleted.",
+            "Approval requested for delete_employee_data(employeeId=EMP002)",
+            "Policy decision: approved - EMP002 (Bob Lee) left the company on 2025-12-31.",
+            "Tool results:",
+            "Tool result (get_employee_info): Employee EMP001: Alice Martin, Engineering, left the company on 2025-12-31.",
+            "Tool result (get_employee_info): Employee EMP002: Bob Lee, Finance, currently employed.",
+            "Tool result (delete_employee_data): Tool call invocation rejected. EMP002 (Bob Lee) is still employed: only the data of former employees can be deleted.",
+            "Tool result (delete_employee_data): Sensitive operation executed: All data for employee 'EMP002' has been permanently deleted. This action cannot be undone.",
+        ];
+
+        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab09.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Labels_the_two_lab09_token_usage_blocks_with_their_scenario()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab09SolutionOutput));
+
+        Assert.Equal(["Scenario 1 · Token Usage (2 runs)", "Scenario 2 · Token Usage (2 runs)"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(1409L, usage.Total!.Value); // 355 + 1054
+    }
 }

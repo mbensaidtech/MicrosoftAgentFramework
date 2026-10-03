@@ -907,6 +907,99 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab09",
+      "number": "09",
+      "track": "Azure OpenAI",
+      "title": "AI Agent With Function Tools and Human Approval",
+      "summary": "Make an agent pause before a sensitive tool runs: wrap the tool in ApprovalRequiredAIFunction, read the approval requests from the response, answer them in the same session (a person at the console, then a policy with a reason) and see what the tools really returned.",
+      "level": "Intermediate",
+      "objectives": [
+        "Mark a tool as requiring approval with ApprovalRequiredAIFunction",
+        "Read the ToolApprovalRequestContent items from response.Messages and show the function call to approve",
+        "Answer with CreateResponse(approved, reason) in a user ChatMessage and continue the run in the same AgentSession (approval binding)",
+        "Run the approval loop until the agent no longer asks, with a human decision or a policy decision",
+        "Read the tool results and the rejections from the response messages, and the token usage of the whole flow"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab09-AIAgentWithFunctionToolsHumanApproval",
+      "startProject": "Start/AIAgentWithFunctionToolsHumanApproval.csproj",
+      "solutionProject": "Solution/AIAgentWithFunctionToolsHumanApproval.csproj",
+      "timeoutSeconds": 240,
+      "interactive": true,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-request",
+          "description": "Scenario 1 - the run paused with an approval request for delete_employee_data(employeeId=EMP001)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent run paused: [1-9]\\d* approval request\\(s\\) pending\\s*$(?:(?!^=== Scenario).)*?^APPROVAL REQUIRED\\s*$(?:(?!^=== Scenario).)*?^\\s*Function: delete_employee_data\\s*$\\s*^\\s*Arguments: employeeId=EMP001\\s*$"
+        },
+        {
+          "id": "scenario1-approved",
+          "description": "Scenario 1 - the user approved (reply Y) and the tool was executed after the approval",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Function call approved by user\\.\\s*$(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-info",
+          "description": "Scenario 2 - get_employee_info ran for both employees without any approval request",
+          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^Tool result \\(get_employee_info\\): Employee EMP001: Alice Martin)(?=(?:(?!^=== Scenario).)*?^Tool result \\(get_employee_info\\): Employee EMP002: Bob Lee)(?!(?:(?!^=== Scenario).)*?^Approval requested for get_employee_info)"
+        },
+        {
+          "id": "scenario2-policy",
+          "description": "Scenario 2 - the policy approved the deletion of EMP001 (former employee) and rejected the deletion of EMP002 (still employed)",
+          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^Approval requested for delete_employee_data\\(employeeId=EMP001\\)\\s*$\\s*^Policy decision: approved - EMP001 \\(Alice Martin\\) left the company on 2025-12-31\\.)(?=(?:(?!^=== Scenario).)*?^Approval requested for delete_employee_data\\(employeeId=EMP002\\)\\s*$\\s*^Policy decision: rejected - EMP002 \\(Bob Lee\\) is still employed)"
+        },
+        {
+          "id": "scenario2-executed",
+          "description": "Scenario 2 - the approved deletion (EMP001) was executed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
+        },
+        {
+          "id": "scenario2-rejected",
+          "description": "Scenario 2 - the rejected deletion (EMP002) was not executed: the model received the rejection and its reason",
+          "pattern": "(?is)^=== Scenario 2:(?!(?:(?!^=== Scenario).)*?employee 'EMP002' has been permanently deleted)(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Tool call invocation rejected\\. EMP002 \\(Bob Lee\\) is still employed"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec function tools et approbation humaine",
+          "level": "Intermédiaire",
+          "summary": "Faites marquer une pause à un agent avant l'exécution d'un outil sensible : enveloppez l'outil dans ApprovalRequiredAIFunction, lisez les demandes d'approbation dans la réponse, répondez-y dans la même session (une personne à la console, puis une politique avec un motif) et voyez ce que les outils ont réellement renvoyé.",
+          "objectives": [
+            "Marquer un outil comme nécessitant une approbation avec ApprovalRequiredAIFunction",
+            "Lire les ToolApprovalRequestContent dans response.Messages et afficher l'appel de fonction à approuver",
+            "Répondre avec CreateResponse(approved, reason) dans un ChatMessage utilisateur et poursuivre le run dans la même AgentSession (liaison des approbations)",
+            "Exécuter la boucle d'approbation jusqu'à ce que l'agent ne demande plus rien, avec une décision humaine ou une décision de politique",
+            "Lire les résultats d'outils et les rejets dans les messages de la réponse, et la consommation de tokens de tout le flux"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-request": "Scénario 1 - le run s'est arrêté avec une demande d'approbation pour delete_employee_data(employeeId=EMP001)",
+            "scenario1-approved": "Scénario 1 - l'utilisateur a approuvé (réponse Y) et l'outil a été exécuté après l'approbation",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-info": "Scénario 2 - get_employee_info a été exécuté pour les deux employés sans aucune demande d'approbation",
+            "scenario2-policy": "Scénario 2 - la politique a approuvé la suppression d'EMP001 (ancien employé) et rejeté celle d'EMP002 (toujours employé)",
+            "scenario2-executed": "Scénario 2 - la suppression approuvée (EMP001) a été exécutée",
+            "scenario2-rejected": "Scénario 2 - la suppression rejetée (EMP002) n'a pas été exécutée : le modèle a reçu le rejet et son motif",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée"
+          }
+        }
+      }
     }
   ]
 }

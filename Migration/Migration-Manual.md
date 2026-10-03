@@ -66,7 +66,9 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | preview.260127.1 | **`ChatMessageStore` → `ChatHistoryProvider`** | #3375 | Lab05 |
 | preview.260127.1 | **`AgentThread` → `AgentSession`** | #3430 | Lab05, Lab09, Lab12 |
 | preview.260205.1 | `GetNewSession` → **`CreateSessionAsync`** ; `AgentSession.Serialize` déplacé sur `AIAgent` | #3501, #3650 | Lab05, Lab09, Lab12 |
-| preview.260205.1 | Suppression de `UserInputRequests` | #3682 | Lab09 |
+| preview.260205.1 | Suppression de `UserInputRequests` | #3682 | Lab09 ✅ |
+| 1.14.0 | **Liaison des réponses d'approbation** aux demandes surfacées (`[BREAKING]`) ; `ToolApprovalAgent` sorti d'expérimental | #7111, #7107 | Lab09 ✅ (session obligatoire) |
+| **1.22.0** | **Liaison des approbations renforcée** (`[BREAKING]`, replay) : seules les demandes enregistrées par le framework dans la session font foi ; liaison aussi pour les réponses « always approve » | #8375, #8432 | Lab09 ✅ |
 | preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 | MAS-Lab02/03 (à vérifier) |
 | preview.260205.1 | Agent et session fournis à `AIContextProvider` / `ChatHistoryProvider` | #3695 | Lab05, Lab12 |
 | rc1 | Session `StateBag`, plusieurs providers par agent, composition au lieu d'héritage typé | #3806, #3988 | Lab05, Lab12 |
@@ -439,6 +441,53 @@ Points découverts :
 - **Le format demandé par instructions n'est pas garanti** : `HotelCsv.Deserialize` tolère les clôtures de code Markdown, mais lève `FormatException` (attrapée et affichée) sur un en-tête ou un nombre de colonnes différent — l'équivalent du scénario 1 de Lab02.
 - **Ordre des scénarios et comparaison** : un bloc de comparaison affiché après le dernier scénario ne doit pas écrire de lignes `Input tokens: N` (le dashboard les lirait comme un usage) ; Lab08 écrit un tableau sans deux-points (`Input tokens  3180  1421  -55%`).
 
+### 4.15 Approbations humaines sur les function tools (validé sur Lab09)
+
+**Ancienne approche**
+```csharp
+List<AITool> tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(SensitiveTools.DeleteEmployeeData, "delete_employee_data"))];
+ChatClientAgent agent = chatClient.CreateAIAgent(instructions: "...", tools: tools);
+var thread = agent.GetNewThread();
+AgentRunResponse response = await agent.RunAsync("delete ...", thread);
+List<UserInputRequestContent> requests = response.UserInputRequests.ToList();                 // supprimé
+if (requests.Any())
+{
+    var answers = requests.OfType<FunctionApprovalRequestContent>()                              // renommé
+        .Select(r => new ChatMessage(ChatRole.User, [r.CreateResponse(approved)])).ToList();   // r.FunctionCall
+    response = await agent.RunAsync(answers, thread);
+}
+```
+
+**Nouvelle approche**
+```csharp
+AIFunction delete = AIFunctionFactory.Create(HrTools.DeleteEmployeeData, "delete_employee_data");
+AIAgent agent = chatClient.AsAIAgent(instructions: "...", name: "...", tools: [new ApprovalRequiredAIFunction(delete)]);
+AgentSession session = await agent.CreateSessionAsync();                                        // obligatoire (liaison)
+AgentResponse response = await agent.RunAsync(prompt, session);
+List<ToolApprovalRequestContent> requests = response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().ToList();
+while (requests.Count > 0)                                                                      // l'agent peut redemander
+{
+    List<ChatMessage> answers = requests.ConvertAll(r =>
+    {
+        FunctionCallContent call = (FunctionCallContent)r.ToolCall;                              // nom + arguments choisis par le modèle
+        return new ChatMessage(ChatRole.User, [r.CreateResponse(approved, reason)]);           // reason transmis au modèle si rejet
+    });
+    response = await agent.RunAsync(answers, session);
+    requests = response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().ToList();
+}
+// Ce que les outils ont renvoyé (ou le rejet reçu par le modèle) : FunctionCallContent / FunctionResultContent (même CallId) dans response.Messages
+```
+
+**Explication** — `ApprovalRequiredAIFunction` et `AIFunctionFactory` (MEAI) sont inchangés. `UserInputRequests` a été supprimé (#3682) : les demandes sont des contenus **`ToolApprovalRequestContent`** (MEAI 10.10, ex-`FunctionApprovalRequestContent`) dans `response.Messages`, dont `ToolCall` est le `FunctionCallContent` à approuver ; `CreateResponse(approved, reason)` crée le `ToolApprovalResponseContent` corrélé (`RequestId`). **Changement conceptuel : la session est obligatoire.** Depuis 1.14 (#7111) et surtout 1.22 (#8375, `[BREAKING]`), `ChatClientAgent` injecte par défaut un `ApprovalResponseBindingChatClient` (`ChatClientAgentOptions.DisableApprovalResponseBinding = false`) qui enregistre dans le `StateBag` de la session chaque demande surfacée et ne laisse passer qu'une réponse liée à une demande enregistrée (appel rebasé sur le nom et les arguments d'origine, consommé une seule fois) — **vérifié** : sans session, la réponse d'approbation est ignorée en silence, l'outil n'est jamais exécuté et le modèle répond sans résultat. Deuxième comportement par défaut : `FunctionInvokingChatClient` est « tout ou rien » (un seul outil à approuver transforme tous les appels du tour en demandes), mais `ChatClientAgent` ajoute `ApprovalNotRequiredFunctionBypassingChatClient` (`DisableApprovalNotRequiredFunctionBypassing = false`), qui exécute lui-même les outils non sensibles et ne surface que les vraies demandes — **vérifié** (outil `get_employee_info` + `delete_employee_data` dans le même tour : une seule demande). Sur rejet, le modèle reçoit un `FunctionResultContent` texte `Tool call invocation rejected.` suivi du motif ; sur approbation, la réponse de la seconde exécution contient le `FunctionCallContent` réémis et le `FunctionResultContent` (`JsonElement` pour une chaîne renvoyée par l'outil). Références : page Learn « Using function tools with human in the loop approvals » (`agents/tools/tool-approval`), sample `Agent_Step01_UsingFunctionToolsWithApprovals`, docs XML 1.22.0 de `ChatClientAgentOptions`, `ApprovalResponseBindingChatClient`, `ApprovalNotRequiredFunctionBypassingChatClient`.
+
+Points découverts :
+- **`ToolApprovalRequestContent.RequiresConfirmation` est `[Experimental]` (`MEAI001`)** : cité dans « Going further » de Lab09, pas enseigné.
+- **« Don't ask again »** : `agent.AsBuilder().UseToolApproval()` (`ToolApprovalAgent`, stable depuis 1.14) + `request.CreateAlwaysApproveToolResponse()` / `CreateAlwaysApproveToolWithArgumentsResponse()` enregistrent des règles dans la session ; non enseigné (Going further).
+- **Décision par du code** : la doc décrit la confirmation comme « a user prompt, a policy decision, or any other approver » ; Lab09 scénario 2 prend la décision dans une politique (`DeletionPolicy`) avec motif, mêmes contenus et même `CreateResponse`.
+- **Usage** : chaque `RunAsync` a son propre `Usage` ; un flux d'approbation coûte au moins deux appels modèle, un rejet aussi (`UsageDetails.Add` pour cumuler).
+- **Lab interactif** : `Console.ReadLine()` → `"interactive": true` dans le catalogue du dashboard (premier lab à l'utiliser) ; `null` (entrée fermée) = rejet.
+- Le `Start` doit **utiliser** ses constantes partagées (`AgentInstructions`) hors des TODO, sinon `CS0219` en `-warnaserror` (Lab09 les affiche dans le bloc Setup) ; le Start de **Lab05** présente aujourd'hui ce défaut (4 `CS0219`), à corriger lors d'un passage ultérieur.
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -448,7 +497,7 @@ Points découverts :
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | Retiré des samples et des dépendances MAF (1.21.0) ; package encore publié mais sa dernière version stable (2.1.0) est antérieure à la v1 API | Construction du client dans tous les labs | `OpenAI.OpenAIClient` + `OpenAIClientOptions.Endpoint = …/openai/v1/` + `ApiKeyCredential` ou `BearerTokenPolicy` | **tous** |
 | `CreateAIAgent` / `GetAIAgent` | Renommés (preview.260121) | Compilation | `AsAIAgent` | tous |
 | `AgentRunResponse` / `AgentRunResponseUpdate` | Renommés | Compilation | `AgentResponse` / `AgentResponseUpdate` | tous |
-| `AgentThread`, `GetNewThread`, `DeserializeThread`, `thread.Serialize()` | Renommés / déplacés / async | Compilation + concept | `AgentSession`, `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync` sur `AIAgent` (§4.11) | Lab05 ✅, Lab09, Lab12 |
+| `AgentThread`, `GetNewThread`, `DeserializeThread`, `thread.Serialize()` | Renommés / déplacés / async | Compilation + concept | `AgentSession`, `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync` sur `AIAgent` (§4.11) | Lab05 ✅, Lab09 ✅, Lab12 |
 | `ChatMessageStore`, `ChatMessageStoreFactory` | Renommés + refondus | Refonte | `ChatHistoryProvider` (instance unique, `ChatClientAgentOptions.ChatHistoryProvider`) + `ProviderSessionState<T>` ; `ChatClientAgentOptions.Instructions` → `ChatOptions.Instructions` (§4.11) | Lab05 ✅ |
 | `AIContextProvider` (API preview) | Refondu (signature, StateBag, composition) | Refonte | `AIContextProvider` 1.x / `MessageAIContextProvider` | Lab12 |
 | `AgentResponse.Deserialize<T>()`, `RunAsync<T>` limité à `ChatClientAgent`, `AIJsonUtilities.CreateJsonSchema` + `ForJsonSchema(schema, …)` | Supprimé / généralisé / simplifié | Compilation (Deserialize) + pédagogie | `JsonSerializer.Deserialize<T>(response.Text, …)`, `AIAgent.RunAsync<T>`, `ChatResponseFormat.ForJsonSchema<T>()` | Lab02 |
@@ -456,7 +505,8 @@ Points découverts :
 | `McpClientFactory.CreateAsync` | Supprimé (API 0.x) — encore montré par la page Learn « Using MCP tools » en C# au 2026-09-23 | Compilation | `McpClient.CreateAsync` (sample `Agent_MCP_Server` au tag) | Lab04, Lab10 |
 | `clientFactory: c => new ConfigureOptionsChatClient(c, o => …)` pour fixer `MaxOutputTokens` / `Temperature` | Toujours disponible (MEAI) mais détourné : c'est un middleware `IChatClient` | Pédagogie | `AsAIAgent(new ChatClientAgentOptions { ChatOptions = new() { Instructions, Tools, MaxOutputTokens, Temperature } })` | Lab04 |
 | `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab qui construit un `ServiceCollection` : Lab10, MAS) |
-| `UserInputRequests` | Supprimé | Compilation | contenu d'approbation dans les messages de réponse (cf. `Agent_Step01_UsingFunctionToolsWithApprovals`) | Lab09 |
+| `UserInputRequests`, `UserInputRequestContent` | Supprimés | Compilation + concept | `response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>()` + boucle `while` ; session obligatoire (§4.15) | Lab09 ✅ |
+| `FunctionApprovalRequestContent` (`.FunctionCall`) | Renommé (MEAI 10.x) | Compilation | `ToolApprovalRequestContent` (`.ToolCall` à caster en `FunctionCallContent`), `CreateResponse(approved, reason)` (§4.15) | Lab09 ✅ |
 | `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02/03 (à vérifier) |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) ; recherche vectorielle : `InMemoryVectorStore` (Lab07, §4.13) | Lab05 ✅, Lab07 ✅ |
 | `MongoVectorStore` (SK) + MongoDB Atlas Vector Search | Préversion, service externe | Lab07 non exécutable sans compte Atlas | `InMemoryVectorStore` ; tout connecteur `Microsoft.Extensions.VectorData` stable en « Going further » (§4.13) | Lab07 ✅ |
@@ -520,6 +570,7 @@ Points découverts :
 - **Régression streaming Azure OpenAI (constatée le 2026-09-28)** : Azure envoie désormais, en streaming Chat Completions, des annotations de filtre de contenu **sans `delta`** ; `Microsoft.Extensions.AI.OpenAI` 10.10.0 (et 10.10.1, dernière version) lève `InvalidOperationException: The requested operation requires an element of type 'Object', but the target element has type 'Null'` dans `OpenAIChatClient.TryGetReasoningDelta` ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790), ouvert). Impact : **tout `RunStreamingAsync`** — Lab01 scénario 5 et Lab02 (streaming) échouent aujourd'hui alors qu'ils étaient validés le 2026-09-26/27 (non corrigés : hors périmètre), et l'hébergement A2A (qui exécute toujours en streaming) renvoie *"Agent handler did not produce any response events"*. Lab06_A2AServer contient un contournement **temporaire** (`StreamingWorkaround.WithNonStreamingResponses()`, middleware `ChatClientBuilder.Use` qui sert les requêtes streaming par un appel non streaming). À retirer, et à re-tester Lab01/Lab02, dès qu'une version corrigée de `Microsoft.Extensions.AI.OpenAI` est publiée.
 - **Port 5000 sur macOS** : le récepteur AirPlay écoute sur `*:5000` ; Kestrel peut quand même se lier à `localhost:5000`, mais quand le serveur du lab ne tourne pas, un client reçoit `403 Forbidden` d'AirPlay. Documenté dans les README Lab06 ; le dashboard utilise un port dédié (5071).
 - **Lab05 / Lab07** : connecteurs Semantic Kernel en préversion et API mémoire/historique profondément refondues → refonte conceptuelle, pas une adaptation syntaxique (Lab05 ✅ §4.11, Lab07 ✅ §4.13).
+- **Vérification des identifiants (2026-10-02)** : `GET …/openai/v1/models` avec `api-key` renvoie **401 même quand Chat Completions fonctionne** avec la même clé (constaté sur Lab09 : `curl` 401 / Entra 400, puis les deux voies ont réussi en exécution réelle). Ne pas conclure d'un `curl` sur `/models` : tester avec un appel chat (p. ex. Lab01 scénario 1) avant de déclarer les identifiants invalides. Les tests d'exécution de Lab07 et Lab08 restent à rejouer.
 - **Identifiants Azure OpenAI de l'environnement de migration (constaté le 2026-09-29)** : la clé API des variables `AzureOpenAI__*` renvoie `401 Access denied due to invalid subscription key` sur tous les chemins (v1 et `api-version`), et Entra ID (`az login`, même tenant, ressource présente et `Succeeded`, RP `Microsoft.CognitiveServices` enregistré, `disableLocalAuth = false`) renvoie `400 SubscriptionNotRegistered` — alors que les deux voies fonctionnaient le 2026-09-28 (Lab06). Cause hors dépôt (clé régénérée ? incident côté Azure ?) : à corriger avant tout test d'exécution (Lab07 §5 du rapport).
 - **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab12.
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
