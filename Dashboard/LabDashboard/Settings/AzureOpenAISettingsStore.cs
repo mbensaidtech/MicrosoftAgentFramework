@@ -26,8 +26,8 @@ public enum SettingSource
 
 public sealed record SettingStatus(string? DashboardValue, string? EffectiveValue, SettingSource Source, string EnvironmentVariable);
 
-/// <summary>Status of the API key. It never carries the key itself.</summary>
-public sealed record ApiKeyStatus(bool Stored, SettingSource Source, bool EnvironmentValueEmpty, string EnvironmentVariable);
+/// <summary>Status of the API key. It never carries the key itself: <see cref="Hint"/> is only the last 4 characters of the key in use.</summary>
+public sealed record ApiKeyStatus(bool Stored, SettingSource Source, bool EnvironmentValueEmpty, string EnvironmentVariable, string? Hint = null);
 
 public sealed record AzureOpenAISettingsStatus(
     string SecretsFile,
@@ -138,7 +138,8 @@ public sealed partial class AzureOpenAISettingsStore
                 : !string.IsNullOrWhiteSpace(storedKey) ? SettingSource.Dashboard
                 : SettingSource.Missing,
             EnvironmentValueEmpty: keyInEnvironment && string.IsNullOrWhiteSpace(environmentKey),
-            EnvironmentVariable: EnvironmentVariableName(ApiKeyName));
+            EnvironmentVariable: EnvironmentVariableName(ApiKeyName),
+            Hint: KeyHint(keyInEnvironment ? environmentKey : storedKey));
 
         // Same rule as the labs: a non-empty key means API key authentication, otherwise Microsoft Entra ID.
         bool usesApiKey = keyInEnvironment ? !string.IsNullOrWhiteSpace(environmentKey) : apiKey.Stored;
@@ -198,6 +199,25 @@ public sealed partial class AzureOpenAISettingsStore
 
     public Task RemoveApiKeyAsync() => UpdateAsync(secrets => Set(secrets, ApiKeyName, null));
 
+    /// <summary>
+    /// Reads another entry of the shared file (flat <c>"Section:Name"</c> or nested spelling), e.g. the workshop key of the reporting.
+    /// Null when absent or when the file is unreadable.
+    /// </summary>
+    public string? GetEntry(string section, string name)
+    {
+        try
+        {
+            return Get(ReadSecrets(), section, name) is { } value && !string.IsNullOrWhiteSpace(value) ? value : null;
+        }
+        catch (AzureOpenAISettingsStoreException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Writes (or removes, with null) another entry of the shared file, keeping everything else.</summary>
+    public Task SetEntryAsync(string section, string name, string? value) => UpdateAsync(secrets => Set(secrets, section, name, value));
+
     /// <summary>The API keys the labs may receive (stored and environment), to mask in the run output.</summary>
     public IReadOnlyList<string> SecretValues()
     {
@@ -239,6 +259,10 @@ public sealed partial class AzureOpenAISettingsStore
         deployment.Contains("YOUR-", StringComparison.OrdinalIgnoreCase) ? "placeholder"
         : DeploymentPattern().IsMatch(deployment) ? null
         : "invalid";
+
+    /// <summary>The last 4 characters of a key, enough to recognise it; nothing for a key too short to hide the rest.</summary>
+    internal static string? KeyHint(string? key) =>
+        key?.Trim() is { Length: >= Execution.SecretRedactor.MinimumSecretLength } trimmed ? trimmed[^4..] : null;
 
     internal static string? ValidateApiKey(string apiKey) =>
         apiKey.Any(char.IsWhiteSpace) ? "invalid"
@@ -385,27 +409,32 @@ public sealed partial class AzureOpenAISettingsStore
         }
     }
 
-    /// <summary>Reads a setting written flat (<c>"AzureOpenAI:Endpoint"</c>, as <c>dotnet user-secrets set</c> does) or nested.</summary>
-    private static string? Get(JsonObject root, string name)
+    private static string? Get(JsonObject root, string name) => Get(root, Section, name);
+
+    private static void Set(JsonObject root, string name, string? value) => Set(root, Section, name, value);
+
+    /// <summary>
+    /// Reads a setting written flat (<c>"AzureOpenAI:Endpoint"</c>, as <c>dotnet user-secrets set</c> does) or nested.
+    /// <paramref name="sectionPath"/> may itself contain ':' (e.g. <c>Dashboard:Reporting</c>): nested objects are walked level by level.
+    /// </summary>
+    private static string? Get(JsonObject root, string sectionPath, string name)
     {
         foreach ((string key, JsonNode? node) in root)
         {
-            if (key.Equals($"{Section}:{name}", StringComparison.OrdinalIgnoreCase))
+            if (key.Equals($"{sectionPath}:{name}", StringComparison.OrdinalIgnoreCase))
             {
                 return AsString(node);
             }
         }
 
-        foreach ((string key, JsonNode? node) in root)
+        JsonObject? section = FindSection(root, sectionPath);
+        if (section is not null)
         {
-            if (key.Equals(Section, StringComparison.OrdinalIgnoreCase) && node is JsonObject section)
+            foreach ((string childKey, JsonNode? child) in section)
             {
-                foreach ((string childKey, JsonNode? child) in section)
+                if (childKey.Equals(name, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (childKey.Equals(name, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return AsString(child);
-                    }
+                    return AsString(child);
                 }
             }
         }
@@ -414,32 +443,75 @@ public sealed partial class AzureOpenAISettingsStore
     }
 
     /// <summary>Removes every spelling of the setting, then writes it flat (null removes it). Other entries are kept.</summary>
-    private static void Set(JsonObject root, string name, string? value)
+    private static void Set(JsonObject root, string sectionPath, string name, string? value)
     {
-        foreach (string key in root.Select(p => p.Key).Where(k => k.Equals($"{Section}:{name}", StringComparison.OrdinalIgnoreCase)).ToArray())
+        foreach (string key in root.Select(p => p.Key).Where(k => k.Equals($"{sectionPath}:{name}", StringComparison.OrdinalIgnoreCase)).ToArray())
         {
             root.Remove(key);
         }
 
-        foreach (string sectionKey in root.Select(p => p.Key).Where(k => k.Equals(Section, StringComparison.OrdinalIgnoreCase)).ToArray())
+        if (FindSection(root, sectionPath) is { } section)
         {
-            if (root[sectionKey] is JsonObject section)
+            foreach (string key in section.Select(p => p.Key).Where(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray())
             {
-                foreach (string key in section.Select(p => p.Key).Where(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray())
-                {
-                    section.Remove(key);
-                }
-
-                if (section.Count == 0)
-                {
-                    root.Remove(sectionKey);
-                }
+                section.Remove(key);
             }
+
+            PruneEmptySections(root, sectionPath.Split(':'));
         }
 
         if (value is not null)
         {
-            root[$"{Section}:{name}"] = value;
+            root[$"{sectionPath}:{name}"] = value;
+        }
+    }
+
+    /// <summary>The nested object at <c>a:b:c</c> (each level matched case-insensitively), or null.</summary>
+    private static JsonObject? FindSection(JsonObject root, string sectionPath)
+    {
+        JsonObject current = root;
+        foreach (string part in sectionPath.Split(':'))
+        {
+            JsonObject? next = null;
+            foreach ((string key, JsonNode? node) in current)
+            {
+                if (key.Equals(part, StringComparison.OrdinalIgnoreCase) && node is JsonObject child)
+                {
+                    next = child;
+                    break;
+                }
+            }
+
+            if (next is null)
+            {
+                return null;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
+    /// <summary>Removes the objects of the path that became empty (deepest first); foreign entries are never touched.</summary>
+    private static void PruneEmptySections(JsonObject parent, string[] parts)
+    {
+        if (parts.Length == 0)
+        {
+            return;
+        }
+
+        string first = parts[0];
+        foreach (string key in parent.Select(p => p.Key).Where(k => k.Equals(first, StringComparison.OrdinalIgnoreCase)).ToArray())
+        {
+            if (parent[key] is JsonObject child)
+            {
+                PruneEmptySections(child, parts[1..]);
+                if (child.Count == 0)
+                {
+                    parent.Remove(key);
+                }
+            }
         }
     }
 

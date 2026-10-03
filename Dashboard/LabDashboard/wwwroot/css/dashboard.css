@@ -304,10 +304,54 @@ details.fig:not([open]) > summary { border-bottom: 0; }
 .field input[aria-invalid="true"] { border-color: var(--bad); }
 .field-hint, .field-source, .field-error { margin: 6px 0 0; font-size: 12px; color: var(--txt3); overflow-wrap: anywhere; }
 .field-source.dashboard { color: var(--ok); }
-.field-source.environment { color: var(--warn); }
+.field-source.environment { color: var(--txt2); }
 .field-error { color: var(--bad); }
 .notice-bad { color: var(--bad); background: var(--badbg); border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
 .dialog code { overflow-wrap: anywhere; }
+
+/* Settings: a side navigation (one tab per concern) next to the form; horizontal tabs on narrow screens. */
+.dialog-wide { width: min(880px, calc(100vw - 32px)); }
+/* Same height on every tab: switching tabs never makes the dialog jump. */
+.dialog-wide form { height: min(720px, calc(100vh - 48px)); }
+.dialog-head-ico { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--acc); background: var(--accbg); border: 1px solid color-mix(in srgb, var(--acc) 28%, var(--line)); }
+.settings-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; flex: 1; }
+.settings-nav { display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; border-right: 1px solid var(--line); background: var(--bg); }
+.settings-nav [role="tab"] { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 10px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--txt2); font: 13px var(--sans); cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.settings-nav [role="tab"]:hover { background: var(--panel2); color: var(--txt); }
+.settings-nav [role="tab"][aria-selected="true"] { background: var(--panel); border-color: var(--line2); color: var(--txt); }
+.settings-nav [role="tab"][aria-selected="true"]::before { content: ""; position: absolute; left: -1px; top: 9px; bottom: 9px; width: 2px; border-radius: 2px; background: var(--acc); }
+.settings-nav-ico { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 7px; background: var(--panel2); border: 1px solid var(--line); color: var(--txt3); }
+.settings-nav-ico .ico { width: 15px; height: 15px; }
+[aria-selected="true"] .settings-nav-ico { color: var(--acc); background: var(--accbg); border-color: color-mix(in srgb, var(--acc) 28%, var(--line)); }
+.settings-nav-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.settings-nav-title { font-weight: 600; }
+.settings-nav-meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.settings-nav-meta .status-dot { width: 6px; height: 6px; box-shadow: none; flex: none; }
+.settings-nav-alert { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px var(--badbg); }
+.settings-panels { padding: 18px 22px 8px; }
+.settings-panel { animation: fade .15s ease-out; }
+.panel-head h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.panel-head .hint { margin: 0 0 4px; }
+.field label { display: inline-flex; align-items: center; gap: 7px; }
+.field label .ico { color: var(--txt3); }
+.pill-machine { display: inline-flex; align-items: center; gap: 5px; color: var(--acc); background: var(--accbg); border-color: color-mix(in srgb, var(--acc) 30%, var(--line)); }
+.pill-machine::before { content: none; }
+.field input[readonly] { color: var(--txt2); background: var(--panel2); border-style: dashed; cursor: default; }
+.field input[readonly]:focus-visible { outline-color: var(--line2); border-color: var(--line2); }
+.status-card { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
+.status-card .status-dot { flex: none; }
+.dialog-foot-note { display: flex; align-items: center; gap: 7px; margin: 0 auto 0 0; font-size: 11.5px; color: var(--txt3); }
+.dialog-foot-note .ico { color: var(--ok); }
+.dialog-foot .btn-primary .ico { stroke-width: 2; }
+@media (max-width: 760px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; overflow-x: auto; }
+  .settings-nav [role="tab"] { width: auto; flex: 1; }
+  .settings-nav [role="tab"][aria-selected="true"]::before { left: 10px; right: 10px; top: auto; bottom: -1px; width: auto; height: 2px; }
+  .settings-nav-meta { display: none; }
+  .settings-panels { padding: 16px 16px 6px; }
+    .dialog-foot-note { display: none; }
+}
 
 /* ---------- Toast, spinner ---------- */
 #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 8px); z-index: 99; max-width: 90vw; background: var(--txt); color: var(--bg); font-size: 12.5px; padding: 8px 14px; border-radius: 7px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: 0 4px 16px var(--shade2); }
@@ -356,4 +400,39 @@ details.fig:not([open]) > summary { border-bottom: 0; }
 }
 @media (max-width: 480px) {
   .status-chip { display: none; }
+}
+
+/* ---------- Reporting to the admin dashboard, help request ---------- */
+.reporting-chip { cursor: default; }
+.reporting-chip.connected { color: var(--txt2); }
+.reporting-chip.offline, .reporting-chip.registering { color: var(--warn); }
+.reporting-chip.rejected { color: var(--bad); }
+.btn-help { border-color: color-mix(in srgb, var(--warn) 45%, var(--line2)); color: var(--warn); }
+.btn-help:hover:not(:disabled) { color: var(--warn); background: var(--warnbg); }
+.btn-help.active { background: var(--warnbg); }
+.hero-row { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.hero-row h1 { flex: 1 1 auto; min-width: 0; }
+.hero-help { margin-top: 8px; }
+.help-banner { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 11px 16px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-left: 3px solid var(--warn); border-radius: var(--radius); background: linear-gradient(90deg, var(--warnbg), var(--panel) 55%); animation: rise .3s ease both; }
+.help-banner .ico { width: 18px; height: 18px; color: var(--warn); }
+.help-banner.acknowledged { border-color: color-mix(in srgb, var(--acc) 40%, var(--line)); border-left-color: var(--acc); background: linear-gradient(90deg, var(--accbg), var(--panel) 55%); }
+.help-banner.acknowledged .ico { color: var(--acc); }
+.help-banner.resolved { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); border-left-color: var(--ok); background: linear-gradient(90deg, var(--okbg), var(--panel) 55%); }
+.help-banner.resolved .ico { color: var(--ok); }
+.help-banner.cancelled, .help-banner.error { border-color: var(--line2); border-left-color: var(--txt3); background: var(--panel); }
+.help-banner.error { border-left-color: var(--bad); }
+.help-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.help-banner-text b { font-weight: 600; color: var(--txt); }
+.help-banner-text span { color: var(--txt3); font-size: 12.5px; overflow-wrap: anywhere; }
+.dialog-sm { width: min(480px, calc(100vw - 32px)); }
+.settings-section { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.settings-section h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.field select, .field textarea { width: 100%; font: 13px var(--sans); color: var(--txt); background: var(--bg); border: 1px solid var(--line2); border-radius: var(--radius-sm); padding: 8px 10px; }
+.field textarea { resize: vertical; min-height: 72px; font-family: var(--sans); }
+.field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }
+.field textarea[aria-invalid="true"] { border-color: var(--bad); }
+@media (max-width: 760px) {
+  #help-button-label { display: none; }
+  .help-banner { flex-wrap: wrap; }
+  .help-banner .btns { width: 100%; margin-left: 0; }
 }

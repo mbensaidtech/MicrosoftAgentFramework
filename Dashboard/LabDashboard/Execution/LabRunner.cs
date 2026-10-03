@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using LabDashboard.Catalog;
 using LabDashboard.History;
+using LabDashboard.Reporting;
 using LabDashboard.Settings;
 
 namespace LabDashboard.Execution;
@@ -17,7 +18,8 @@ public sealed class LabRunner(
     RunHistoryStore history,
     AzureOpenAISettingsStore settings,
     DashboardOptions options,
-    ILogger<LabRunner> logger)
+    ILogger<LabRunner> logger,
+    ReportingClient? reporting = null)
 {
     private const int MaxLogLines = 2000;
     private const int KeptRuns = 20;
@@ -57,6 +59,8 @@ public sealed class LabRunner(
         }
 
         LabRun started = run;
+        // Reporting only enqueues: a slow or absent admin dashboard never delays the run.
+        reporting?.RunStarted(started);
         _ = Task.Run(() => ExecuteAsync(started));
         return true;
     }
@@ -108,6 +112,8 @@ public sealed class LabRunner(
         }
         finally
         {
+            // After the record is in the history (the snapshot that follows the event reads it), before the browser sees the result.
+            reporting?.RunFinished(record);
             run.Complete(record);
         }
     }

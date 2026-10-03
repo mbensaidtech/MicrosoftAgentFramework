@@ -31,6 +31,7 @@ const state = {
   eventSource: null, clockTimer: null, runId: null, runTarget: null,
   record: null, recordIsHistory: false, target: "start",
   settings: null,
+  reporting: null, reportingTimer: null, helpBusy: false,
 };
 
 // ---------- helpers ----------
@@ -136,6 +137,7 @@ async function applyLanguage(lang) {
   document.querySelectorAll("#lang-switch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
   translateTree(document);
   renderConfigChip();
+  renderReporting();
   if (document.getElementById("settings").open) renderSettings();
   renderRail();
   if (!state.view || !state.details) return;
@@ -208,7 +210,9 @@ async function selectLab(id) {
   wireInput(main);
   resetInput();
   wireSolution(main);
-  main.querySelector('[data-action="open-settings"]').addEventListener("click", openSettings);
+  main.querySelector('[data-action="open-settings"]').addEventListener("click", () => openSettings("azure"));
+  main.querySelector('[data-action="help"]').addEventListener("click", openHelp);
+  renderHelpButtons();
 
   const lab = state.details.lab;
   if (lab.activeRunId) {
@@ -713,11 +717,14 @@ function renderTokens(container, usage) {
   container.replaceChildren(totals, table, el("p", "hint", `${t("tokens.source")} ${t("tokens.cost")}`));
 }
 
-// ---------- Azure OpenAI settings (shared by the labs; the API key is write-only) ----------
+// ---------- Settings: Azure OpenAI (shared by the labs; the API key is write-only) and Workshop (reporting identity) ----------
 const settingsFields = [
-  { key: "endpoint", input: "set-endpoint", source: "src-endpoint", error: "err-endpoint" },
-  { key: "chatDeploymentName", input: "set-deployment", source: "src-deployment", error: "err-deployment" },
+  { key: "endpoint", input: "set-endpoint", source: "src-endpoint", error: "err-endpoint", machine: "machine-endpoint" },
+  { key: "chatDeploymentName", input: "set-deployment", source: "src-deployment", error: "err-deployment", machine: "machine-deployment" },
 ];
+
+/** A key is never sent to the page: only its last 4 characters, shown behind a mask. */
+const maskedKey = (hint) => `••••••••${hint ?? ""}`;
 
 async function loadSettings() {
   try {
@@ -768,7 +775,55 @@ function setFieldError(errorId, inputId, code) {
 function clearSettingsErrors() {
   for (const field of settingsFields) setFieldError(field.error, field.input, null);
   setFieldError("err-apikey", "set-apikey", null);
+  for (const field of reportingFields) setReportingFieldError(field.error, field.input, null);
   document.getElementById("settings-store-error").hidden = true;
+  markSettingsTabErrors();
+}
+
+const settingsTabs = ["azure", "workshop"];
+
+/** Shows one tab of the settings dialog (roving tabindex), optionally focusing its first field. */
+function selectSettingsTab(name, { focusField = false } = {}) {
+  for (const tab of settingsTabs) {
+    const selected = tab === name;
+    const button = document.getElementById(`settings-tab-${tab}`);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    document.getElementById(`settings-panel-${tab}`).hidden = !selected;
+  }
+  if (focusField) document.querySelector(`#settings-panel-${name} input`)?.focus();
+}
+
+/** A red mark on each tab holding a field in error; switches to the first such tab so the error is visible. */
+function markSettingsTabErrors({ reveal = false } = {}) {
+  let first = null;
+  for (const tab of settingsTabs) {
+    const failing = !!document.querySelector(`#settings-panel-${tab} [aria-invalid="true"]`);
+    document.getElementById(`settings-nav-${tab}-alert`).hidden = !failing;
+    if (failing && !first) first = tab;
+  }
+  if (reveal && first) {
+    selectSettingsTab(first);
+    document.querySelector(`#settings-panel-${first} [aria-invalid="true"]`)?.focus();
+  }
+}
+
+/** The one-line state under each tab name: authentication mode, and reporting state. */
+function renderSettingsNav() {
+  const { kind, dot } = configState(state.settings);
+  document.getElementById("settings-nav-azure-dot").className = `status-dot ${dot}`;
+  document.getElementById("settings-nav-azure-state").textContent = t(`config.${kind}`);
+
+  const status = state.reporting;
+  const workshop = !status ? { key: "unknown", dot: "" }
+    : status.standalone ? { key: "standalone", dot: "" }
+    : !status.enabled ? { key: "notJoined", dot: "" }
+    : status.state === "connected" ? { key: "connected", dot: "ok" }
+    : status.state === "rejected" ? { key: "rejected", dot: "ko" }
+    : { key: "pending", dot: "warn" };
+  document.getElementById("settings-nav-workshop-dot").className = `status-dot ${workshop.dot}`;
+  document.getElementById("settings-nav-workshop-state").textContent = t(`settings.workshopState.${workshop.key}`, { username: status?.username ?? "" });
+  document.getElementById("reporting-settings-dot").className = `status-dot ${workshop.dot}`;
 }
 
 /** Renders the status; fills the inputs only when asked, so that a language switch keeps what the user typed. */
@@ -778,7 +833,12 @@ function renderSettings({ fill = false } = {}) {
 
   for (const field of settingsFields) {
     const status = settings[field.key];
-    if (fill) document.getElementById(field.input).value = status.dashboardValue ?? "";
+    // Set on this computer (AzureOpenAI__* variable): shown as the labs see it, read-only, since that value wins over the form.
+    const onComputer = status.source === "environment";
+    const input = document.getElementById(field.input);
+    if (fill) input.value = (onComputer ? status.effectiveValue : status.dashboardValue) ?? "";
+    input.readOnly = onComputer;
+    document.getElementById(field.machine).hidden = !onComputer;
     const source = document.getElementById(field.source);
     source.className = `field-source ${status.source}`;
     source.textContent = sourceText(field, status);
@@ -786,16 +846,23 @@ function renderSettings({ fill = false } = {}) {
 
   const apiKey = settings.apiKey;
   const keyInput = document.getElementById("set-apikey");
+  const keyOnComputer = apiKey.source === "environment";
   if (fill) keyInput.value = "";
-  keyInput.placeholder = apiKey.stored ? t("settings.apiKeyKeep") : t("settings.apiKeyOptional");
-  document.getElementById("apikey-stored").hidden = !apiKey.stored;
-  document.querySelector('[data-action="remove-key"]').hidden = !apiKey.stored;
+  keyInput.readOnly = keyOnComputer;
+  keyInput.placeholder = keyOnComputer
+    ? (apiKey.environmentValueEmpty ? t("settings.apiKeyOnComputerEmpty") : maskedKey(apiKey.hint))
+    : apiKey.stored ? t("settings.apiKeyKeep", { masked: maskedKey(apiKey.hint) }) : t("settings.apiKeyOptional");
+  document.getElementById("machine-apikey").hidden = !keyOnComputer;
+  document.getElementById("hint-apikey").hidden = keyOnComputer;
+  document.getElementById("apikey-stored").hidden = !apiKey.stored || keyOnComputer;
+  document.querySelector('[data-action="remove-key"]').hidden = !apiKey.stored || keyOnComputer;
   const keySource = document.getElementById("src-apikey");
   keySource.className = `field-source ${apiKey.source}`;
   keySource.textContent = apiKeySourceText(apiKey);
 
-  document.getElementById("settings-file").textContent = settings.secretsFile;
   showStoreError(settings.storeError);
+  renderReportingSettings({ fill });
+  renderSettingsNav();
 }
 
 function showStoreError(code) {
@@ -804,17 +871,20 @@ function showStoreError(code) {
   node.textContent = code ? t(`settings.store.${code}`, { file: state.settings?.secretsFile ?? "" }) : "";
 }
 
-async function openSettings() {
-  await loadSettings();
+/** Opens the settings on a tab: "azure" (the labs' Azure OpenAI values) or "workshop" (username and workshop key). */
+async function openSettings(tab = "azure") {
+  await Promise.all([loadSettings(), loadReportingStatus()]);
   clearSettingsErrors();
   renderSettings({ fill: true });
+  selectSettingsTab(settingsTabs.includes(tab) ? tab : "azure");
   document.getElementById("settings").showModal();
-  document.getElementById("set-endpoint").focus();
+  selectSettingsTab(settingsTabs.includes(tab) ? tab : "azure", { focusField: true });
 }
 
 function closeSettings() {
-  // Never keep the key in the page once the dialog is closed.
+  // Never keep the keys in the page once the dialog is closed.
   document.getElementById("set-apikey").value = "";
+  document.getElementById("rep-key").value = "";
   document.getElementById("settings").close();
 }
 
@@ -840,9 +910,33 @@ function applySettingsResponse({ ok, status, payload }) {
 
 function wireSettings() {
   const dialog = document.getElementById("settings");
-  document.getElementById("config-chip").addEventListener("click", openSettings);
+  document.getElementById("config-chip").addEventListener("click", () => openSettings("azure"));
+  const reportingChip = document.getElementById("reporting-chip");
+  reportingChip.addEventListener("click", () => openSettings("workshop"));
+  reportingChip.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openSettings("workshop"); }
+  });
+
+  const nav = dialog.querySelector(".settings-nav");
+  nav.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-settings-tab]");
+    if (tab) selectSettingsTab(tab.dataset.settingsTab);
+  });
+  nav.addEventListener("keydown", (event) => {
+    const current = settingsTabs.indexOf(document.activeElement?.dataset?.settingsTab);
+    if (current < 0) return;
+    const moves = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+    let next = null;
+    if (event.key in moves) next = (current + moves[event.key] + settingsTabs.length) % settingsTabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = settingsTabs.length - 1;
+    if (next === null) return;
+    event.preventDefault();
+    selectSettingsTab(settingsTabs[next]);
+    document.getElementById(`settings-tab-${settingsTabs[next]}`).focus();
+  });
   dialog.querySelectorAll('[data-action="close-settings"]').forEach((b) => b.addEventListener("click", closeSettings));
-  dialog.addEventListener("cancel", () => { document.getElementById("set-apikey").value = ""; });
+  dialog.addEventListener("cancel", () => { document.getElementById("set-apikey").value = ""; document.getElementById("rep-key").value = ""; });
 
   document.getElementById("settings-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -850,14 +944,25 @@ function wireSettings() {
     const submit = event.submitter ?? dialog.querySelector('[type="submit"]');
     submit.disabled = true;
     try {
+      // A read-only field shows a value set on this computer: send back what was saved here, never copy the computer's value.
+      const formValue = (id, key) => {
+        const input = document.getElementById(id);
+        return input.readOnly ? (state.settings?.[key]?.dashboardValue ?? "") : input.value;
+      };
+      const keyInput = document.getElementById("set-apikey");
       const response = await api.send("PUT", "/settings/azure-openai", {
-        endpoint: document.getElementById("set-endpoint").value,
-        chatDeploymentName: document.getElementById("set-deployment").value,
-        apiKey: document.getElementById("set-apikey").value,
+        endpoint: formValue("set-endpoint", "endpoint"),
+        chatDeploymentName: formValue("set-deployment", "chatDeploymentName"),
+        apiKey: keyInput.readOnly ? "" : keyInput.value,
       });
-      if (applySettingsResponse(response)) {
+      const azureOk = applySettingsResponse(response);
+      const reportingOk = await submitReportingSettings();
+      if (azureOk && reportingOk) {
         renderSettings({ fill: true });
         toast(t("settings.saved"));
+      } else {
+        markSettingsTabErrors({ reveal: true });
+        renderSettingsNav();
       }
     } finally {
       submit.disabled = false;
@@ -883,15 +988,335 @@ function wireSettings() {
   storage.remove("labbench.theme"); // the dashboard has a single (dark) theme
   wireChrome();
   wireSettings();
+  wireReporting();
   setServer("connecting");
 
   try {
     await loadSettings();
     await refreshLabs();
     setServer("connected");
+    await loadReportingStatus();
+    if (state.reporting?.needsIdentity) openWelcome();
     if (state.labs.length) await selectLab(state.labs[0].id);
   } catch (error) {
     setServer("unreachable");
     document.getElementById("lab-view").replaceChildren(el("p", "placeholder", t("boot.error", { message: error.message })));
   }
 })();
+
+// ---------- Reporting to the trainer's admin dashboard (identity, status, help) ----------
+const reportingFields = [
+  { key: "username", input: "rep-username", error: "err-rep-username" },
+  { key: "workshopKey", input: "rep-key", error: "err-rep-key" },
+];
+
+const helpHelpers = {
+  relative(iso) {
+    const minutes = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (minutes < 1) return language() === "fr" ? "à l'instant" : "just now";
+    const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
+    return minutes < 60 ? rtf.format(-minutes, "minute") : rtf.format(-Math.round(minutes / 60), "hour");
+  },
+  labTitle(labId) {
+    const lab = state.labs.find((l) => l.id === labId);
+    return lab ? `${t("lab.kicker", { number: lab.number })} · ${labText(lab, "title")}` : labId;
+  },
+};
+
+async function loadReportingStatus() {
+  try {
+    state.reporting = await api.get("/reporting/status");
+  } catch {
+    state.reporting = null;
+  }
+  renderReporting();
+  scheduleReportingPoll();
+}
+
+/** The status (connection, outbox, help request) is local and cheap: poll it while reporting is on, faster while a help request is active. */
+function scheduleReportingPoll() {
+  clearTimeout(state.reportingTimer);
+  if (!state.reporting?.enabled) return;
+  const activeHelp = state.reporting.help && !["resolved", "cancelled"].includes(state.reporting.help.status);
+  const delay = state.reporting.state === "registering" ? 2000 : activeHelp ? 5000 : 10000;
+  state.reportingTimer = setTimeout(loadReportingStatus, delay);
+}
+
+function reportingErrorText(code) {
+  const key = `reporting.error.${code}`;
+  return code && t(key) !== key ? t(key) : (code ?? "");
+}
+
+function renderReporting() {
+  const status = state.reporting;
+  const chip = document.getElementById("reporting-chip");
+  const enabled = !!status?.enabled;
+  chip.hidden = !enabled;
+  if (enabled) {
+    const kind = status.state;
+    chip.className = `status-chip reporting-chip ${kind}`;
+    document.getElementById("reporting-dot").className = `status-dot ${kind === "connected" ? "ok" : kind === "rejected" ? "ko" : "warn"}`;
+    document.getElementById("reporting-state").textContent = t(`reporting.${kind}`);
+    const params = { host: status.serverHost, username: status.username ?? "—", count: status.outboxCount, reason: reportingErrorText(status.lastError) };
+    chip.title = kind === "rejected" ? t("reporting.chipTitleRejected", params)
+      : kind === "connected" ? t("reporting.chipTitle", params)
+      : kind === "registering" ? t("reporting.chipTitleRegistering", params)
+      : t("reporting.chipTitleOffline", params);
+    chip.setAttribute("aria-label", chip.title);
+  }
+  renderHelpButtons();
+  renderHelpBanner();
+  if (document.getElementById("settings").open) renderSettingsNav();
+}
+
+function renderHelpButtons() {
+  const status = state.reporting;
+  const show = !!status?.enabled && !status.needsIdentity;
+  const active = !!status?.help && ["pending", "open", "acknowledged"].includes(status.help.status);
+  for (const button of [document.getElementById("help-button"), state.view?.querySelector('[data-action="help"]')].filter(Boolean)) {
+    button.hidden = !show;
+    button.classList.toggle("active", active);
+    button.querySelector("span").textContent = t(active ? "help.buttonActive" : "help.button");
+    button.setAttribute("aria-pressed", String(active));
+  }
+}
+
+function renderHelpBanner() {
+  const help = state.reporting?.help;
+  const banner = document.getElementById("help-banner");
+  if (!help) { banner.hidden = true; return; }
+
+  // A closed request stays visible for 5 minutes, then goes away by itself.
+  if ((help.status === "resolved" || help.status === "cancelled") && help.closedAt && Date.now() - new Date(help.closedAt) > 5 * 60000) {
+    banner.hidden = true;
+    api.post("/help/dismiss").then(() => loadReportingStatus()).catch(() => {});
+    return;
+  }
+
+  const lab = help.labId ? t("help.forLab", { lab: helpHelpers.labTitle(help.labId) }) : "";
+  const title = document.getElementById("help-banner-title");
+  const detail = document.getElementById("help-banner-detail");
+  let kind = help.status;
+  switch (help.status) {
+    case "pending":
+      title.textContent = t("help.pendingTitle");
+      detail.textContent = t("help.pendingDetail");
+      break;
+    case "open":
+      title.textContent = t("help.openTitle");
+      detail.textContent = t("help.openDetail", { time: helpHelpers.relative(help.createdAt), lab });
+      break;
+    case "acknowledged":
+      title.textContent = t("help.acknowledgedTitle");
+      detail.textContent = t("help.acknowledgedDetail", { lab });
+      break;
+    case "resolved":
+      title.textContent = t("help.resolvedTitle");
+      detail.textContent = help.adminNote ? t("help.resolvedNote", { note: help.adminNote }) : t("help.resolvedDetail");
+      break;
+    default:
+      kind = "cancelled";
+      title.textContent = t("help.cancelledTitle");
+      detail.textContent = t("help.cancelledDetail");
+  }
+  banner.className = `help-banner ${kind}`;
+  const active = ["pending", "open", "acknowledged"].includes(help.status);
+  document.getElementById("help-unblocked").hidden = !active;
+  document.getElementById("help-dismiss").hidden = active;
+  banner.hidden = false;
+}
+
+// --- welcome (first launch): join the workshop, or work on your own ---
+function openWelcome() {
+  const status = state.reporting;
+  const dialog = document.getElementById("welcome");
+  // The admin URL comes from the project configuration: shown, never edited. Without it, only "work on my own" is possible.
+  document.getElementById("welcome-server").textContent = status.serverUrl ? t("welcome.server", { url: status.serverUrl }) : "";
+  document.getElementById("welcome-no-server").hidden = !!status.serverUrl;
+  dialog.querySelector('[type="submit"]').hidden = !status.serverUrl;
+  document.getElementById("wel-key-field").hidden = status.workshopKeyConfigured;
+  if (!dialog.open) dialog.showModal();
+  document.getElementById("wel-username").focus();
+}
+
+function setReportingFieldError(errorId, inputId, code) {
+  const node = document.getElementById(errorId);
+  node.hidden = !code;
+  node.textContent = code ? t(`reporting.error.${code}`) : "";
+  document.getElementById(inputId).setAttribute("aria-invalid", String(Boolean(code)));
+}
+
+function showReportingErrors(prefix, errors) {
+  const ids = { username: [`err-${prefix}-username`, `${prefix}-username`], workshopKey: [`err-${prefix}-key`, `${prefix}-key`] };
+  for (const [field, code] of Object.entries(errors ?? {})) {
+    if (ids[field]) setReportingFieldError(ids[field][0], ids[field][1], `${field}.${code}`);
+    else if (field === "serverUrl") toast(t("welcome.noServer"));
+  }
+}
+
+// --- settings section ---
+function renderReportingSettings({ fill = false } = {}) {
+  const status = state.reporting;
+  if (!status) return;
+  const summary = document.getElementById("reporting-settings-status");
+  summary.textContent = status.standalone ? t("reporting.statusStandalone")
+    : !status.enabled ? t("reporting.statusDisabled")
+    : t("reporting.statusEnabled", { host: status.serverHost, username: status.username, id: status.userId.slice(0, 8) })
+      + (status.state === "rejected" && status.lastError ? ` ${t("reporting.statusProblem", { reason: reportingErrorText(status.lastError) })}` : "");
+
+  if (fill) {
+    document.getElementById("rep-username").value = status.username ?? "";
+    document.getElementById("rep-key").value = "";
+  }
+
+  document.getElementById("rep-key-stored").hidden = !status.workshopKeyConfigured;
+  const key = document.getElementById("src-rep-key");
+  key.className = `field-source ${status.workshopKeySource}`;
+  key.textContent = status.workshopKeySource === "environment" ? t("reporting.keyEnvironment", { variable: "Dashboard__Reporting__WorkshopKey" })
+    : status.workshopKeySource === "dashboard" ? t("reporting.keyDashboard")
+    : status.workshopKeySource === "appsettings" ? t("reporting.keyAppsettings")
+    : t("reporting.keyMissing");
+}
+
+/** Sends the reporting fields of the settings dialog when at least one was filled. Returns true when nothing failed. */
+async function submitReportingSettings() {
+  const values = {
+    username: document.getElementById("rep-username").value.trim(),
+    workshopKey: document.getElementById("rep-key").value,
+  };
+  const unchanged = values.username === (state.reporting?.username ?? "") && !values.workshopKey;
+  if (unchanged) return true;
+
+  const response = await api.send("PUT", "/reporting/settings", values);
+  document.getElementById("rep-key").value = "";
+  if (response.ok) {
+    state.reporting = response.payload;
+    renderReporting();
+    scheduleReportingPoll();
+    toast(t("reporting.saved"));
+    return true;
+  }
+  if (response.status === 400 && response.payload.errors) showReportingErrors("rep", response.payload.errors);
+  else if (response.payload.error) showStoreError(response.payload.error);
+  else toast(t("settings.saveError", { status: response.status }));
+  return false;
+}
+
+// --- help dialog ---
+function openHelp() {
+  const status = state.reporting;
+  if (!status?.enabled) { toast(t("help.error.disabled")); return; }
+  if (status.needsIdentity) { openWelcome(); return; }
+  if (status.help && ["pending", "open", "acknowledged"].includes(status.help.status)) {
+    document.getElementById("help-banner").scrollIntoView({ block: "nearest" });
+    return;
+  }
+
+  const select = document.getElementById("help-lab");
+  select.replaceChildren(
+    el("option", null, t("help.noLab")),
+    ...state.labs.map((lab) => el("option", null, `${t("lab.kicker", { number: lab.number })} · ${labText(lab, "title")}`)));
+  select.options[0].value = "";
+  state.labs.forEach((lab, index) => { select.options[index + 1].value = lab.id; });
+  select.value = state.currentId ?? "";
+  document.getElementById("help-message").value = "";
+  setHelpError(null);
+  document.getElementById("help-dialog").showModal();
+  document.getElementById("help-message").focus();
+}
+
+function setHelpError(message) {
+  const node = document.getElementById("err-help-message");
+  node.hidden = !message;
+  node.textContent = message ?? "";
+  document.getElementById("help-message").setAttribute("aria-invalid", String(!!message));
+}
+
+function wireReporting() {
+  document.getElementById("help-button").addEventListener("click", openHelp);
+  const helpDialog = document.getElementById("help-dialog");
+  helpDialog.querySelectorAll('[data-action="close-help"]').forEach((b) => b.addEventListener("click", () => helpDialog.close()));
+
+  document.getElementById("help-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (state.helpBusy) return;
+    const message = document.getElementById("help-message").value.trim();
+    if (message.length > 500) return setHelpError(t("help.error.message.tooLong"));
+    state.helpBusy = true;
+    try {
+      const response = await api.post("/help", { labId: document.getElementById("help-lab").value || null, message: message || null });
+      if (!response.ok) {
+        const code = response.payload?.error;
+        if (response.status === 400 && response.payload?.errors?.message) return setHelpError(t(`help.error.message.${response.payload.errors.message}`));
+        if (code === "active") { helpDialog.close(); await loadReportingStatus(); return; }
+        return setHelpError(code && t(`help.error.${code}`) !== `help.error.${code}` ? t(`help.error.${code}`) : t("help.error.other", { status: response.status }));
+      }
+      helpDialog.close();
+      toast(response.payload.status === "pending" ? t("help.queued") : t("help.sent"));
+      await loadReportingStatus();
+    } finally {
+      state.helpBusy = false;
+    }
+  });
+
+  document.getElementById("help-unblocked").addEventListener("click", async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      await api.post("/help/cancel");
+      toast(t("help.cancelled"));
+      await loadReportingStatus();
+    } finally {
+      event.currentTarget.disabled = false;
+    }
+  });
+
+  document.getElementById("help-dismiss").addEventListener("click", async () => {
+    await api.post("/help/dismiss");
+    await loadReportingStatus();
+  });
+
+  // Welcome: blocking (Escape does nothing) until the developer joins the workshop or chooses to work alone.
+  const welcome = document.getElementById("welcome");
+  welcome.addEventListener("cancel", (event) => event.preventDefault());
+  document.getElementById("welcome-skip").addEventListener("click", async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      const response = await api.post("/identity/skip");
+      if (response.ok) {
+        state.reporting = response.payload;
+        welcome.close();
+        renderReporting();
+        toast(t("welcome.skipped"));
+      } else {
+        toast(t("settings.saveError", { status: response.status }));
+      }
+    } finally {
+      document.getElementById("welcome-skip").disabled = false;
+    }
+  });
+  document.getElementById("welcome-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    for (const [error, input] of [["err-wel-username", "wel-username"], ["err-wel-key", "wel-key"]]) setReportingFieldError(error, input, null);
+    const submit = event.submitter ?? welcome.querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      const response = await api.post("/identity", {
+        username: document.getElementById("wel-username").value.trim(),
+        workshopKey: document.getElementById("wel-key-field").hidden ? null : document.getElementById("wel-key").value,
+      });
+      if (response.ok) {
+        document.getElementById("wel-key").value = "";
+        state.reporting = response.payload;
+        welcome.close();
+        renderReporting();
+        scheduleReportingPoll();
+      } else if (response.status === 400 && response.payload.errors) {
+        showReportingErrors("wel", response.payload.errors);
+      } else {
+        toast(t("settings.saveError", { status: response.status }));
+      }
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}

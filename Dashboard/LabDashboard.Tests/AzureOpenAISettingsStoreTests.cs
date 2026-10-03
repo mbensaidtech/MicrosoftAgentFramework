@@ -121,6 +121,23 @@ public sealed class AzureOpenAISettingsStoreTests : IDisposable
         Assert.Equal("entraId", status.Authentication); // an empty variable hides the stored key from the labs
     }
 
+    [Fact]
+    public async Task The_status_shows_only_the_last_four_characters_of_the_key_in_use()
+    {
+        AzureOpenAISettingsStore store = Store();
+        await store.SaveAsync(new("https://my-resource.openai.azure.com/", "gpt-4o-mini", Key));
+        Assert.Equal(Key[^4..], store.GetStatus().ApiKey.Hint);
+
+        // A key set on the computer is the one the labs use: its last characters are shown, never the key.
+        _environment["AzureOpenAI__APIKey"] = "env-key-0123456789-wxyz";
+        AzureOpenAISettingsStatus status = store.GetStatus();
+        Assert.Equal("wxyz", status.ApiKey.Hint);
+        Assert.DoesNotContain("env-key-0123456789", System.Text.Json.JsonSerializer.Serialize(status));
+
+        _environment["AzureOpenAI__APIKey"] = "";
+        Assert.Null(store.GetStatus().ApiKey.Hint);
+    }
+
     [Theory]
     [InlineData("http://my-resource.openai.azure.com/", null, null, "endpoint", "invalid")]
     [InlineData("my-resource.openai.azure.com", null, null, "endpoint", "invalid")]

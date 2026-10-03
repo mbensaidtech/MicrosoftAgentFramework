@@ -46,7 +46,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07** and **AzureOpenAI/Lab08**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08** and **AzureOpenAI/Lab09**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,11 +57,11 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
-| Interactive labs (`Console.ReadLine`) | Supported (keyboard) | Supported for labs declared interactive: an input box asks for each value |
+| Interactive labs (`Console.ReadLine`) | Supported (keyboard) | Supported for labs declared interactive (Lab09): an input box asks for each value |
 | Best for | Every lab, debugging, IDE workflow | Getting started, quick feedback on the migrated labs |
 
 Whichever you choose, **configure Azure OpenAI once first**: the configuration is shared by every lab and by both options.
@@ -218,12 +218,20 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab08): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab09): run the other labs with the CLI.
+- Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
 
 More details (architecture, HTTP API, security, registering a new lab, tests): [Dashboard/README.md](Dashboard/README.md).
+
+#### Optional: report your progress to the trainer's admin dashboard
+
+In a workshop, the trainer may host the **Admin Dashboard** (a separate Next.js + MongoDB application, kept in its own repository) and give you its URL and a workshop key.
+Set them once (`Dashboard:Reporting:ServerUrl` and `Dashboard:Reporting:WorkshopKey`, see [Reporting to the admin dashboard](Dashboard/README.md#reporting-to-the-admin-dashboard)), choose a username at the first launch, and your Lab Bench reports which labs you run and finish, plus a **Help / Je suis bloqué** button that the trainer sees in real time.
+Nothing is reported when `ServerUrl` is empty (the default), and never your code, your API key or your console output.
+The API contract between the two applications is described in [specs/admin-dashboard-progress-tracking/spec.md](specs/admin-dashboard-progress-tracking/spec.md).
 
 ---
 
@@ -348,13 +356,14 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 09 - AI Agent with Human Approval
+### Lab 09 - AI Agent with Function Tools and Human Approval
 
-**Learn how to implement human-in-the-loop patterns for sensitive operations**
+**Learn how to make an agent pause before a sensitive tool runs (human-in-the-loop): `ApprovalRequiredAIFunction`, `ToolApprovalRequestContent`, `CreateResponse` and the same `AgentSession`**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Function tools with human approval workflow |
+| Scenario 1 | Human approval at the console: the run pauses with an approval request (function + arguments), you reply Y or N, the agent continues in the same session; tool result and token usage of the whole flow displayed |
+| Scenario 2 | Several approval requests decided by a policy: a harmless tool runs without approval, each sensitive call is approved or rejected with a reason by code (`CreateResponse(approved, reason)`), and the rejection the model received is shown |
 
 ---
 

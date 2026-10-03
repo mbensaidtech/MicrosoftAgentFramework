@@ -46,3 +46,6 @@ Dashboard/.data/
 # Local working files - never versioned
 **/Analyse-*-agent-framework-samples.md
 **/disco-architecture.html
+
+# Lab dashboard - project secrets kept out of the public repository (admin API key)
+Dashboard/LabDashboard/appsettings.Local.json

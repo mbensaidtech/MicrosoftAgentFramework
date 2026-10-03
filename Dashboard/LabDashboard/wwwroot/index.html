@@ -27,6 +27,16 @@
     <symbol id="i-x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></symbol>
     <symbol id="i-terminal" viewBox="0 0 16 16"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><path d="M4.5 6.5l2 1.8-2 1.8M8.5 10.3h3"/></symbol>
     <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.2" y="7" width="9.6" height="6.8" rx="1.4"/><path d="M5.3 7V5.3a2.7 2.7 0 0 1 5.4 0V7"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 16 16"><path d="M5 8.5V3.6a1.1 1.1 0 0 1 2.2 0V7M7.2 7V2.6a1.1 1.1 0 0 1 2.2 0V7M9.4 7V3.6a1.1 1.1 0 0 1 2.2 0v4.6M11.6 8.2V6.4a1.1 1.1 0 0 1 2.2 0v3.4c0 2.6-1.9 4.4-4.4 4.4H8.6c-1.5 0-2.6-.6-3.4-1.8L2.6 8.6a1.1 1.1 0 0 1 1.9-1.1L5 8.5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.6 12.8h7a2.9 2.9 0 0 0 .5-5.76A4 4 0 0 0 4.4 6.3a3.25 3.25 0 0 0 .2 6.5z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.4" r="2.7"/><path d="M2.8 13.8c.6-2.5 2.7-4 5.2-4s4.6 1.5 5.2 4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5.3" cy="10.7" r="2.8"/><path d="M7.3 8.7l6-6M11.2 4.8l1.6 1.6M9.6 6.4l1.2 1.2"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.7 1.7 2.5 3.7 2.5 6S9.7 12.3 8 14C6.3 12.3 5.5 10.3 5.5 8S6.3 3.7 8 2z"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 16 16"><path d="M8 1.9l5.4 3v6.2L8 14.1l-5.4-3V4.9z"/><path d="M2.6 4.9L8 8l5.4-3.1M8 8v6.1"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 16 16"><path d="M2 4.8c0-.4.3-.8.8-.8h10.4c.5 0 .8.4.8.8v1.6a1.6 1.6 0 0 0 0 3.2v1.6c0 .4-.3.8-.8.8H2.8c-.5 0-.8-.4-.8-.8V9.6a1.6 1.6 0 0 0 0-3.2z"/><path d="M10.2 5.6v1.1M10.2 9.3v1.1"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1.8l5 1.9v3.9c0 3.2-2.1 5.6-5 6.6-2.9-1-5-3.4-5-6.6V3.7z"/><path d="M5.8 8l1.6 1.6 2.9-3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.8 4.3h10.4M6.3 4.3V2.9h3.4v1.4M4.2 4.3l.6 8.6c.1.7.6 1.2 1.3 1.2h3.8c.7 0 1.2-.5 1.3-1.2l.6-8.6"/></symbol>
   </svg>
 
   <header class="top">
@@ -45,6 +55,16 @@
           <span class="mono">127.0.0.1</span>
         </span>
 
+        <!-- Reporting to the trainer's admin dashboard: hidden unless a server URL is configured. -->
+        <span class="status-chip reporting-chip" id="reporting-chip" hidden tabindex="0">
+          <i class="status-dot" id="reporting-dot" aria-hidden="true"></i>
+          <span id="reporting-state"></span>
+        </span>
+        <button class="btn btn-help" id="help-button" type="button" hidden aria-haspopup="dialog" aria-controls="help-dialog">
+          <svg class="ico"><use href="#i-hand"/></svg>
+          <span id="help-button-label" data-i18n="help.button">Help / Je suis bloqué</span>
+        </button>
+
         <div class="seg seg-sm" id="lang-switch" role="group" data-i18n-aria="lang.aria">
           <button type="button" data-lang="en" aria-pressed="true" title="English">EN</button>
           <button type="button" data-lang="fr" aria-pressed="false" title="Français">FR</button>
@@ -59,6 +79,21 @@
       </div>
     </div>
   </header>
+
+  <!-- Status of the help request (shown while a request is active or just closed). -->
+  <div class="wrap">
+    <div class="help-banner" id="help-banner" role="status" aria-live="polite" hidden>
+      <svg class="ico"><use href="#i-hand"/></svg>
+      <div class="help-banner-text">
+        <b id="help-banner-title"></b>
+        <span id="help-banner-detail"></span>
+      </div>
+      <div class="btns push">
+        <button class="btn" type="button" id="help-unblocked" data-i18n="help.unblocked"></button>
+        <button class="btn" type="button" id="help-dismiss" data-i18n="help.dismiss" hidden></button>
+      </div>
+    </div>
+  </div>
 
   <div class="wrap shell">
     <aside class="rail" aria-labelledby="rail-title">
@@ -77,55 +112,174 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <!-- AZURE OPENAI SETTINGS (shared by the labs, saved in the user-secrets store) -->
-  <dialog id="settings" class="dialog" aria-labelledby="settings-title">
+  <!-- SETTINGS: two tabs. Azure OpenAI (shared by the labs, saved in the user-secrets store) and Workshop (identity sent to the trainer's dashboard). -->
+  <dialog id="settings" class="dialog dialog-wide" aria-labelledby="settings-title">
     <form id="settings-form" novalidate>
       <header class="dialog-head">
+        <span class="dialog-head-ico" aria-hidden="true"><svg class="ico"><use href="#i-sliders"/></svg></span>
         <h2 id="settings-title" data-i18n="settings.title"></h2>
         <button class="term-btn dialog-close" type="button" data-action="close-settings" data-i18n-aria="settings.close" data-i18n-title="settings.close"><svg class="ico"><use href="#i-x"/></svg></button>
       </header>
 
-      <div class="dialog-body">
-        <p class="hint" data-i18n="settings.intro"></p>
-        <p class="notice notice-bad" id="settings-store-error" role="alert" hidden></p>
+      <div class="settings-layout">
+        <nav class="settings-nav" role="tablist" aria-orientation="vertical" data-i18n-aria="settings.sections">
+          <button role="tab" type="button" id="settings-tab-azure" data-settings-tab="azure" aria-controls="settings-panel-azure" aria-selected="true">
+            <span class="settings-nav-ico" aria-hidden="true"><svg class="ico"><use href="#i-cloud"/></svg></span>
+            <span class="settings-nav-text">
+              <span class="settings-nav-title" data-i18n="settings.tabAzure"></span>
+              <span class="settings-nav-meta"><i class="status-dot" id="settings-nav-azure-dot" aria-hidden="true"></i><span id="settings-nav-azure-state"></span></span>
+            </span>
+            <i class="settings-nav-alert" id="settings-nav-azure-alert" aria-hidden="true" hidden></i>
+          </button>
+          <button role="tab" type="button" id="settings-tab-workshop" data-settings-tab="workshop" aria-controls="settings-panel-workshop" aria-selected="false" tabindex="-1">
+            <span class="settings-nav-ico" aria-hidden="true"><svg class="ico"><use href="#i-user"/></svg></span>
+            <span class="settings-nav-text">
+              <span class="settings-nav-title" data-i18n="settings.tabWorkshop"></span>
+              <span class="settings-nav-meta"><i class="status-dot" id="settings-nav-workshop-dot" aria-hidden="true"></i><span id="settings-nav-workshop-state"></span></span>
+            </span>
+            <i class="settings-nav-alert" id="settings-nav-workshop-alert" aria-hidden="true" hidden></i>
+          </button>
+        </nav>
 
-        <div class="field">
-          <label for="set-endpoint" data-i18n="settings.endpoint"></label>
-          <input id="set-endpoint" name="endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-resource.openai.azure.com/" aria-describedby="src-endpoint err-endpoint">
-          <p class="field-source" id="src-endpoint"></p>
-          <p class="field-error" id="err-endpoint" hidden></p>
+        <div class="dialog-body settings-panels">
+          <p class="notice notice-bad" id="settings-store-error" role="alert" hidden></p>
+
+          <!-- Azure OpenAI: used by every lab run (dashboard and dotnet run). -->
+          <section class="settings-panel" id="settings-panel-azure" role="tabpanel" aria-labelledby="settings-tab-azure">
+            <div class="panel-head">
+              <h3 data-i18n="settings.azureTitle"></h3>
+              <p class="hint" data-i18n="settings.intro"></p>
+            </div>
+
+            <div class="field">
+              <div class="field-label-row">
+                <label for="set-endpoint"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="settings.endpoint"></span></label>
+                <span class="pill pill-machine" id="machine-endpoint" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+              </div>
+              <input id="set-endpoint" name="endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-resource.openai.azure.com/" aria-describedby="src-endpoint err-endpoint">
+              <p class="field-source" id="src-endpoint"></p>
+              <p class="field-error" id="err-endpoint" hidden></p>
+            </div>
+
+            <div class="field">
+              <div class="field-label-row">
+                <label for="set-deployment"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cube"/></svg><span data-i18n="settings.deployment"></span></label>
+                <span class="pill pill-machine" id="machine-deployment" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+              </div>
+              <input id="set-deployment" name="chatDeploymentName" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" aria-describedby="hint-deployment src-deployment err-deployment">
+              <p class="field-hint" id="hint-deployment" data-i18n="settings.deploymentHint"></p>
+              <p class="field-source" id="src-deployment"></p>
+              <p class="field-error" id="err-deployment" hidden></p>
+            </div>
+
+            <div class="field">
+              <div class="field-label-row">
+                <label for="set-apikey"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-key"/></svg><span data-i18n="settings.apiKey"></span></label>
+                <span class="pill passed" id="apikey-stored" data-i18n="settings.apiKeyStored" hidden></span>
+                <span class="pill pill-machine" id="machine-apikey" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+              </div>
+              <div class="field-inline">
+                <input id="set-apikey" name="apiKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="hint-apikey src-apikey err-apikey">
+                <button class="btn" type="button" data-action="remove-key" hidden><svg class="ico"><use href="#i-trash"/></svg><span data-i18n="settings.removeKey"></span></button>
+              </div>
+              <p class="field-hint" id="hint-apikey" data-i18n="settings.apiKeyHint"></p>
+              <p class="field-source" id="src-apikey"></p>
+              <p class="field-error" id="err-apikey" hidden></p>
+            </div>
+          </section>
+
+          <!-- Workshop: the developer's identity on the trainer's admin dashboard. Saved separately from the Azure OpenAI values. -->
+          <section class="settings-panel" id="settings-panel-workshop" role="tabpanel" aria-labelledby="settings-tab-workshop" hidden>
+            <div class="panel-head">
+              <h3 id="reporting-settings-title" data-i18n="reporting.settingsTitle"></h3>
+              <p class="hint" data-i18n="reporting.settingsIntro"></p>
+            </div>
+            <p class="notice status-card" id="reporting-settings-status-card"><i class="status-dot" id="reporting-settings-dot" aria-hidden="true"></i><span id="reporting-settings-status"></span></p>
+
+            <div class="field">
+              <label for="rep-username"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-user"/></svg><span data-i18n="reporting.username"></span></label>
+              <input id="rep-username" name="username" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="john-dev" aria-describedby="hint-rep-username err-rep-username">
+              <p class="field-hint" id="hint-rep-username" data-i18n="reporting.usernameHint"></p>
+              <p class="field-error" id="err-rep-username" hidden></p>
+            </div>
+
+            <div class="field">
+              <div class="field-label-row">
+                <label for="rep-key"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-ticket"/></svg><span data-i18n="reporting.workshopKey"></span></label>
+                <span class="pill passed" id="rep-key-stored" data-i18n="reporting.workshopKeyStored" hidden></span>
+              </div>
+              <input id="rep-key" name="workshopKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="src-rep-key err-rep-key">
+              <p class="field-source" id="src-rep-key"></p>
+              <p class="field-error" id="err-rep-key" hidden></p>
+            </div>
+          </section>
         </div>
-
-        <div class="field">
-          <label for="set-deployment" data-i18n="settings.deployment"></label>
-          <input id="set-deployment" name="chatDeploymentName" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" aria-describedby="hint-deployment src-deployment err-deployment">
-          <p class="field-hint" id="hint-deployment" data-i18n="settings.deploymentHint"></p>
-          <p class="field-source" id="src-deployment"></p>
-          <p class="field-error" id="err-deployment" hidden></p>
-        </div>
-
-        <div class="field">
-          <div class="field-label-row">
-            <label for="set-apikey" data-i18n="settings.apiKey"></label>
-            <span class="pill passed" id="apikey-stored" data-i18n="settings.apiKeyStored" hidden></span>
-          </div>
-          <div class="field-inline">
-            <input id="set-apikey" name="apiKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="hint-apikey src-apikey err-apikey">
-            <button class="btn" type="button" data-action="remove-key" hidden data-i18n="settings.removeKey"></button>
-          </div>
-          <p class="field-hint" id="hint-apikey" data-i18n="settings.apiKeyHint"></p>
-          <p class="field-source" id="src-apikey"></p>
-          <p class="field-error" id="err-apikey" hidden></p>
-        </div>
-
-        <p class="hint"><b data-i18n="settings.apiVersion"></b> <span data-i18n="settings.apiVersionHint"></span></p>
-        <p class="hint"><span data-i18n="settings.storage"></span> <code id="settings-file"></code></p>
-        <p class="hint" data-i18n="settings.precedence"></p>
       </div>
 
       <footer class="dialog-foot">
+        <p class="dialog-foot-note"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="settings.footNote"></span></p>
         <button class="btn" type="button" data-action="close-settings" data-i18n="settings.cancel"></button>
-        <button class="btn btn-primary" type="submit" data-i18n="settings.save"></button>
+        <button class="btn btn-primary" type="submit"><svg class="ico"><use href="#i-check"/></svg><span data-i18n="settings.save"></span></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- WELCOME: first launch. Join the workshop (username + key; the admin URL is fixed in appsettings.json) or work on your own (nothing is sent). -->
+  <dialog id="welcome" class="dialog dialog-sm" aria-labelledby="welcome-title">
+    <form id="welcome-form" novalidate>
+      <header class="dialog-head">
+        <h2 id="welcome-title" data-i18n="welcome.title"></h2>
+      </header>
+      <div class="dialog-body">
+        <p class="hint" data-i18n="welcome.intro"></p>
+        <p class="hint" id="welcome-server"></p>
+        <p class="notice" id="welcome-no-server" data-i18n="welcome.noServer" hidden></p>
+
+        <div class="field">
+          <label for="wel-username" data-i18n="reporting.username"></label>
+          <input id="wel-username" name="username" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="john-dev" required aria-describedby="hint-wel-username err-wel-username">
+          <p class="field-hint" id="hint-wel-username" data-i18n="reporting.usernameHint"></p>
+          <p class="field-error" id="err-wel-username" hidden></p>
+        </div>
+
+        <div class="field" id="wel-key-field" hidden>
+          <label for="wel-key" data-i18n="reporting.workshopKey"></label>
+          <input id="wel-key" name="workshopKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="hint-wel-key err-wel-key">
+          <p class="field-hint" id="hint-wel-key" data-i18n="reporting.workshopKeyHint"></p>
+          <p class="field-error" id="err-wel-key" hidden></p>
+        </div>
+        <p class="hint" data-i18n="welcome.privacy"></p>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn" type="button" id="welcome-skip" data-i18n="welcome.skip"></button>
+        <button class="btn btn-primary" type="submit" data-i18n="welcome.start"></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- HELP: "I'm blocked" request sent to the trainer. -->
+  <dialog id="help-dialog" class="dialog dialog-sm" aria-labelledby="help-title">
+    <form id="help-form" novalidate>
+      <header class="dialog-head">
+        <h2 id="help-title" data-i18n="help.title"></h2>
+        <button class="term-btn dialog-close" type="button" data-action="close-help" data-i18n-aria="settings.close" data-i18n-title="settings.close"><svg class="ico"><use href="#i-x"/></svg></button>
+      </header>
+      <div class="dialog-body">
+        <p class="hint" data-i18n="help.intro"></p>
+        <div class="field">
+          <label for="help-lab" data-i18n="help.lab"></label>
+          <select id="help-lab" name="labId"></select>
+        </div>
+        <div class="field">
+          <label for="help-message" data-i18n="help.message"></label>
+          <textarea id="help-message" name="message" rows="3" maxlength="500" data-i18n-placeholder="help.messagePlaceholder" aria-describedby="hint-help-message err-help-message"></textarea>
+          <p class="field-hint" id="hint-help-message" data-i18n="help.messageHint"></p>
+          <p class="field-error" id="err-help-message" hidden></p>
+        </div>
+      </div>
+      <footer class="dialog-foot">
+        <button class="btn" type="button" data-action="close-help" data-i18n="settings.cancel"></button>
+        <button class="btn btn-primary" type="submit" data-i18n="help.send"></button>
       </footer>
     </form>
   </dialog>
@@ -137,7 +291,10 @@
         <span class="tag" data-bind="track"></span>
         <span class="tag" data-bind="level"></span>
       </div>
-      <h1 data-bind="title"></h1>
+      <div class="hero-row">
+        <h1 data-bind="title"></h1>
+        <button class="btn btn-help hero-help" type="button" data-action="help" hidden><svg class="ico"><use href="#i-hand"/></svg><span data-i18n="help.button"></span></button>
+      </div>
       <p class="lede" data-bind="summary"></p>
     </header>
 

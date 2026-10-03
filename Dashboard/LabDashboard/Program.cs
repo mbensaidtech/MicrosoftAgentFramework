@@ -7,10 +7,23 @@ using LabDashboard;
 using LabDashboard.Catalog;
 using LabDashboard.Execution;
 using LabDashboard.History;
+using LabDashboard.Reporting;
 using LabDashboard.Settings;
 using Markdig;
+using Microsoft.Extensions.Configuration.Json;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+// Project values that must stay out of the public repository (the admin API key): an optional, git-ignored file read right
+// after appsettings.json, so environment variables and the command line still win.
+int appSettingsIndex = builder.Configuration.Sources.ToList().FindLastIndex(source =>
+    source is JsonConfigurationSource { Path: { } path } && path.StartsWith("appsettings", StringComparison.OrdinalIgnoreCase));
+builder.Configuration.Sources.Insert(appSettingsIndex + 1, new JsonConfigurationSource
+{
+    Path = "appsettings.Local.json",
+    Optional = true,
+    FileProvider = builder.Environment.ContentRootFileProvider,
+});
 
 DashboardOptions options = builder.Configuration.GetSection(DashboardOptions.SectionName).Get<DashboardOptions>() ?? new();
 
@@ -30,7 +43,16 @@ builder.Services.AddSingleton<RunHistoryStore>();
 builder.Services.AddSingleton(services => AzureOpenAISettingsStore.ForCatalog(services.GetRequiredService<LabCatalog>()));
 builder.Services.AddSingleton<LabRunner>();
 
+// Reporting to the trainer's admin dashboard: off until the developer joins a workshop from the welcome dialog or the settings (no network call before that).
+builder.Services.AddSingleton(services => IdentityStore.ForOptions(options, services.GetRequiredService<IHostEnvironment>(), services.GetRequiredService<ILogger<IdentityStore>>()));
+builder.Services.AddSingleton(services => new ReportingOutbox(
+    Path.Combine(Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, options.DataDirectory)), "outbox.json"),
+    services.GetRequiredService<ILogger<ReportingOutbox>>()));
+builder.Services.AddSingleton<ReportingClient>();
+builder.Services.AddHostedService(services => services.GetRequiredService<ReportingClient>());
+
 WebApplication app = builder.Build();
+ReportingClient reporting = app.Services.GetRequiredService<ReportingClient>();
 
 app.Use(async (context, next) =>
 {
@@ -52,6 +74,11 @@ app.Use(async (context, next) =>
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
+    }
+
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        reporting.NoteBrowserActivity();
     }
 
     await next();
@@ -82,6 +109,7 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
     string readmePath = localizedReadme ?? catalog.ReadmePath(lab);
     string readmeHtml = File.Exists(readmePath) ? Markdown.ToHtml(File.ReadAllText(readmePath), markdown) : "";
     IReadOnlyList<RunRecord> runs = history.ForLab(lab.Id);
+    reporting.ReportLabOpened(lab.Id);
 
     return Results.Ok(new LabDetails(
         LabSummary.From(lab, runs, runner.ActiveRun),
@@ -101,7 +129,15 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
 });
 
 api.MapGet("/labs/{id}/solution", (string id, LabCatalog catalog) =>
-    catalog.Find(id) is { } lab ? Results.Ok(SolutionFiles(catalog, lab)) : Results.NotFound());
+{
+    if (catalog.Find(id) is not { } lab)
+    {
+        return Results.NotFound();
+    }
+
+    reporting.Report("solution.viewed", lab.Id, null);
+    return Results.Ok(SolutionFiles(catalog, lab));
+});
 
 api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalog, LabRunner runner) =>
 {
@@ -158,7 +194,14 @@ api.MapPut("/settings/azure-openai", async (AzureOpenAISettingsUpdate update, Az
     try
     {
         IReadOnlyDictionary<string, string> errors = await settings.SaveAsync(update);
-        return errors.Count > 0 ? Results.BadRequest(new { errors }) : Results.Ok(settings.GetStatus());
+        if (errors.Count > 0)
+        {
+            return Results.BadRequest(new { errors });
+        }
+
+        AzureOpenAISettingsStatus status = settings.GetStatus();
+        reporting.ReportSettingsChanged(status);
+        return Results.Ok(status);
     }
     catch (AzureOpenAISettingsStoreException ex)
     {
@@ -171,7 +214,9 @@ api.MapDelete("/settings/azure-openai/api-key", async (AzureOpenAISettingsStore 
     try
     {
         await settings.RemoveApiKeyAsync();
-        return Results.Ok(settings.GetStatus());
+        AzureOpenAISettingsStatus status = settings.GetStatus();
+        reporting.ReportSettingsChanged(status);
+        return Results.Ok(status);
     }
     catch (AzureOpenAISettingsStoreException ex)
     {
@@ -179,10 +224,81 @@ api.MapDelete("/settings/azure-openai/api-key", async (AzureOpenAISettingsStore 
     }
 });
 
+// Reporting to the admin dashboard: identity, status and help requests. The workshop key and the dev token are never returned.
+api.MapGet("/reporting/status", () => reporting.GetStatus());
+
+api.MapPost("/identity", (ReportingSettingsUpdate update) => ApplyReportingSettingsAsync(update, reporting, settingsStore: app.Services.GetRequiredService<AzureOpenAISettingsStore>()));
+
+// "Work on my own": the developer skips the workshop at the first launch; nothing is ever sent.
+api.MapPost("/identity/skip", () =>
+{
+    reporting.SkipReporting();
+    return Results.Ok(reporting.GetStatus());
+});
+
+api.MapPut("/reporting/settings", (ReportingSettingsUpdate update) => ApplyReportingSettingsAsync(update, reporting, settingsStore: app.Services.GetRequiredService<AzureOpenAISettingsStore>()));
+
+api.MapGet("/help", () => Results.Json(reporting.Help));
+
+api.MapPost("/help", async (HelpRequest request, LabCatalog catalog) =>
+{
+    if (!reporting.Enabled)
+    {
+        return Results.Conflict(new { error = "disabled" });
+    }
+
+    if (reporting.GetStatus().NeedsIdentity)
+    {
+        return Results.Conflict(new { error = "noIdentity" });
+    }
+
+    string? labId = string.IsNullOrWhiteSpace(request.LabId) ? null : catalog.Find(request.LabId)?.Id;
+    if (request.LabId is { Length: > 0 } && labId is null)
+    {
+        return Results.BadRequest(new { errors = new Dictionary<string, string> { ["labId"] = "unknown" } });
+    }
+
+    if (request.Message is { Length: > 500 })
+    {
+        return Results.BadRequest(new { errors = new Dictionary<string, string> { ["message"] = "tooLong" } });
+    }
+
+    if (reporting.Help is { IsActive: true } active)
+    {
+        return Results.Conflict(new { error = "active", help = active });
+    }
+
+    HelpState help = await reporting.RequestHelpAsync(labId, request.Message);
+    return Results.Accepted("/api/help", help);
+});
+
+api.MapPost("/help/cancel", async () =>
+    reporting.Help is { IsActive: true } ? Results.Ok(await reporting.CancelHelpAsync()) : Results.NotFound());
+
+api.MapPost("/help/dismiss", () =>
+{
+    reporting.DismissHelp();
+    return Results.NoContent();
+});
+
 app.Lifetime.ApplicationStarted.Register(() =>
     app.Logger.LogInformation("Lab dashboard running on http://127.0.0.1:{Port} (Ctrl+C to stop)", options.Port));
 
 app.Run();
+
+static async Task<IResult> ApplyReportingSettingsAsync(ReportingSettingsUpdate update, ReportingClient reporting, AzureOpenAISettingsStore settingsStore)
+{
+    try
+    {
+        IReadOnlyDictionary<string, string> errors = await reporting.ApplySettingsAsync(update);
+        return errors.Count > 0 ? Results.BadRequest(new { errors }) : Results.Ok(reporting.GetStatus());
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        // The workshop key lives in the same user-secrets file as the Azure OpenAI settings.
+        return SettingsStoreError(ex, settingsStore);
+    }
+}
 
 // The store refuses to overwrite a file it cannot parse: the user fixes or deletes it (the path is shown in the form).
 static IResult SettingsStoreError(AzureOpenAISettingsStoreException error, AzureOpenAISettingsStore settings) =>
@@ -241,6 +357,8 @@ static IReadOnlyList<SourceFile> SolutionFiles(LabCatalog catalog, LabDefinition
 internal sealed record RunRequest(RunTarget Target);
 
 internal sealed record InputRequest(string? Text);
+
+internal sealed record HelpRequest(string? LabId, string? Message);
 
 internal sealed record SourceFile(string Path, string Content);
 
