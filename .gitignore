@@ -49,3 +49,13 @@ Dashboard/.data/
 
 # Lab dashboard - project secrets kept out of the public repository (admin API key)
 Dashboard/LabDashboard/appsettings.Local.json
+
+# Completed copies of the Start projects (local checks of the labs) - never versioned
+**/_StartCompleted/
+
+# Playwright - generated test results, reports and browser automation snapshots
+.playwright-mcp/
+test-results/
+playwright-report/
+blob-report/
+**/playwright/.cache/
