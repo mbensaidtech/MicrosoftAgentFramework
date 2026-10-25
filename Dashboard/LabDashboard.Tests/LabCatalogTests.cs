@@ -12,7 +12,8 @@ public class LabCatalogTests
     {
         LabCatalog catalog = LoadRealCatalog();
 
-        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab07", "azureopenai-lab08", "azureopenai-lab09", "azureopenai-lab10", "azureopenai-lab11", "azureopenai-lab12", "multiagent-lab01"],
+        // Catalog order = the essential learning path (root README), then the optional labs (Lab10, Lab08)
+        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab09", "azureopenai-lab07", "azureopenai-lab12", "multiagent-lab01", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab11", "azureopenai-lab13", "azureopenai-lab10", "azureopenai-lab08"],
             catalog.Labs.Select(lab => lab.Id));
         foreach (LabDefinition lab in catalog.Labs)
         {

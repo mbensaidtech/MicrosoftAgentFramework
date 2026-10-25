@@ -19,6 +19,9 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
+    <!-- OpenTelemetry SDK (scenario 3): tracer provider, and an exporter that keeps the finished spans in a list. -->
+    <PackageReference Include="OpenTelemetry" Version="1.20.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.20.1" />
   </ItemGroup>
 
   <ItemGroup>

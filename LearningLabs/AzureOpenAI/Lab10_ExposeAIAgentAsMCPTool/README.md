@@ -248,6 +248,21 @@ MCP client / host                     MCP server (this program)
 4. **stdio** (`WithStdioServerTransport()`): the host starts the server process; requests arrive on stdin and answers leave on stdout, one JSON-RPC message per line. Any other line on stdout is an invalid message: logs go to **stderr**, which hosts show as the server log (`[server]` lines in scenarios 2 and 3). The server stops when the host closes stdin.
 5. **Whose tokens?** The `CompanyAssistant` calls the model **in the server process**, with the Azure OpenAI settings of the server. A client only sends a query and receives text. In scenario 3, the usage displayed is the `OfficeAssistant`'s; the `CompanyAssistant`'s model calls are made by the server and are not included.
 
+## Expose an agent: MCP or A2A?
+
+Lab 10 exposes an agent with **MCP**; Lab06_A2AServer exposes agents with **A2A**. Both make an agent usable by other programs, but they do not give the caller the same thing:
+
+| | MCP (this lab) | A2A (Lab06_A2AServer and Lab06_A2AClient) |
+|---|---|---|
+| What the agent becomes | A **tool** (`tools/list`, `tools/call`): a name, a description, one `query` parameter | An **agent**: an agent card (skills, interfaces), messages, a conversation |
+| Who can use it | Any **MCP host**: IDEs (VS Code), MCP Inspector, assistants, other agents | Other **agents** that speak A2A, whatever their framework |
+| Conversation | None: every call runs the agent in a new session (point 1 above) | A `contextId` per conversation, kept by the server in a session store |
+| Discovery | The client knows the server (URL or command), then lists its tools | An agent card at `.well-known/agent-card.json`, or a registry |
+| Long-running work | One call, one answer | A2A tasks (polling, stream reconnection) |
+| Status in .NET | MCP C# SDK `ModelContextProtocol` **stable** (2.2.0) | A2A packages of Agent Framework and A2A SDK v1 in **preview** |
+
+Choose **MCP** when the agent is one more capability among the tools of an assistant or an IDE, called with a single question. Choose **A2A** when another agent must hold a conversation with yours, discover what it can do, or follow long tasks across a service, team or organization boundary. Within one process, neither is needed: give the agent to the other agent as a tool with `AsAIFunction()` (MultiAgentSystem lab *Delegate a Task to Another Agent*).
+
 ## Key Concepts
 
 | Concept | Description |

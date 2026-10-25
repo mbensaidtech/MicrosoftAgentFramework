@@ -6,17 +6,20 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
 using CommonUtilities;
 
 using AIAgentWithCustomHttpTransport;
 using AIAgentWithCustomHttpTransport.Tools;
 using static AIAgentWithCustomHttpTransport.HttpConsole;
+using static AIAgentWithCustomHttpTransport.TraceConsole;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2] or [1, 2] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2];
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -116,6 +119,65 @@ if (ShouldRunScenario(2))
 
 #endregion
 
+#region Scenario 3: Observe an agent with OpenTelemetry
+
+if (ShouldRunScenario(3))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Observe an agent with OpenTelemetry ===");
+    string prompt = "I am going to Amsterdam tomorrow. Do I need an umbrella?";
+    ColoredConsole.WriteUserLine($"User: {prompt}");
+
+    // Step 1: Create the tracer provider. It listens to the activity source of the lab, and keeps the finished spans
+    // in a list so that the lab can display them (in an application: an OTLP exporter to the Aspire Dashboard, or Azure Monitor)
+    const string TelemetrySourceName = "AIAgentWithCustomHttpTransport";
+    List<Activity> spans = [];
+    using TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder()
+        .AddSource(TelemetrySourceName)
+        .AddInMemoryExporter(spans)
+        .Build();
+
+    // Step 2: Create the weather agent of scenario 2, instrumented at two levels:
+    // - the chat client (clientFactory): a "chat" span for each model call, an "execute_tool" span for each tool call
+    // - the agent (AsBuilder().UseOpenTelemetry): an "invoke_agent" span around the whole run
+    // EnableSensitiveData stays false (the default): prompts, answers and tool arguments are not recorded
+    AIAgent weatherAgent = chatClient.AsAIAgent(
+            instructions: "You are a helpful assistant. Use the tools to answer.",
+            name: "WeatherAgent",
+            description: "Gives the weather forecast for a city.",
+            tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")],
+            clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
+        .AsBuilder()
+        .UseOpenTelemetry(sourceName: TelemetrySourceName)
+        .Build();
+
+    // Step 3: Create a travel assistant that calls the weather agent as a tool, instrumented the same way
+    AIAgent travelAgent = chatClient.AsAIAgent(
+            instructions: "You help travelers prepare their trips. Use your tools, then answer in two sentences.",
+            name: "TravelAssistant",
+            tools: [weatherAgent.AsAIFunction()],
+            clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
+        .AsBuilder()
+        .UseOpenTelemetry(sourceName: TelemetrySourceName)
+        .Build();
+
+    // Step 4: Run the travel assistant without the HTTP log: the spans show the same run, from the agent's point of view
+    loggingHandler.WriteTraffic = false;
+    int requestsBefore = loggingHandler.RequestCount;
+    AgentResponse travelResponse = await travelAgent.RunAsync(prompt).WithSpinner("Running the travel assistant");
+    loggingHandler.WriteTraffic = true;
+
+    // Step 5: Display the answer, then the spans as a tree: the spans of the weather agent are inside the "execute_tool" span
+    // of the travel assistant, with their own token usage (the AgentResponse only has the usage of the travel assistant)
+    ColoredConsole.WritePrimaryLogLine("Agent answer:");
+    ColoredConsole.WriteAssistantLine(travelResponse.Text);
+    WriteSpanTree(spans);
+    ColoredConsole.WritePrimaryLogLine($"HTTP requests sent by this run: {loggingHandler.RequestCount - requestsBefore}");
+    WriteTokenUsage(travelResponse);
+}
+
+#endregion
+
 #region Custom HTTP handler: intercepts every request sent by the OpenAI SDK, and its response
 
 /// <summary>
@@ -129,6 +191,9 @@ internal sealed class HttpLoggingHandler : DelegatingHandler
     /// <summary>Number of HTTP requests sent through this handler since the start of the program.</summary>
     public int RequestCount => _requestCount;
 
+    /// <summary>When false, the requests are counted and forwarded without being written (scenario 3).</summary>
+    public bool WriteTraffic { get; set; } = true;
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         // The same handler can serve several requests at the same time: count them atomically
@@ -136,6 +201,12 @@ internal sealed class HttpLoggingHandler : DelegatingHandler
 
         // Step 1: Add a custom header to the request (correlation, tracking, routing through a gateway...)
         request.Headers.Add("X-agent-name", "AIAgentWithCustomHttpTransport");
+
+        // Scenario 3 turns the HTTP log off: OpenTelemetry shows the same run as spans
+        if (!WriteTraffic)
+        {
+            return await base.SendAsync(request, cancellationToken);
+        }
 
         // Step 2: Write the HTTP request: method and URL, headers (credentials masked by the helper), body
         ColoredConsole.WriteDividerLine();

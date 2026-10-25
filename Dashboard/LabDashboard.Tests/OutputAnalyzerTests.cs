@@ -1743,6 +1743,29 @@ public class OutputAnalyzerTests
         "  Input tokens: 185",
         "  Output tokens: 31",
         "  Total tokens: 216",
+
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Observe an agent with OpenTelemetry ===",
+        "User: I am going to Amsterdam tomorrow. Do I need an umbrella?",
+        "Agent answer:",
+        "The weather in Amsterdam tomorrow will be cloudy with a high of 15 degrees Celsius. It might be a good idea to take an umbrella just in case of rain.",
+        "Spans recorded by OpenTelemetry: 8",
+        "  invoke_agent TravelAssistant(828286a3b37a4d9ab1868c65bf0b6cc2) (4057 ms) - input tokens 204, output tokens 49",
+        "      chat gpt-4o-mini (1153 ms) - input tokens 83, output tokens 15",
+        "      execute_tool WeatherAgent (1434 ms)",
+        "          invoke_agent WeatherAgent(5e464ff2d59f411085f0520058c0a577) (1431 ms) - input tokens 171, output tokens 30",
+        "              chat gpt-4o-mini (635 ms) - input tokens 67, output tokens 14",
+        "              execute_tool get_weather (1 ms)",
+        "              chat gpt-4o-mini (794 ms) - input tokens 104, output tokens 16",
+        "      chat gpt-4o-mini (1464 ms) - input tokens 121, output tokens 34",
+        "HTTP requests sent by this run: 4",
+        "",
+        "Token Usage:",
+        "  Input tokens: 204",
+        "  Output tokens: 49",
+        "  Total tokens: 253",
     ];
 
     // Standard output of the Lab11 exercise as delivered (TODOs not done yet): no client, no agent run, no HTTP log.
@@ -1760,6 +1783,12 @@ public class OutputAnalyzerTests
         "",
         "=== Scenario 2: One agent run, several HTTP requests (function calling) ===",
         "User: What is the weather like in Amsterdam?",
+
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Observe an agent with OpenTelemetry ===",
+        "User: I am going to Amsterdam tomorrow. Do I need an umbrella?",
     ];
 
     [Fact]
@@ -1873,9 +1902,36 @@ public class OutputAnalyzerTests
         TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab11SolutionOutput));
 
         // The "usage" objects of the response bodies ("prompt_tokens": 74) and the rate limit headers are not usage reports
-        Assert.Equal(["Scenario 1 · Token Usage", "Scenario 2 · Token Usage"], usage.Reports.Select(r => r.Label));
-        Assert.Equal(201L, usage.Input!.Value); // 16 + 185
-        Assert.Equal(239L, usage.Total!.Value); // 23 + 216
+        // The token counts of the spans ("- input tokens 171, output tokens 30") are not usage reports either
+        Assert.Equal(["Scenario 1 · Token Usage", "Scenario 2 · Token Usage", "Scenario 3 · Token Usage"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(405L, usage.Input!.Value); // 16 + 185 + 204
+        Assert.Equal(492L, usage.Total!.Value); // 23 + 216 + 253
+    }
+
+    [Fact]
+    public void Lab11_trace_checks_fail_when_only_the_agents_are_instrumented_and_the_http_log_stays_on()
+    {
+        LabDefinition lab11 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab11")!;
+        // UseOpenTelemetry on the agents only (no clientFactory): no chat or execute_tool span, so the weather agent is not
+        // nested in the travel assistant; and WriteTraffic stayed true, so the HTTP log is printed during the traced run.
+        string[] output =
+        [
+            "=== Scenario 3: Observe an agent with OpenTelemetry ===",
+            "=== HTTP REQUEST #4 ===",
+            "[URL] POST https://example.openai.azure.com/openai/v1/chat/completions",
+            "Agent answer:",
+            "Take an umbrella.",
+            "Spans recorded by OpenTelemetry: 2",
+            "  invoke_agent WeatherAgent(5e464ff2d59f411085f0520058c0a577) (1431 ms)",
+            "  invoke_agent TravelAssistant(828286a3b37a4d9ab1868c65bf0b6cc2) (4057 ms) - input tokens 204, output tokens 49",
+            "HTTP requests sent by this run: 4",
+            "Token Usage:",
+            "  Input tokens: 204",
+        ];
+
+        Assert.Equal(
+            ["scenario3-spans", "scenario3-usage"],
+            OutputAnalyzer.EvaluateExpectations(lab11.Expectations, output).Where(r => r.Id.StartsWith("scenario3", StringComparison.Ordinal) && r.Passed).Select(r => r.Id));
     }
 
     // Standard output of the Lab12 solution (real run), with "I work remotely on Fridays." then an empty line typed in the chat
@@ -2246,5 +2302,127 @@ public class OutputAnalyzerTests
                 "Scenario 2 · Token Usage (FrontDesk only, without the specialists)",
             ],
             usage.Reports.Select(r => r.Label));
+    }
+
+    // Standard output of the Lab13 solution (real run): the API, then the four scenarios that call it.
+    private static readonly string[] Lab13SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "info: Microsoft.Hosting.Lifetime[14]",
+        "      Now listening on: http://localhost:5200",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Application started. Press Ctrl+C to shut down.",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Hosting environment: Production",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Content root path: /repo/LearningLabs/AzureOpenAI/Lab13-AIAgentInAspNetCoreApi/Solution",
+        "API: POST http://localhost:5200/api/conversations/{conversationId}/messages (bearer token required)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Requests refused before the agent runs ===",
+        "POST /api/conversations/7045ff93-cda8-4630-834f-2b687ceac0ce/messages: Hello, which team am I in?",
+        "HTTP 401 Unauthorized (no content)",
+        "POST /api/conversations/4eaebd6c-e281-4f45-9b2e-4eeb2f140ea6/messages:",
+        "HTTP 400 BadRequest (application/problem+json)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Alice - a streamed answer, with a tool that knows who she is ===",
+        "POST /api/conversations/3000ec4f-8bd8-44b6-8be3-316183fb873c/messages: Which team am I in? Please also remember that my favorite meeting room is ROOM-B.",
+        "HTTP 200 OK (text/event-stream)",
+        "Agent: You are in the Engineering team, and your office is in Paris.",
+        "Server-sent events received: 14",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Alice - the conversation continues in another request ===",
+        "POST /api/conversations/3000ec4f-8bd8-44b6-8be3-316183fb873c/messages: Which meeting room do I prefer?",
+        "HTTP 200 OK (text/event-stream)",
+        "Agent: Your favorite meeting room is ROOM-B.",
+        "Server-sent events received: 8",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Bob - the same conversation id, another user ===",
+        "POST /api/conversations/3000ec4f-8bd8-44b6-8be3-316183fb873c/messages: Which meeting room do I prefer, and which team am I in?",
+        "HTTP 200 OK (text/event-stream)",
+        "Agent: You are in the Sales team and your office is in Lyon. Please let me know if you need anything else!",
+        "Server-sent events received: 23",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Application is shutting down...",
+    ];
+
+    // Standard output of the Lab13 exercise as delivered: the API starts without endpoint, every scenario gets 404.
+    private static readonly string[] Lab13StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "info: Microsoft.Hosting.Lifetime[14]",
+        "      Now listening on: http://localhost:5200",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Application started. Press Ctrl+C to shut down.",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Hosting environment: Production",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Content root path: /repo/LearningLabs/AzureOpenAI/Lab13-AIAgentInAspNetCoreApi/Start",
+        "API: POST http://localhost:5200/api/conversations/{conversationId}/messages (bearer token required)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Requests refused before the agent runs ===",
+        "POST /api/conversations/dda94db8-ac88-4557-b517-0ddc41ea9826/messages: Hello, which team am I in?",
+        "HTTP 404 NotFound (no content)",
+        "POST /api/conversations/40931401-c386-498a-ba52-6828c2ffbeb8/messages:",
+        "HTTP 404 NotFound (no content)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Alice - a streamed answer, with a tool that knows who she is ===",
+        "POST /api/conversations/771f85e6-df28-4fef-9d46-1ffe7dfceb31/messages: Which team am I in? Please also remember that my favorite meeting room is ROOM-B.",
+        "HTTP 404 NotFound (no content)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Alice - the conversation continues in another request ===",
+        "POST /api/conversations/771f85e6-df28-4fef-9d46-1ffe7dfceb31/messages: Which meeting room do I prefer?",
+        "HTTP 404 NotFound (no content)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Bob - the same conversation id, another user ===",
+        "POST /api/conversations/771f85e6-df28-4fef-9d46-1ffe7dfceb31/messages: Which meeting room do I prefer, and which team am I in?",
+        "HTTP 404 NotFound (no content)",
+        "info: Microsoft.Hosting.Lifetime[0]",
+        "      Application is shutting down...",
+    ];
+
+    [Fact]
+    public void Every_lab13_check_passes_on_the_solution_output_and_only_the_startup_checks_on_the_delivered_exercise()
+    {
+        LabDefinition lab13 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab13")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab13.Expectations, Lab13SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config", "api-started"],
+            OutputAnalyzer.EvaluateExpectations(lab13.Expectations, Lab13StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab13_checks_fail_when_the_endpoint_is_open_and_the_conversations_are_not_bound_to_the_user()
+    {
+        LabDefinition lab13 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab13")!;
+        // No RequireAuthorization (no 401), no message check (no 400), and a storage key without the user id:
+        // Bob gets the conversation of Alice and her favorite meeting room.
+        string[] output = [.. Lab13SolutionOutput
+            .Select(line => line
+                .Replace("HTTP 401 Unauthorized (no content)", "HTTP 200 OK (text/event-stream)")
+                .Replace("HTTP 400 BadRequest (application/problem+json)", "HTTP 200 OK (text/event-stream)")
+                .Replace("Agent: You are in the Sales team and your office is in Lyon.", "Agent: Your favorite meeting room is ROOM-B, and you are in the Sales team."))];
+
+        Assert.Equal(
+            ["scenario1-unauthorized", "scenario1-validation", "scenario4-isolated"],
+            OutputAnalyzer.EvaluateExpectations(lab13.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
     }
 }

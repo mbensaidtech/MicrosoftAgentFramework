@@ -45,7 +45,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
-> **Agent Framework version:** the 13 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 14 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -56,7 +56,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11, Lab12; MultiAgentSystem Lab01) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab13, with Lab06 server and client; MultiAgentSystem Lab01), in the order of the [learning path](#learning-path) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -217,10 +217,11 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab12): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab13, MultiAgentSystem Lab01), in the order of the [learning path](#learning-path): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab12: needs its MongoDB container (`docker compose up -d` in its `MongoDB/` folder). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
+- Lab13: the program starts its API on `WebApi:BaseUrl` (`http://localhost:5200` by default) and stops it at the end: the port must be free during the run.
 - Lab10: each scenario starts its own MCP server (HTTP on `McpServer:BaseUrl`, `http://localhost:5100` by default, or stdio as a child process) and stops it: the port must be free during the run.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
@@ -349,6 +350,8 @@ This lab is split into two parts: start the server, then run the client.
 
 ### Lab 08 - Data Format Comparison
 
+*Optional: outside the essential learning path.*
+
 **Learn how the format of the data exchanged with the model (tool results and answers) changes the token usage**
 
 | Scenario | Description |
@@ -373,6 +376,8 @@ This lab is split into two parts: start the server, then run the client.
 
 ### Lab 10 - Expose an AI Agent as an MCP Tool
 
+*Optional: outside the essential learning path. Its README compares the two ways to expose an agent: MCP or A2A.*
+
 **Learn how to expose your AI agent as a tool of an MCP server (`AsAIFunction`, `McpServerTool.Create`), over Streamable HTTP and stdio, for other applications and agents**
 
 | Scenario | Description |
@@ -384,14 +389,15 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 11 - AI Agent with Custom HTTP Transport
+### Lab 11 - Observe an Agent: HTTP Transport and OpenTelemetry
 
-**Learn how to plug your own `HttpClient` into the OpenAI SDK (`OpenAIClientOptions.Transport`, `HttpClientPipelineTransport`) and intercept every request with a `DelegatingHandler`: add a header, log the traffic with the credentials masked, measure and count the calls**
+**Learn how to observe an agent: plug your own `HttpClient` into the OpenAI SDK (`OpenAIClientOptions.Transport`, `HttpClientPipelineTransport`) and intercept every request with a `DelegatingHandler` (header, traffic logged with the credentials masked, duration, request count), then trace the agent with OpenTelemetry**
 
 | Scenario | Description |
 |----------|-------------|
 | Scenario 1 | See the HTTP traffic of an agent run: the v1 URL, the headers (custom `X-agent-name` added, `Authorization` masked), the JSON bodies, the status and duration of the call; one request, its token usage |
 | Scenario 2 | One agent run, several HTTP requests: with a function tool, the first response asks for the tool (`tool_calls`), a second request sends the tool result (`"role": "tool"`); the token usage of the run is the total of both |
+| Scenario 3 | Observe an agent with OpenTelemetry (`UseOpenTelemetry` on the chat client and on the agent, `TracerProvider`): the spans of a travel assistant that calls a weather agent as a tool — `invoke_agent`, `chat`, `execute_tool` — show the inner run and its tokens, which the `AgentResponse` of the caller does not count |
 
 ---
 
@@ -403,6 +409,19 @@ This lab is split into two parts: start the server, then run the client.
 |----------|-------------|
 | Scenario 1 | Remember the user from one session to another: the user introduces herself, the provider extracts the facts (another agent, `RunAsync<T>`) and stores them in MongoDB; in a new session (empty chat history), the provider adds them to the request as a message framed as data (not as instructions, kept out of the chat history) and the agent knows her name and preferences; token usage displayed |
 | Scenario 2 | Chat with the agent at the console: it speaks first (`RunAsync(session)`) and greets you with what it remembers, then stores what you tell it — still known at the next run |
+
+---
+
+### Lab 13 - Host an Agent in an ASP.NET Core API
+
+**Learn how to turn an agent into a web API for an application: the agent in dependency injection, an endpoint protected by JWT bearer tokens that streams the answer (Server-Sent Events), and conversations kept between requests and bound to each user**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Requests refused before the agent runs: no token (`RequireAuthorization`, 401), an empty message (400, problem details) |
+| Scenario 2 | Alice: a streamed answer (`RunStreamingAsync`, `TypedResults.ServerSentEvents`), with a tool that reads the user from the token, not from the model |
+| Scenario 3 | Alice: the conversation continues in another HTTP request (`SerializeSessionAsync` / `DeserializeSessionAsync`, store keyed by user and conversation) |
+| Scenario 4 | Bob sends the conversation id of Alice: he gets his own conversation — a conversation id is not a proof of ownership |
 
 ---
 
@@ -572,29 +591,27 @@ echo $env:AzureOpenAI__Endpoint
 
 ## Learning Path
 
-We recommend following the **AzureOpenAI** labs (individual agents) in order, then **MultiAgentSystem Lab 01**. MultiAgentSystem Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
+The labs keep their numbers, but the **essential path** follows the order below (the order of the Lab Bench dashboard). Lab 08 and Lab 10 are **optional**. MultiAgentSystem Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                           Part 1: AzureOpenAI (Individual Agents)                              │
-├────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  Lab01 → Lab02 → Lab03 → Lab04 → Lab05 → Lab06 → Lab07 → Lab08 → Lab09 → Lab10 → Lab11 → Lab12│
-│    │       │       │       │       │       │       │       │       │       │       │       │   │
-│    ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼   │
-│  Basic  Struct  Tools    MCP   Sessions  A2A    RAG   Format  Human    MCP   Custom  Context  │
-│  Agent  Output  Calling Client                        Optim  Approval Server  HTTP  Provider  │
-└────────────────────────────────────────────────────────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│      Part 2: MultiAgentSystem (Multi-Agent Solutions) — Lab02 and Lab03 NOT MIGRATED YET       │
-├────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  Lab01 → Lab02 → Lab03 → ...                                                                   │
-│    │       │       │                                                                           │
-│    ▼       ▼       ▼                                                                           │
-│ Delegate Sequential Concurrent                                                                 │
-│ a task   Orchestr. Orchestr.                                                                   │
-└────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 1. Build an agent                                                                            │
+│    Lab01 Agent (+ Responses API) → Lab02 Structured output → Lab03 Tools → Lab04 MCP client  │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 2. Conversations and control                                                                 │
+│    Lab05 Sessions and chat history → Lab09 Human approval and guardrails                     │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 3. Knowledge and memory                                                                      │
+│    Lab07 RAG → Lab12 Memory (context provider)                                               │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 4. Agents working with agents                                                                │
+│    MultiAgentSystem Lab01 Delegate a task to another agent (same process)                    │
+│    → Lab06 A2A server → Lab06 A2A client (remote agents, A2A — preview packages)             │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 5. In production                                                                             │
+│    Lab11 Observe an agent (HTTP, OpenTelemetry) → Lab13 Host an agent in an ASP.NET Core API │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+  Optional: Lab10 Expose an agent as an MCP tool · Lab08 Data formats and token usage
 ```
 
 > **Note:** While we recommend following the labs in order, there are **no strict dependencies** between the different labs. If you already have some knowledge in a specific area, feel free to jump to any lab that interests you.
