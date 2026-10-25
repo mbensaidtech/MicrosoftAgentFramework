@@ -59,3 +59,19 @@ test-results/
 playwright-report/
 blob-report/
 **/playwright/.cache/
+
+# dotnet test (Microsoft.Testing.Platform / VSTest) - TRX reports, coverage, crash and hang dumps
+[Tt]est[Rr]esult*/
+
+# Logs (MSBuild binary logs included)
+*.log
+*.binlog
+
+# Temporary copies used while checking the labs (.tmp-start-check, .tmp-probe, .tmp-home...)
+**/.tmp-*/
+
+# Local IDE settings (JetBrains Rider)
+.idea/
+
+# Local secrets - use user secrets or environment variables instead
+.env
