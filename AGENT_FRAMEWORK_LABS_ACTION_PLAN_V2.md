@@ -150,7 +150,7 @@ Pas de lab dédié au middleware : couvert par A7 (garde-fous), A11 (niveau chat
 |---|---|---|---|
 | **1 · P0** ✅ *fait le 2026-10-25* | A1, A2, A3 | ≈ 1 j | Streaming validé (deux authentifications) ; contournement Lab06 supprimé ; README racine corrigé. **Résultat** : `Microsoft.Extensions.AI.OpenAI` 10.11.0 ajouté à Lab01, Lab02, Lab06_A2AServer ; Lab01 7/7, Lab02 9/9, Lab06 serveur 10/10 et client 9/9 (clé API et Entra ID) ; `dotnet test` du dashboard 207/207 |
 | **2 · P1** ✅ *fait le 2026-10-25* | A4 | ≈ 2–3 j | 13 labs en 1.26.0 ; Lab09, Lab03, Lab06 re-testés. **Résultat** : aucune API changée ; Entra ID 127/127, clé API 127/127 après correction de Lab07 (culture) ; Start livrés OK ; dashboard 207/207 — [rapport](Migration/Upgrade-1.26.0-Report.md) |
-| **3 · P1** | A5 → A10 | ≈ 7–10 j | Labs enrichis, TODO du README alignés, tests du dashboard au vert |
+| **3 · P1** ✅ *fait le 2026-10-25* | A5 → A10 | ≈ 7–10 j | Labs enrichis, TODO du README alignés, tests du dashboard au vert. **Résultat** : Lab01 (API Responses), Lab03 (outils déclarés et validés), Lab05 (réducteur d'historique), Lab07 (sécurité du RAG), Lab09 (garde-fous par middleware), Lab12 (souvenirs en `Messages`) ; clé API 135/135, Entra ID 135/135 ; Start à 0 warning ; dashboard 207/207 — [rapport](Migration/Enrichments-Step3-Report.md) |
 | **4 · P1** | A13, A14, A15 (communication entre agents) | ≈ 5–6 j | Lab01-UseAgentAsTool refondu en 1.26.0 et enregistré dans le dashboard ; conversation A2A client ↔ serveur démontrée |
 | **5 · P2** | A11, A16, NL1, A12 | ≈ 5–7 j | « Observer un agent » ; NL1 enregistré ; ordre de suivi publié |
 

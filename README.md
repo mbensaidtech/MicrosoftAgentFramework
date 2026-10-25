@@ -257,6 +257,7 @@ This part focuses on building **individual AI agents** with various capabilities
 | Scenario 3 | Use ChatMessages for fine-grained control |
 | Scenario 4 | Monitor token usage from responses |
 | Scenario 5 | Stream the response with `RunStreamingAsync` |
+| Scenario 6 | Run the same agent on the **Responses API** recommended by Microsoft (`GetResponsesClient().AsAIAgent(model: ...)`), and choose between Chat Completions and Responses |
 
 ---
 
@@ -280,7 +281,7 @@ This part focuses on building **individual AI agents** with various capabilities
 | Scenario | Description |
 |----------|-------------|
 | Scenario 1 | Basic function tools calling: `AIFunctionFactory.Create()`, `[Description]`, `AsAIAgent(..., tools: ...)` |
-| Scenario 2 | Function tools discovered with reflection (`MethodInfo` + `AIFunctionFactory.Create(method, target)`) |
+| Scenario 2 | A plugin that declares its tools (`AsAITools()`) and checks the arguments chosen by the model: a booking in the past is refused, the problem is explained to the model |
 | Scenario 3 | Static tools with dependency injection (`IServiceProvider` parameter + `AsAIAgent(..., services: ...)`) |
 | Scenario 4 | Function calling middleware that traces every tool call (`AsBuilder().Use(...)`) |
 
@@ -300,13 +301,13 @@ This part focuses on building **individual AI agents** with various capabilities
 
 ### Lab 05 - AI Agent with Sessions
 
-**Learn how to hold, save and resume conversations (`AgentSession`) and where their chat history is stored (`ChatHistoryProvider`)**
+**Learn how to hold, save and resume conversations (`AgentSession`), where their chat history is stored (`ChatHistoryProvider`) and how to keep it bounded**
 
 | Scenario | Description |
 |----------|-------------|
 | Scenario 1 | Session with the default in-memory chat history: `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync`, the messages kept in the session |
-| Scenario 2 | Custom `ChatHistoryProvider` storing the chat history in a vector store (`InMemoryVectorStore`): the serialized session only holds a key |
-| Scenario 3 | The same with MongoDB: a new agent resumes the saved session after a simulated restart (MongoDB container provided) |
+| Scenario 2 | Bound the chat history with a chat reducer (`MessageCountingChatReducer`): the cost of each run stops growing, and the agent forgets the beginning of the conversation |
+| Scenario 3 | Custom `ChatHistoryProvider` storing the chat history in MongoDB: the serialized session only holds a key, a new agent resumes it after a simulated restart (MongoDB container provided) |
 
 ---
 
@@ -357,14 +358,15 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 09 - AI Agent with Function Tools and Human Approval
+### Lab 09 - Control an Agent: Human Approval and Guardrails
 
-**Learn how to make an agent pause before a sensitive tool runs (human-in-the-loop): `ApprovalRequiredAIFunction`, `ToolApprovalRequestContent`, `CreateResponse` and the same `AgentSession`**
+**Learn how to make an agent pause before a sensitive tool runs (human-in-the-loop): `ApprovalRequiredAIFunction`, `ToolApprovalRequestContent`, `CreateResponse` and the same `AgentSession`; then how to add guardrails with an agent run middleware**
 
 | Scenario | Description |
 |----------|-------------|
 | Scenario 1 | Human approval at the console: the run pauses with an approval request (function + arguments), you reply Y or N, the agent continues in the same session; tool result and token usage of the whole flow displayed |
 | Scenario 2 | Several approval requests decided by a policy: a harmless tool runs without approval, each sensitive call is approved or rejected with a reason by code (`CreateResponse(approved, reason)`), and the rejection the model received is shown |
+| Scenario 3 | Guardrails with an agent run middleware (`AsBuilder().Use(runFunc: ...)`): a forbidden question is answered by the middleware without calling the model, personal data is masked in the request and checked in the answer |
 
 ---
 
@@ -398,7 +400,7 @@ This lab is split into two parts: start the server, then run the client.
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Remember the user from one session to another: the user introduces herself, the provider extracts the facts (another agent, `RunAsync<T>`) and stores them in MongoDB; in a new session (empty chat history), the provider adds them to the instructions and the agent knows her name and preferences; token usage displayed |
+| Scenario 1 | Remember the user from one session to another: the user introduces herself, the provider extracts the facts (another agent, `RunAsync<T>`) and stores them in MongoDB; in a new session (empty chat history), the provider adds them to the request as a message framed as data (not as instructions, kept out of the chat history) and the agent knows her name and preferences; token usage displayed |
 | Scenario 2 | Chat with the agent at the console: it speaks first (`RunAsync(session)`) and greets you with what it remembers, then stores what you tell it — still known at the next run |
 
 ---

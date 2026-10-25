@@ -32,4 +32,15 @@ public static class SessionConsole
         ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {response.Usage?.OutputTokenCount}");
         ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {response.Usage?.TotalTokenCount}");
     }
+
+    /// <summary>
+    /// Displays one turn of a conversation: the question, the answer, how many messages the session keeps after the run,
+    /// and the input tokens of the run (instructions + chat history sent back to the model + question).
+    /// </summary>
+    public static void WriteTurn(string question, AgentResponse response, int storedMessages)
+    {
+        ColoredConsole.WritePrimaryLogLine($"User: {question}");
+        ColoredConsole.WriteSecondaryLogLine($"Agent: {response.Text}");
+        ColoredConsole.WriteInfoLine($"Messages kept in the session: {storedMessages} (input tokens of this run: {response.Usage?.InputTokenCount})");
+    }
 }

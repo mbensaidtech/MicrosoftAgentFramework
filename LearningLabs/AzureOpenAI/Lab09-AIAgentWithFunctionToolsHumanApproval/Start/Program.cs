@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Text.RegularExpressions;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -15,8 +16,8 @@ using static AIAgentWithFunctionToolsHumanApproval.ApprovalConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2] or [1, 2] to run specific scenarios (scenario 1 asks you to approve at the console)
-HashSet<int> scenariosToRun = [1, 2];
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios (scenario 1 asks you to approve at the console)
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -132,6 +133,83 @@ if (ShouldRunScenario(2))
     // TODO 16: Display the tool results and the final answer (same as TODO 9)
 
     // TODO 17: Display the token usage of all the runs (same as TODO 10)
+}
+
+#endregion
+
+#region Scenario 3: Guardrails - an agent run middleware checks the request and the answer
+
+if (ShouldRunScenario(3))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Guardrails with an agent run middleware ===");
+
+    // TODO 18: Create the HR agent of scenario 2 (same tools and agent as TODO 11 and TODO 12)
+    // AIAgent hrAgent = ...
+
+    // TODO 19: Wrap the agent in the guardrail middleware (HrGuardrail.RunAsync, at the end of this file)
+    // Hint: hrAgent.AsBuilder().Use(runFunc: HrGuardrail.RunAsync, runStreamingFunc: null).Build()
+    // AIAgent guardedAgent = ...
+
+    // TODO 20: Run the guarded agent with a forbidden question and display the answer and the usage
+    // Question: "What is the salary of the employee EMP002?"
+    // Hint: the response has no Usage when the middleware answered by itself: display "Token usage: none, the model was not called"
+
+    // TODO 21: Run the guarded agent with a question that contains personal data, then display the answer and WriteTokenUsage([response])
+    // Question: "My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001."
+}
+
+#endregion
+
+#region Guardrail middleware: checks the request and the answer of every run of the agent it wraps
+
+/// <summary>
+/// An agent run middleware (official sample Agent_Step11_Middleware): <see cref="RunAsync"/> is called around every run
+/// of the agent it wraps. It receives the messages of the run and the inner agent: it can answer by itself (without calling
+/// the agent), change the request before the agent sees it, and change the response before the caller sees it.
+/// </summary>
+internal static class HrGuardrail
+{
+    private static readonly string[] ForbiddenTopics = ["salary", "salaries", "password"];
+
+    public static async Task<AgentResponse> RunAsync(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session,
+        AgentRunOptions? options,
+        AIAgent innerAgent,
+        CancellationToken cancellationToken)
+    {
+        List<ChatMessage> request = [.. messages];
+
+        // TODO 22: Block a forbidden topic: if a user message contains one of the ForbiddenTopics (case-insensitive),
+        // write "[Guardrail] Request blocked: forbidden topic '<topic>'. The agent was not called." with ColoredConsole.WriteWarningLine,
+        // and return new AgentResponse([new ChatMessage(ChatRole.Assistant, "I can't help with salaries or passwords. ...")])
+        // WITHOUT calling innerAgent
+
+        // TODO 23: Mask the personal data of the request with MaskPersonalData(request) and write how many items were masked,
+        // run the inner agent with the masked request, then mask the personal data of response.Messages and return the response
+        // (see the README for the lines to write)
+
+        // Until TODO 23 is done, the middleware only passes the run on to the agent
+        return await innerAgent.RunAsync(request, session, options, cancellationToken);
+    }
+
+    /// <summary>
+    /// Masks the e-mail addresses and the international phone numbers of the text of the messages, and returns how many were masked.
+    /// Masked in place: only the text changes, the other contents (tool calls, approval requests...) stay as they are.
+    /// Simple patterns for the lab: a real application uses a dedicated detection service.
+    /// </summary>
+    public static int MaskPersonalData(IEnumerable<ChatMessage> messages)
+    {
+        int masked = 0;
+        foreach (TextContent text in messages.SelectMany(message => message.Contents).OfType<TextContent>())
+        {
+            text.Text = Regex.Replace(text.Text, @"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", _ => { masked++; return "[e-mail masked]"; });
+            text.Text = Regex.Replace(text.Text, @"\+\d{1,3}(?:[ .-]?\d){8,12}", _ => { masked++; return "[phone masked]"; });
+        }
+
+        return masked;
+    }
 }
 
 #endregion

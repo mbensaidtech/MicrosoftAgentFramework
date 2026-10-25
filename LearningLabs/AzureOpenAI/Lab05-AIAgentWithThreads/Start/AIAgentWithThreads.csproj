@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Agent Framework + OpenAI integration (brings OpenAI, Microsoft.Extensions.AI and Microsoft.Extensions.VectorData.Abstractions transitively). -->
+    <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
     <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
@@ -19,8 +19,6 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
-    <!-- InMemoryVectorStore: the vector store used by the official sample Agent_Step04_3rdPartyChatHistoryStorage (scenario 2). -->
-    <PackageReference Include="CommunityToolkit.VectorData.InMemory" Version="1.0.1" />
     <!-- Official MongoDB driver: storage of the chat history in MongoDB (scenario 3). -->
     <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
   </ItemGroup>

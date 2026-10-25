@@ -4,13 +4,14 @@
 
 In this lab, you will create an AI Agent that uses **Function Tools** (also known as *function calling*) with **Microsoft Agent Framework** and **Azure OpenAI**.
 
-A function tool is a .NET method that the agent can decide to call while it answers: it gives the agent access to data and systems the model cannot know (employees, meeting rooms, notifications...). You will register tools one by one, discover them with reflection, give tools access to services through dependency injection, and trace every tool call with a function calling middleware.
+A function tool is a .NET method that the agent can decide to call while it answers: it gives the agent access to data and systems the model cannot know (employees, meeting rooms, notifications...). You will register tools one by one, write a plugin that declares its tools and checks the arguments chosen by the model, give tools access to services through dependency injection, and trace every tool call with a function calling middleware.
 
 ## What You Will Learn
 
 - How to turn a .NET method into a tool with `AIFunctionFactory.Create()`, and how `[Description]` attributes describe the tool to the model
 - How to give tools to an agent with `AsAIAgent(..., tools: ...)`
-- How to discover tools with reflection (`MethodInfo` + `AIFunctionFactory.Create(method, target)`)
+- How to write a **plugin**: a class that declares which of its methods are tools (`AsAITools()`), instead of exposing every public method
+- Why the arguments chosen by the model are **untrusted input**, and how a tool checks them and explains the problem to the model
 - How to let tools resolve services: `IServiceProvider` parameter + `AsAIAgent(..., services: ...)`
 - How to intercept every tool call with a function calling middleware (`AsBuilder().Use(...)`)
 - Why the token usage of a run with tools covers several model calls
@@ -84,10 +85,10 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
-- `Tools/CompanyTools.cs` — the company "internal systems". Each public method is a tool candidate: `GetEmployeeInfo`, `GetMeetingRooms`, `BookMeetingRoom`. The `[Description]` attributes on the methods and on their parameters are sent to the model with the tool: the method description helps the model decide **when** to call it, the parameter descriptions tell it **what** to pass (for example the `yyyy-MM-dd` date format). The private methods are there to show that reflection only exposes what you ask for (scenario 2).
+- `Tools/CompanyTools.cs` — the company "internal systems". Each public method is a tool candidate: `GetEmployeeInfo`, `GetMeetingRooms`, `BookMeetingRoom`. The `[Description]` attributes on the methods and on their parameters are sent to the model with the tool: the method description helps the model decide **when** to call it, the parameter descriptions tell it **what** to pass (for example the `yyyy-MM-dd` date format). Scenario 2 does not give this class to the agent: a plugin decides which of its features become tools.
 - `Tools/NotificationTools.cs` — **static** tools whose first parameter is an `IServiceProvider`: they resolve the `INotificationRepository` from it (scenario 3).
 - `Repositories/` — the notification store used by `NotificationTools`.
-- `AgentConsole.cs` — `WriteTokenUsage(response)` displays the token usage of a run. `Program.cs` imports it with `using static`, so you can call it directly.
+- `AgentConsole.cs` — `WriteTokenUsage(response)` displays the token usage of a run; `WriteToolResults(response)` displays what each tool returned to the model (scenario 2). `Program.cs` imports it with `using static`, so you can call it directly.
 
 ### Step 3: Complete the Program.cs
 
@@ -121,17 +122,19 @@ You create each tool yourself with `AIFunctionFactory.Create()`, from a method o
 
 ---
 
-#### Scenario 2: Function tools calling - using reflection
+#### Scenario 2: Function tools calling - a plugin that declares its tools
 
-Instead of listing the methods one by one, you discover all the public instance methods of `CompanyTools` and register them as tools. Without an explicit name, a tool is named after its method (`GetEmployeeInfo`).
+Giving the agent every public method of a class is convenient, but dangerous: any public method added later (for example a `CancelAllBookings` for an admin screen) silently becomes a tool that the model can call. A **plugin** does the opposite: it declares the tools it exposes, and only those (official sample [`Agent_Step12_Plugins`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/Agents/Agent_Step12_Plugins)). It is also the right place to **check the arguments chosen by the model**: for your application they are untrusted input, like the data of a web form ([Agent Safety](https://learn.microsoft.com/agent-framework/concepts/agents/safety?pivots=programming-language-csharp)).
+
+`MeetingRoomPlugin` is at the end of `Program.cs`: it wraps `CompanyTools` and exposes two tools. The prompt asks for two bookings: one in the past, which the plugin must refuse, and one tomorrow.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 9** | Get the public instance methods | • `var companyTools = new CompanyTools();` <br> • `MethodInfo[] methods = typeof(CompanyTools).GetMethods(BindingFlags.Public \| BindingFlags.Instance \| BindingFlags.DeclaredOnly);` <br> • `DeclaredOnly` excludes the methods inherited from `object` (`ToString`, `GetHashCode`...) |
-| **TODO 10** | Create one tool per method | • `List<AITool> tools = [.. methods.Select(method => AIFunctionFactory.Create(method, companyTools))];` <br> • The second argument is the instance the method is invoked on |
-| **TODO 11** | Display the names of the tools | • `ColoredConsole.WriteSecondaryLogLine($"Tools that will be available to the agent: {string.Join(", ", tools.Select(tool => tool.Name))}");` |
-| **TODO 12** | Create the agent | • Same as TODO 6 with the discovered `tools` |
-| **TODO 13** | Run the agent and display the answer | • Prompt: `"What are the available meeting rooms? Then book the room ROOM-A for the employee with the ID EMP001 on 2025-12-16 from 10:00 to 11:00 for a 'Sprint Review'."` <br> • Same pattern as TODO 7 (`RunAsync(...).WithSpinner("Running agent")`, then `response.Text`) |
+| **TODO 9** | Create the plugin and get its tools | • `MeetingRoomPlugin plugin = new(new CompanyTools());` <br> • `List<AITool> tools = [.. plugin.AsAITools()];` <br> • `ColoredConsole.WriteSecondaryLogLine($"Tools declared by the plugin: {string.Join(", ", tools.Select(tool => tool.Name))}");` |
+| **TODO 10** | `AsAITools()` — declare the tools of the plugin | • `yield return AIFunctionFactory.Create(GetMeetingRooms, "get_meeting_rooms");` <br> • `yield return AIFunctionFactory.Create(BookMeetingRoom, "book_meeting_room");` <br> • Remove the `yield break;` line. Only the methods listed here can be called by the model |
+| **TODO 11** | `BookMeetingRoom` — check the date chosen by the model | • `if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day)) return $"Cannot book: '{date}' is not a date in the format yyyy-MM-dd.";` <br> • `if (day < DateOnly.FromDateTime(DateTime.Today)) return $"Cannot book: {date} is in the past (today is {DateTime.Today:yyyy-MM-dd}).";` <br> • **Return** the problem as text, do not throw: the model reads the result and can tell the user or try again (an exception would only give it a generic error) |
+| **TODO 12** | Create the agent | • Same as TODO 6 with the `tools` of the plugin |
+| **TODO 13** | Run the agent, then display what the tools returned and the answer | • `string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);` <br> • Prompt: `"What are the available meeting rooms? Then book the room ROOM-A for the employee with the ID EMP001 on 2025-12-16 from 10:00 to 11:00 for a 'Sprint Review', " + $"and the room ROOM-B for the employee with the ID EMP002 on {tomorrow} from 14:00 to 15:00 for a 'Design Review'."` <br> • `AgentResponse response = await companyAgent.RunAsync(...).WithSpinner("Running agent");` <br> • `WriteToolResults(response);` then `ColoredConsole.WritePrimaryLogLine(response.Text);` |
 | **TODO 14** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -158,7 +161,7 @@ A **function calling middleware** is called for every tool call made by the agen
 |------|-------------|-------|
 | **TODO 20** | Write the middleware (local function at the end of `Program.cs`) | • Signature (already in the skeleton): `async ValueTask<object?> FunctionCallMiddleware(AIAgent agent, FunctionInvocationContext context, Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>> next, CancellationToken cancellationToken)` <br> • `string arguments = string.Join(", ", context.Arguments.Select(argument => $"{argument.Key}: {argument.Value}"));` <br> • `ColoredConsole.WriteWarningLine($"[Middleware] Calling {context.Function.Name}({arguments})");` <br> • `object? result = await next(context, cancellationToken);` <br> • `ColoredConsole.WriteWarningLine($"[Middleware] {context.Function.Name} returned: {result?.ToString()?.Split('\n')[0]}");` <br> • `return result;` |
 | **TODO 21** | Create the agent of scenario 1 and wrap it with the middleware | • `var companyTools = new CompanyTools();` then the same `AsAIAgent(...)` call as TODO 6, with the three tools of TODO 4 written directly in `tools: [ ... ]` <br> • `AIAgent tracedAgent = companyAgent.AsBuilder().Use(FunctionCallMiddleware).Build();` |
-| **TODO 22** | Run the wrapped agent and display the answer | • `AgentResponse response = await tracedAgent.RunAsync("Get the information of the employee EMP003, then book the room ROOM-B for this employee on 2026-10-15 from 14:00 to 15:00 for a 'Design Review'.");` <br> • **No** `.WithSpinner()` here: the spinner would overwrite the lines written by the middleware <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` |
+| **TODO 22** | Run the wrapped agent and display the answer | • `AgentResponse response = await tracedAgent.RunAsync("Get the information of the employee EMP003, then book the room ROOM-B for this employee on {DateTime.Today.AddDays(2):yyyy-MM-dd} from 14:00 to 15:00 for a 'Design Review'.");` (an interpolated string: `$"..."`) <br> • **No** `.WithSpinner()` here: the spinner would overwrite the lines written by the middleware <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` |
 | **TODO 23** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -186,6 +189,16 @@ To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (fo
 3. The agent (through the `FunctionInvokingChatClient` that `AsAIAgent()` adds for you) invokes the matching .NET methods, then sends the results back to the model.
 4. Steps 2–3 repeat until the model answers with text. `RunAsync` returns this final answer.
 
+## Designing safe tools
+
+A tool is a door from the model to your systems. The model chooses **when** to call it and **with which arguments**, and it can be wrong or manipulated (for example by a document that contains instructions, see Lab 07). The official guidance ([Agent Safety](https://learn.microsoft.com/agent-framework/concepts/agents/safety?pivots=programming-language-csharp)) applies to every tool:
+
+- **Expose only what is needed**: declare the tools explicitly (scenario 2), and give each agent only the tools of its task.
+- **Validate the arguments**: types, ranges, allowed values, lengths, dates; never build SQL, file paths or shell commands directly from them.
+- **Return the problem as text**: a clear message (*"Cannot book: 2025-12-16 is in the past"*) lets the model correct itself or explain the problem to the user.
+- **Ask a person before an irreversible action**: deletions, payments, e-mails sent on behalf of someone... use `ApprovalRequiredAIFunction` (Lab 09).
+- **Authorize in the tool, not in the prompt**: instructions do not enforce permissions; the tool checks that the user may do what is asked.
+
 That is why a run with tools uses more tokens than a simple question: its `Usage` is the **total** of all the model calls of the loop (scenario 4 makes two or three tool calls, hence several round trips).
 
 ## Key Concepts
@@ -193,13 +206,14 @@ That is why a run with tools uses more tokens than a simple question: its `Usage
 | Concept | Description |
 |---------|-------------|
 | Function tool | A .NET method the agent can decide to call while it answers |
-| `AIFunctionFactory.Create()` | Creates an `AIFunction` from a delegate (instance or static method) or from a `MethodInfo` + target instance; the optional name overrides the method name |
+| `AIFunctionFactory.Create()` | Creates an `AIFunction` from a delegate (instance or static method); the optional name overrides the method name |
 | `AITool` / `AIFunction` | Base type of the tools given to an agent / a tool implemented by .NET code. `Name` and `Description` are what the model sees |
 | `[Description]` | `System.ComponentModel` attribute: description of the tool (on the method) and of its parameters, copied into the tool's JSON schema |
 | `AsAIAgent(..., tools: ...)` | Creates an agent that can call the tools. The function calling loop is handled for you |
 | `AsAIAgent(..., services: ...)` | Gives an `IServiceProvider` to the agent; tools that declare an `IServiceProvider` parameter receive it (hidden from the model) |
 | `ServiceCollection` / `IServiceProvider` | The `Microsoft.Extensions.DependencyInjection` container and the object that resolves the services |
-| `BindingFlags` | Reflection filter: `Public \| Instance \| DeclaredOnly` = public instance methods declared by the class itself |
+| Plugin | A class that declares its tools (`IEnumerable<AITool> AsAITools()`): only the listed methods can be called by the model |
+| Argument validation | The arguments are chosen by the model: the tool checks them and returns the problem as text, so that the model can react |
 | Function calling middleware | `agent.AsBuilder().Use(callback).Build()`: a callback called around every tool call |
 | `FunctionInvocationContext` | What the middleware sees: `Function`, `Arguments`, `Iteration`, `Terminate` (stop the function calling loop) |
 
@@ -215,8 +229,8 @@ That is why a run with tools uses more tokens than a simple question: its `Usage
 | `Microsoft.Agents.AI` | `AIAgent`, `AgentResponse`, `AsBuilder()`, and the `Use(...)` overload for function calling middleware |
 | `Microsoft.Extensions.AI` | `AIFunctionFactory`, `AITool`, `FunctionInvocationContext` |
 | `Microsoft.Extensions.DependencyInjection` | `ServiceCollection`, `AddSingleton()`, `BuildServiceProvider()`, `GetRequiredService()` |
-| `System.Reflection` | `MethodInfo`, `BindingFlags` |
-| `System.ComponentModel` | `[Description]` (in `Tools/`) |
+| `System.ComponentModel` | `[Description]` (in `Tools/` and in `MeetingRoomPlugin`) |
+| `System.Globalization` | `CultureInfo.InvariantCulture`, `DateTimeStyles` (date checks of the plugin) |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
 
 ## Expected Output
@@ -240,11 +254,15 @@ Token Usage:
   Output tokens: 75
   Total tokens: 582
 ----------------------------------------
-=== Scenario 2: Function tools calling - using reflection ===
-Tools that will be available to the agent: GetEmployeeInfo, GetMeetingRooms, BookMeetingRoom
+=== Scenario 2: Function tools calling - a plugin that declares its tools ===
+Tools declared by the plugin: get_meeting_rooms, book_meeting_room
+[Tool] get_meeting_rooms returned: Available Meeting Rooms:
+[Tool] book_meeting_room returned: Cannot book: 2025-12-16 is in the past (today is 2026-10-25).
+[Tool] book_meeting_room returned: Booking confirmed!
 Here are the available meeting rooms:
 ...
-The Innovation Lab (ROOM-A) has been successfully booked for the employee with ID EMP001 on 2025-12-16 from 10:00 to 11:00 ...
+- The booking for ROOM-A on 2025-12-16 could not be confirmed as the date is in the past.
+- The booking for ROOM-B on 2026-10-26 has been successfully confirmed ...
 ----------------------------------------
 Token Usage:
   Input tokens: 1110
@@ -259,7 +277,7 @@ Here are all notifications for Mohammed:
 === Scenario 4: Function calling middleware ===
 [Middleware] Calling get_employee_info(employeeId: EMP003)
 [Middleware] get_employee_info returned: Employee Found:
-[Middleware] Calling book_meeting_room(roomId: ROOM-B, employeeId: EMP003, date: 2026-10-15, startTime: 14:00, endTime: 15:00, subject: Design Review)
+[Middleware] Calling book_meeting_room(roomId: ROOM-B, employeeId: EMP003, date: 2026-10-27, startTime: 14:00, endTime: 15:00, subject: Design Review)
 [Middleware] book_meeting_room returned: Booking confirmed!
 Employee Information:
 - Name: Charlie Brown
@@ -314,9 +332,17 @@ The following files should be modified:
 
 ## Going Further
 
-- **Choose explicitly which methods are tools**: instead of reflection, a class can expose its tools itself (a method returning `IEnumerable<AITool>`), and the class can be resolved from the service provider with its own dependencies. See the official sample `Agent_Step12_Plugins`.
+- **A plugin resolved from dependency injection**: register the plugin and its dependencies in a `ServiceCollection`, then `tools: [.. serviceProvider.GetRequiredService<MeetingRoomPlugin>().AsAITools()]` (official sample `Agent_Step12_Plugins`).
 - **Tools for a single run**: `new ChatClientAgentRunOptions(new ChatOptions { Tools = [...] })` passed to `RunAsync` adds tools for that run only (official sample `Agent_Step11_Middleware`).
-- **Other middleware types**: agent run middleware (`Use(runFunc: ..., runStreamingFunc: ...)`, inspect or change the messages of a run) and `IChatClient` middleware (`clientFactory:` in `AsAIAgent`). See [Agent Middleware](https://learn.microsoft.com/agent-framework/agents/middleware?pivots=programming-language-csharp).
+- **Other middleware types**: Agent Framework has three levels of middleware:
+
+  | Level | Registered with | Sees | Typical use |
+  |---|---|---|---|
+  | Agent run | `agent.AsBuilder().Use(runFunc: ..., runStreamingFunc: ...)` | The messages of the run and the response | Guardrails, filtering the request or the answer (**Lab 09**) |
+  | Function calling | `agent.AsBuilder().Use(functionMiddleware)` | Each tool call: function, arguments, result | Tracing, overriding a result (scenario 4) |
+  | `IChatClient` | `clientFactory:` in `AsAIAgent`, or `chatClient.AsBuilder().Use(...)` | Each model call | Logging, telemetry (**Lab 11**) |
+
+  See [Agent Middleware](https://learn.microsoft.com/agent-framework/concepts/agents/middleware/?pivots=programming-language-csharp). Setting `FunctionInvocationContext.Terminate` stops the function calling loop, but it *"might result in your chat history being left in an inconsistent state"*: use it with care.
 - **Human approval before a tool runs**: `ApprovalRequiredAIFunction` — this is the topic of Lab 09.
 - **An agent as a tool**: `agent.AsAIFunction()` turns an agent into a function tool for another agent (official sample `Agent_Step09_AsFunctionTool`).
 

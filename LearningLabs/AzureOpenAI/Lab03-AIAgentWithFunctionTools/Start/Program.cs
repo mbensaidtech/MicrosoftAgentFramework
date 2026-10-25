@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
-using System.Reflection;
+using System.ComponentModel;
+using System.Globalization;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -80,29 +81,26 @@ if (ShouldRunScenario(1))
 
 #endregion
 
-#region Scenario 2: Function tools calling - using reflection
+#region Scenario 2: Function tools calling - a plugin that declares its tools
 
 if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario 2: Function tools calling - using reflection ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Function tools calling - a plugin that declares its tools ===");
 
-    // TODO 9: Create a CompanyTools instance and get all the public instance methods declared by CompanyTools
-    // Hint: typeof(CompanyTools).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-    // var companyTools = ...
-    // MethodInfo[] methods = ...
+    // TODO 9: Create the plugin (MeetingRoomPlugin, at the end of this file) from a new CompanyTools, get its tools,
+    // and display their names
+    // Hint: MeetingRoomPlugin plugin = new(new CompanyTools()); List<AITool> tools = [.. plugin.AsAITools()];
+    //       ColoredConsole.WriteSecondaryLogLine($"Tools declared by the plugin: {string.Join(", ", tools.Select(tool => tool.Name))}")
 
-    // TODO 10: Create one tool per method
-    // Hint: [.. methods.Select(method => AIFunctionFactory.Create(method, companyTools))]
-    // List<AITool> tools = ...
+    // TODO 10 and TODO 11: complete MeetingRoomPlugin at the end of this file
 
-    // TODO 11: Display the names of the tools
-    // Hint: ColoredConsole.WriteSecondaryLogLine($"Tools that will be available to the agent: {string.Join(", ", tools.Select(tool => tool.Name))}")
-
-    // TODO 12: Create the agent with the discovered tools (same instructions and name as TODO 6)
+    // TODO 12: Create the agent with the tools of the plugin (same instructions and name as TODO 6)
     // AIAgent companyAgent = ...
 
-    // TODO 13: Run the agent and display the answer (see the README for the prompt)
+    // TODO 13: Run the agent (see the README for the prompt: one booking in the past, one tomorrow), then display
+    // what the tools returned with WriteToolResults(response), and the answer
+    // Hint: string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     // AgentResponse response = ...
 
     // TODO 14: Display token usage
@@ -171,3 +169,44 @@ if (ShouldRunScenario(4))
 //     3. Write "[Middleware] <function name> returned: <first line of the result>"
 //     4. return result;
 // }
+
+
+#region Plugin: a class that declares its tools and checks the arguments chosen by the model
+
+/// <summary>
+/// A plugin (official sample Agent_Step12_Plugins): the class declares which of its methods are tools (<see cref="AsAITools"/>),
+/// instead of exposing every public method by reflection. It is also where the arguments chosen by the model are checked
+/// before they reach the company systems (<see cref="CompanyTools"/>): for the application, they are untrusted input.
+/// </summary>
+internal sealed class MeetingRoomPlugin(CompanyTools companyTools)
+{
+    [Description("Lists all available meeting rooms with their capacity and features.")]
+    public string GetMeetingRooms() => companyTools.GetMeetingRooms();
+
+    [Description("Books a meeting room for a specific date, time, and subject.")]
+    public string BookMeetingRoom(
+        [Description("The room ID (e.g., ROOM-A)")] string roomId,
+        [Description("The employee ID making the booking")] string employeeId,
+        [Description("The date (format: yyyy-MM-dd)")] string date,
+        [Description("Start time (format: HH:mm)")] string startTime,
+        [Description("End time (format: HH:mm)")] string endTime,
+        [Description("Meeting subject/title")] string subject)
+    {
+        // TODO 11: The arguments come from the model: check the date before booking, and explain the problem in the
+        // returned text so that the model can react
+        // - not a date in the format yyyy-MM-dd (DateOnly.TryParseExact with CultureInfo.InvariantCulture): "Cannot book: '...' is not a date in the format yyyy-MM-dd."
+        // - a day before today (DateOnly.FromDateTime(DateTime.Today)): "Cannot book: <date> is in the past (today is <today>)."
+
+        return companyTools.BookMeetingRoom(roomId, employeeId, date, startTime, endTime, subject);
+    }
+
+    /// <summary>The tools of the plugin: the model can only call the methods listed here.</summary>
+    public IEnumerable<AITool> AsAITools()
+    {
+        // TODO 10: Declare the tools of the plugin: GetMeetingRooms as "get_meeting_rooms", BookMeetingRoom as "book_meeting_room"
+        // Hint: yield return AIFunctionFactory.Create(GetMeetingRooms, "get_meeting_rooms");
+        yield break;
+    }
+}
+
+#endregion

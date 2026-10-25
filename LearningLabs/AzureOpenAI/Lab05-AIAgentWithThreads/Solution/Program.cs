@@ -2,9 +2,7 @@ using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Text.Json;
 using Azure.Identity;
-using CommunityToolkit.VectorData.InMemory;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.VectorData;
 using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
@@ -24,10 +22,11 @@ HashSet<int> scenariosToRun = [1, 2, 3];
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
 
-// The same agent and the same conversation in every scenario: only the storage of the chat history changes.
+// The same agent and the same conversation in every scenario: only where the chat history is kept, and how much of it, changes.
 const string AgentName = "GlobalAgent";
 const string AgentInstructions = "You are a global agent that can answer questions about any topic. The response should be very short and concise.";
 const string FirstQuestion = "Hello, my name is Ada. What is the capital of France?";
+const string IntermediateQuestion = "And what is the capital of Italy?";
 const string FollowUpQuestion = "What is the population of that city? And what is my name?";
 
 #region Setup: Configuration and Client Initialization
@@ -36,6 +35,10 @@ const string FollowUpQuestion = "What is the population of that city? And what i
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
+
+// The conversation of every scenario: the same agent, the same questions
+ColoredConsole.WritePrimaryLogLine($"{AgentName} instructions: {AgentInstructions}");
+ColoredConsole.WriteSecondaryLogLine($"Questions: \"{FirstQuestion}\", then \"{FollowUpQuestion}\" (scenario 2 asks \"{IntermediateQuestion}\" in between)");
 
 // Step 2: Create an OpenAIClient that targets the Azure OpenAI v1 endpoint (https://<resource>.openai.azure.com/openai/v1/)
 // - API key when one is configured
@@ -99,51 +102,47 @@ if (ShouldRunScenario(1))
 
 #endregion
 
-#region Scenario 2: Custom ChatHistoryProvider - chat history in a vector store
+#region Scenario 2: Bound the chat history - keep only the last messages
 
 if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Bound the chat history with a chat reducer ===");
 
-    // Step 1: Create the vector store that receives the messages (in memory: lost when the application stops)
-    VectorStore vectorStore = new InMemoryVectorStore();
-
-    // Step 2: Create the agent with ChatClientAgentOptions and the custom ChatHistoryProvider
+    // Step 1: Create the agent with an InMemoryChatHistoryProvider that keeps only the last 2 messages of the conversation.
+    // Without a limit, every run sends back the whole history: the cost grows with each turn, until the context window is full.
+    // MessageCountingChatReducer keeps the most recent messages (it drops old tool calls and results with their turn).
+    // It is still flagged [Experimental] (MEAI001) in Microsoft.Extensions.AI.
+#pragma warning disable MEAI001
     AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
         Name = AgentName,
         ChatOptions = new() { Instructions = AgentInstructions },
-        ChatHistoryProvider = new VectorChatHistoryProvider(vectorStore)
+        ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
+        {
+            ChatReducer = new AIExtensions.MessageCountingChatReducer(2)
+        })
     });
+#pragma warning restore MEAI001
 
-    // Step 3: Create a session and ask the first question
+    // Step 2: Get the provider (to read the stored history) and create a session
+    InMemoryChatHistoryProvider chatHistory = agent.GetService<InMemoryChatHistoryProvider>()!;
     AgentSession session = await agent.CreateSessionAsync();
-    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
-    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
-    ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
 
-    // Step 4: Get the provider from the agent and display the key under which the messages are stored
-    VectorChatHistoryProvider chatHistoryProvider = agent.GetService<VectorChatHistoryProvider>()!;
-    ColoredConsole.WriteInfoLine($"Chat history stored in the vector store under the key: {chatHistoryProvider.GetSessionDbKey(session)}");
+    // Step 3: Two turns in the same session; after each one, look at how many messages the session keeps.
+    // The reducer runs before the history is given to the next run: the session briefly holds 4 messages, the model gets 2 of them.
+    AgentResponse response = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    WriteTurn(FirstQuestion, response, chatHistory.GetMessages(session).Count);
 
-    // Step 5: Serialize the session: the JSON only contains the key, the messages stay in the vector store
-    JsonElement serializedSession = await agent.SerializeSessionAsync(session);
-    WriteSerializedSession(serializedSession);
+    response = await agent.RunAsync(IntermediateQuestion, session).WithSpinner("Running agent");
+    WriteTurn(IntermediateQuestion, response, chatHistory.GetMessages(session).Count);
 
-    // Step 6: Save the session as text, then restore it
-    string savedSession = JsonSerializer.Serialize(serializedSession);
-    ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("Restoring the session from the saved JSON...");
-    AgentSession resumedSession = await agent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
+    // Step 4: The follow-up question: "that city" is in the last turn (kept), "my name" was in the first one (dropped)
+    response = await agent.RunAsync(FollowUpQuestion, session).WithSpinner("Running agent");
+    WriteTurn(FollowUpQuestion, response, chatHistory.GetMessages(session).Count);
 
-    // Step 7: Ask the follow-up question: the provider reloads the history from the vector store
-    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
-    AgentResponse followUpResponse = await agent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
-    ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
-
-    // Step 8: Display token usage
-    WriteTokenUsage(followUpResponse);
+    // Step 5: Display token usage
+    WriteTokenUsage(response);
 }
 
 #endregion

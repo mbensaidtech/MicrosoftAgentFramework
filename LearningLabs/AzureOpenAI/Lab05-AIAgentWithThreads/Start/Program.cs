@@ -2,9 +2,7 @@ using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Text.Json;
 using Azure.Identity;
-using CommunityToolkit.VectorData.InMemory;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.VectorData;
 using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
@@ -24,10 +22,11 @@ HashSet<int> scenariosToRun = [1, 2, 3];
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
 
-// The same agent and the same conversation in every scenario: only the storage of the chat history changes.
+// The same agent and the same conversation in every scenario: only where the chat history is kept, and how much of it, changes.
 const string AgentName = "GlobalAgent";
 const string AgentInstructions = "You are a global agent that can answer questions about any topic. The response should be very short and concise.";
 const string FirstQuestion = "Hello, my name is Ada. What is the capital of France?";
+const string IntermediateQuestion = "And what is the capital of Italy?";
 const string FollowUpQuestion = "What is the population of that city? And what is my name?";
 
 #region Setup: Configuration and Client Initialization
@@ -36,6 +35,10 @@ const string FollowUpQuestion = "What is the population of that city? And what i
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
+
+// The conversation of every scenario: the same agent, the same questions
+ColoredConsole.WritePrimaryLogLine($"{AgentName} instructions: {AgentInstructions}");
+ColoredConsole.WriteSecondaryLogLine($"Questions: \"{FirstQuestion}\", then \"{FollowUpQuestion}\" (scenario 2 asks \"{IntermediateQuestion}\" in between)");
 
 // TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
 // Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
@@ -82,29 +85,32 @@ if (ShouldRunScenario(1))
 
 #endregion
 
-#region Scenario 2: Custom ChatHistoryProvider - chat history in a vector store
+#region Scenario 2: Bound the chat history - keep only the last messages
 
 if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Bound the chat history with a chat reducer ===");
 
-    // TODO 10: Create an InMemoryVectorStore (type it as VectorStore)
+    // TODO 10: Create the agent with AsAIAgent(new ChatClientAgentOptions { ... }):
+    //   - Name = AgentName and ChatOptions = new() { Instructions = AgentInstructions }
+    //   - ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
+    //         { ChatReducer = new AIExtensions.MessageCountingChatReducer(2) })
+    // MessageCountingChatReducer is flagged experimental (MEAI001): keep the pragma around it.
+#pragma warning disable MEAI001
+    // AIAgent agent = ...
+#pragma warning restore MEAI001
 
-    // TODO 11: Create the agent with AsAIAgent(new ChatClientAgentOptions { ... }):
-    //   - Name = AgentName
-    //   - ChatOptions = new() { Instructions = AgentInstructions }
-    //   - ChatHistoryProvider = new VectorChatHistoryProvider(vectorStore)
+    // TODO 11: Get the InMemoryChatHistoryProvider of the agent with agent.GetService<...>() and create a session
 
-    // TODO 12: Create a session and ask FirstQuestion (same as TODO 5)
+    // TODO 12: Ask FirstQuestion in the session, then display the turn:
+    //          WriteTurn(FirstQuestion, response, chatHistory.GetMessages(session).Count)
 
-    // TODO 13: Get the VectorChatHistoryProvider with agent.GetService<...>()
-    // and display the key under which the messages are stored: GetSessionDbKey(session)
+    // TODO 13: Ask IntermediateQuestion in the same session and display the turn (same as TODO 12)
 
-    // TODO 14: Serialize the session, display it, save it as text and restore it (same as TODO 7 and TODO 8)
-    // The JSON now only contains the key: the messages stay in the vector store
+    // TODO 14: Ask FollowUpQuestion in the same session and display the turn: does the agent still know the city? the name?
 
-    // TODO 15: Ask FollowUpQuestion in the restored session, display the answer and the token usage (same as TODO 9)
+    // TODO 15: Display the token usage of the last run with WriteTokenUsage(response)
 }
 
 #endregion

@@ -7,7 +7,7 @@ namespace AIAgentWithFunctionTools.Tools;
 /// These tools give the agent access to internal systems: employees, meeting rooms, vacations, etc.
 /// The [Description] attributes on the methods and their parameters are sent to the model with the tool
 /// (function description and JSON schema of the parameters): they tell the model when and how to call each tool.
-/// Only the public methods are exposed in scenario 2 (reflection); the private ones stay internal helpers.
+/// Scenario 2 does not give this class to the agent: MeetingRoomPlugin (Program.cs) declares the tools and checks their arguments.
 /// </summary>
 public class CompanyTools
 {

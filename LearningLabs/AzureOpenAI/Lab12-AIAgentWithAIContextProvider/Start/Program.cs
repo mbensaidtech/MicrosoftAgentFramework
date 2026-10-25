@@ -86,6 +86,8 @@ ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {ExtractorIn
 //   - Name = AgentName and ChatOptions = new() { Instructions = AgentInstructions }
 //   - AIContextProviders = [new UserMemoryAIContextProvider(memoryExtractor, memoriesRepository,
 //         stateInitializer: _ => new UserMemoryAIContextProvider.State(UserId))]
+//   - ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { StorageInputRequestMessageFilter = ... })
+//         that keeps the messages added by the provider out of the chat history (AgentRequestMessageSourceType, see the README)
 // AIAgent memoryAgent = ...
 
 #endregion
@@ -174,14 +176,15 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
     public override IReadOnlyList<string> StateKeys => _stateKeys ??= [_sessionState.StateKey];
 
     /// <summary>
-    /// Called before each model call: returns the context to add to the run (here, instructions).
+    /// Called before each model call: returns the context to add to the run (here, a message with the memories).
     /// </summary>
     protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
         // TODO 13: Give the memories of the user to the model
         // - get the id of the user from the state of the session: _sessionState.GetOrInitializeState(context.Session).UserId
         // - load the memories of the user from MongoDB and display them with WriteMemoriesProvided(userId, memories)
-        // - return a new AIContext whose Instructions list the memories (or an empty AIContext when there is none)
+        // - return a new AIContext whose Messages contain one user message that lists the memories, framed as data
+        //   (or an empty AIContext when there is none). Not Instructions: they are sent as the system message.
         // Replace the last line of this method.
 
         // Until TODO 13 is done, the provider adds nothing: the base class returns an empty AIContext

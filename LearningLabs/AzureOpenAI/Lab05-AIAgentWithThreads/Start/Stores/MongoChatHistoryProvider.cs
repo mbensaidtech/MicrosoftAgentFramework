@@ -10,7 +10,7 @@ namespace AIAgentWithThreads.Stores;
 /// <summary>
 /// A <see cref="ChatHistoryProvider"/> that stores the chat history in a MongoDB collection, with the official MongoDB driver.
 /// <para>
-/// Same pattern as <see cref="VectorChatHistoryProvider"/>: the provider only holds the collection, and the key of the
+/// Same pattern as the official sample Agent_Step04_3rdPartyChatHistoryStorage: the provider only holds the collection, and the key of the
 /// conversation (<see cref="State.SessionDbKey"/>) lives in <see cref="AgentSession.StateBag"/>. The messages survive the
 /// application: a session serialized today can be restored tomorrow, by another process, with a new agent.
 /// </para>

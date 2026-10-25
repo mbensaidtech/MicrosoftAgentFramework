@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Text.RegularExpressions;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -15,8 +16,8 @@ using static AIAgentWithFunctionToolsHumanApproval.ApprovalConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2] or [1, 2] to run specific scenarios (scenario 1 asks you to approve at the console)
-HashSet<int> scenariosToRun = [1, 2];
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios (scenario 1 asks you to approve at the console)
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -193,6 +194,107 @@ if (ShouldRunScenario(2))
 
     // Step 7: Display the token usage of all the runs of the flow
     WriteTokenUsage(runs);
+}
+
+#endregion
+
+#region Scenario 3: Guardrails - an agent run middleware checks the request and the answer
+
+if (ShouldRunScenario(3))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Guardrails with an agent run middleware ===");
+
+    // Step 1: Create the HR agent of scenario 2 (the deletion still requires an approval)
+    List<AITool> tools =
+    [
+        AIFunctionFactory.Create(HrTools.GetEmployeeInfo, "get_employee_info"),
+        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(HrTools.DeleteEmployeeData, "delete_employee_data"))
+    ];
+    AIAgent hrAgent = chatClient.AsAIAgent(instructions: AgentInstructions, name: "HrAssistant", tools: tools);
+
+    // Step 2: Wrap it in the guardrail middleware (HrGuardrail, at the end of this file). The agent itself is not changed.
+    // Only the non-streaming function is given, as in the official sample: a RunStreamingAsync of the guarded agent then
+    // runs in non-streaming mode, so that the guardrail always sees the whole answer.
+    AIAgent guardedAgent = hrAgent.AsBuilder().Use(runFunc: HrGuardrail.RunAsync, runStreamingFunc: null).Build();
+
+    // Step 3: A forbidden topic: the middleware answers itself, the agent (and the model) is never called
+    const string forbiddenQuestion = "What is the salary of the employee EMP002?";
+    ColoredConsole.WritePrimaryLogLine($"User: {forbiddenQuestion}");
+    AgentResponse blockedResponse = await guardedAgent.RunAsync(forbiddenQuestion);
+    ColoredConsole.WritePrimaryLogLine($"Agent: {blockedResponse.Text}");
+    ColoredConsole.WriteSecondaryLogLine(blockedResponse.Usage is null
+        ? "Token usage: none, the model was not called"
+        : $"Token usage: {blockedResponse.Usage.TotalTokenCount}");
+
+    // Step 4: Personal data in the request: masked before the agent sees it (and checked in the answer)
+    const string personalDataQuestion = "My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. " +
+                                        "Call me back with the status of the employee EMP001.";
+    ColoredConsole.WritePrimaryLogLine($"User: {personalDataQuestion}");
+    AgentResponse maskedResponse = await guardedAgent.RunAsync(personalDataQuestion);
+    ColoredConsole.WritePrimaryLogLine($"Agent: {maskedResponse.Text}");
+    WriteTokenUsage([maskedResponse]);
+}
+
+#endregion
+
+#region Guardrail middleware: checks the request and the answer of every run of the agent it wraps
+
+/// <summary>
+/// An agent run middleware (official sample Agent_Step11_Middleware): <see cref="RunAsync"/> is called around every run
+/// of the agent it wraps. It receives the messages of the run and the inner agent: it can answer by itself (without calling
+/// the agent), change the request before the agent sees it, and change the response before the caller sees it.
+/// </summary>
+internal static class HrGuardrail
+{
+    private static readonly string[] ForbiddenTopics = ["salary", "salaries", "password"];
+
+    public static async Task<AgentResponse> RunAsync(
+        IEnumerable<ChatMessage> messages,
+        AgentSession? session,
+        AgentRunOptions? options,
+        AIAgent innerAgent,
+        CancellationToken cancellationToken)
+    {
+        List<ChatMessage> request = [.. messages];
+
+        // 1. A forbidden topic: answer directly, the agent and the model are never called
+        string? topic = ForbiddenTopics.FirstOrDefault(forbidden =>
+            request.Any(message => message.Role == ChatRole.User && message.Text.Contains(forbidden, StringComparison.OrdinalIgnoreCase)));
+        if (topic is not null)
+        {
+            ColoredConsole.WriteWarningLine($"[Guardrail] Request blocked: forbidden topic '{topic}'. The agent was not called.");
+            return new AgentResponse([new ChatMessage(ChatRole.Assistant, "I can't help with salaries or passwords. Please contact the HR department directly.")]);
+        }
+
+        // 2. Personal data in the request: masked before the agent (and the model) sees it
+        int maskedInRequest = MaskPersonalData(request);
+        ColoredConsole.WriteWarningLine($"[Guardrail] Request: {maskedInRequest} personal data item(s) masked before the agent sees them");
+
+        AgentResponse response = await innerAgent.RunAsync(request, session, options, cancellationToken);
+
+        // 3. Personal data in the answer: masked before the caller sees it
+        int maskedInAnswer = MaskPersonalData(response.Messages);
+        ColoredConsole.WriteWarningLine($"[Guardrail] Answer: {maskedInAnswer} personal data item(s) masked");
+        return response;
+    }
+
+    /// <summary>
+    /// Masks the e-mail addresses and the international phone numbers of the text of the messages, and returns how many were masked.
+    /// Masked in place: only the text changes, the other contents (tool calls, approval requests...) stay as they are.
+    /// Simple patterns for the lab: a real application uses a dedicated detection service.
+    /// </summary>
+    public static int MaskPersonalData(IEnumerable<ChatMessage> messages)
+    {
+        int masked = 0;
+        foreach (TextContent text in messages.SelectMany(message => message.Contents).OfType<TextContent>())
+        {
+            text.Text = Regex.Replace(text.Text, @"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", _ => { masked++; return "[e-mail masked]"; });
+            text.Text = Regex.Replace(text.Text, @"\+\d{1,3}(?:[ .-]?\d){8,12}", _ => { masked++; return "[phone masked]"; });
+        }
+
+        return masked;
+    }
 }
 
 #endregion

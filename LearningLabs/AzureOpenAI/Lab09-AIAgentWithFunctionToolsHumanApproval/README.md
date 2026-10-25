@@ -1,10 +1,12 @@
-# Lab 09 - AI Agent With Function Tools and Human Approval
+# Lab 09 - Control an Agent: Human Approval and Guardrails
 
 ## Objective
 
 In this lab, you will build an AI Agent whose **sensitive tools require approval before they run**, with **Microsoft Agent Framework** and **Azure OpenAI**.
 
 This is the **human-in-the-loop** pattern: when the model decides to call a tool marked as requiring approval, the agent does not invoke it. The run completes with an **approval request** instead of an answer. Your code shows the request to a person (or applies a policy), sends the decision back to the agent **in the same session**, and the agent then invokes the approved calls, or tells the model why a call was rejected, and answers.
+
+Then you add **guardrails** around the agent with an **agent run middleware**: code that runs around every run of the agent, without changing the agent. It refuses a forbidden request before the model is even called, and masks personal data in the request and in the answer. Approvals and middleware are the two ways to add runtime controls to a .NET agent: *"Use agent middleware, tool approval, and agent safety to add runtime controls to .NET agents"* ([Agent Hooks](https://learn.microsoft.com/agent-framework/agents/agent-hooks?pivots=programming-language-csharp)).
 
 ## What You Will Learn
 
@@ -14,6 +16,7 @@ This is the **human-in-the-loop** pattern: when the model decides to call a tool
 - How to answer with `CreateResponse(approved, reason)` in a user `ChatMessage`, and continue the run with the same `AgentSession`
 - Why the session is mandatory (approval binding) and why only the sensitive tools ask for approval
 - How to run the approval loop until the agent no longer asks, how to see what the tools returned, and what a rejection costs in tokens
+- How to wrap an agent in an **agent run middleware** (`AsBuilder().Use(runFunc: ..., runStreamingFunc: ...)`), and what it can do: answer without calling the agent, change the request, change the answer
 
 ## Prerequisites
 
@@ -139,6 +142,25 @@ The agent has two tools: `get_employee_info` (no approval) and `delete_employee_
 | **TODO 16** | Display the tool results and the final answer | • Same as TODO 9: `WriteToolResults(runs);` then `Agent answer:` and `response.Text` |
 | **TODO 17** | Display token usage | • `WriteTokenUsage(runs);` |
 
+#### Scenario 3: Guardrails with an agent run middleware
+
+The same HR agent is wrapped in a guardrail: `HrGuardrail.RunAsync`, at the end of `Program.cs`. It is an **agent run middleware**: Agent Framework calls it instead of the agent, with the messages of the run and the inner agent, and it decides what to do (official sample [`Agent_Step11_Middleware`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/Agents/Agent_Step11_Middleware), [Termination & Guardrails](https://learn.microsoft.com/agent-framework/concepts/agents/middleware/termination?pivots=programming-language-csharp)):
+
+1. a question about a **forbidden topic** (salaries, passwords): the middleware answers by itself, **the model is never called**;
+2. **personal data** in the request (an e-mail, a phone number): masked before the agent and the model see it;
+3. the **answer**: checked the same way before the caller sees it.
+
+`MaskPersonalData` and the list of forbidden topics are provided: the patterns are simple on purpose (a real application uses a dedicated detection service). What matters is where the checks run.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 18** | Create the HR agent of scenario 2 | • Same tools and agent as TODO 11 and TODO 12 |
+| **TODO 19** | Wrap the agent in the guardrail | • `AIAgent guardedAgent = hrAgent.AsBuilder().Use(runFunc: HrGuardrail.RunAsync, runStreamingFunc: null).Build();` <br> • The agent itself is not changed: `guardedAgent` is a new agent that calls the middleware, which calls `hrAgent` <br> • Only the non-streaming function is given, as in the official sample: a `RunStreamingAsync` of `guardedAgent` then runs in non-streaming mode, so that the guardrail always sees the whole answer. Give a `runStreamingFunc` too when you need real streaming |
+| **TODO 20** | Ask a forbidden question | • `const string forbiddenQuestion = "What is the salary of the employee EMP002?";` display it (`User: ...`) <br> • `AgentResponse blockedResponse = await guardedAgent.RunAsync(forbiddenQuestion);` (no spinner: the middleware writes to the console) <br> • `ColoredConsole.WritePrimaryLogLine($"Agent: {blockedResponse.Text}");` <br> • `blockedResponse.Usage` is `null` when the middleware answered by itself: display `Token usage: none, the model was not called` |
+| **TODO 21** | Ask a question with personal data | • Question: `"My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001."` <br> • Run it on `guardedAgent`, display the answer, then `WriteTokenUsage([maskedResponse]);` |
+| **TODO 22** | `HrGuardrail.RunAsync` — block a forbidden topic | • `string? topic = ForbiddenTopics.FirstOrDefault(forbidden => request.Any(message => message.Role == ChatRole.User && message.Text.Contains(forbidden, StringComparison.OrdinalIgnoreCase)));` <br> • `if (topic is not null) { ColoredConsole.WriteWarningLine($"[Guardrail] Request blocked: forbidden topic '{topic}'. The agent was not called."); return new AgentResponse([new ChatMessage(ChatRole.Assistant, "I can't help with salaries or passwords. Please contact the HR department directly.")]); }` <br> • Returning without calling `innerAgent` ends the run: no model call, no tokens |
+| **TODO 23** | `HrGuardrail.RunAsync` — mask the personal data | • `int maskedInRequest = MaskPersonalData(request);` then `ColoredConsole.WriteWarningLine($"[Guardrail] Request: {maskedInRequest} personal data item(s) masked before the agent sees them");` <br> • `AgentResponse response = await innerAgent.RunAsync(request, session, options, cancellationToken);` <br> • `int maskedInAnswer = MaskPersonalData(response.Messages);` then `ColoredConsole.WriteWarningLine($"[Guardrail] Answer: {maskedInAnswer} personal data item(s) masked");` and `return response;` <br> • Remove the last line of the method |
+
 ---
 
 ### Step 4: Run and Test
@@ -188,6 +210,9 @@ Every `RunAsync` is a run with its own token usage: an approval flow costs at le
 | Approval loop | `while (approvalRequests.Count > 0)`: answer, run again, check again, until the agent answers with text |
 | `FunctionCallContent` / `FunctionResultContent` | The tool calls and their results in `response.Messages` (same `CallId`): what the tools returned, or `Tool call invocation rejected.` |
 | Policy decision | The decision can come from code as well as from a person: same request, same `CreateResponse`. In real applications a policy approves the routine calls and leaves the rest to a person |
+| Agent run middleware | `agent.AsBuilder().Use(runFunc: ..., runStreamingFunc: ...).Build()`: a function called around every run, with the messages of the run, the session, the options and the inner agent. The original agent is not modified |
+| Guardrail | A check around the run: block a request (return an `AgentResponse` without calling the inner agent), or change the request / the answer before passing them on |
+| `runStreamingFunc: null` | Only the non-streaming function is given: a streaming run of the wrapped agent runs in non-streaming mode (the official sample does the same for its guardrails) |
 
 ## Namespaces Reference
 
@@ -198,7 +223,8 @@ Every `RunAsync` is a run with its own token usage: an approval flow costs at le
 | `System.ClientModel` | `ApiKeyCredential` |
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
-| `Microsoft.Agents.AI` | `AIAgent`, `AgentSession`, `AgentResponse` |
+| `Microsoft.Agents.AI` | `AIAgent`, `AgentSession`, `AgentResponse`, `AsBuilder()` and its `Use(runFunc: ..., runStreamingFunc: ...)` |
+| `System.Text.RegularExpressions` | `Regex` (personal data patterns of the guardrail) |
 | `Microsoft.Extensions.AI` | `AIFunctionFactory`, `AIFunction`, `AITool`, `ApprovalRequiredAIFunction`, `ToolApprovalRequestContent`, `FunctionCallContent`, `FunctionResultContent`, `ChatRole` |
 | `using ChatMessage = Microsoft.Extensions.AI.ChatMessage;` | Alias: `OpenAI.Chat` also defines a `ChatMessage` type |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
@@ -250,6 +276,21 @@ Token Usage (2 runs):
   Input tokens: xxx
   Output tokens: xxx
   Total tokens: xxx
+----------------------------------------
+=== Scenario 3: Guardrails with an agent run middleware ===
+User: What is the salary of the employee EMP002?
+[Guardrail] Request blocked: forbidden topic 'salary'. The agent was not called.
+Agent: I can't help with salaries or passwords. Please contact the HR department directly.
+Token usage: none, the model was not called
+User: My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001.
+[Guardrail] Request: 2 personal data item(s) masked before the agent sees them
+[Guardrail] Answer: 0 personal data item(s) masked
+Agent: Employee EMP001, Alice Martin, was part of the Engineering department and left the company on December 31, 2025.
+----------------------------------------
+Token Usage (1 runs):
+  Input tokens: 432
+  Output tokens: 44
+  Total tokens: 476
 ```
 
 Answers vary from one run to another. In scenario 2 the model usually looks up both employees, then asks for the two deletions at once (`2 approval request(s) pending`, two runs in total); it may also ask for them one after the other (`1 approval request(s) pending` twice, three runs): the loop handles both. Among the tool results of one run, the rejected calls are listed before the executed ones.
@@ -301,6 +342,9 @@ The following files should be modified:
 - **Waiting for a person**: between the request and the answer, persist the session with `SerializeSessionAsync` / `DeserializeSessionAsync` (Lab 05, official sample `Agent_Step03_PersistedConversations`); the recorded requests travel with it.
 - **"Don't ask again"**: `agent.AsBuilder().UseToolApproval().Build()` adds the `ToolApprovalAgent` middleware; answering with `request.CreateAlwaysApproveToolResponse()` (or `CreateAlwaysApproveToolWithArgumentsResponse()`) records a standing rule in the session, and later matching calls are approved automatically, one request at a time.
 - **All calls as requests**: `ChatClientAgentOptions.DisableApprovalNotRequiredFunctionBypassing = true` surfaces every call of a turn that contains a sensitive one, including the harmless ones (`RequiresConfirmation`, still experimental, then tells them apart).
+- **Guardrails with a streaming run**: give a `runStreamingFunc` too (`IAsyncEnumerable<AgentResponseUpdate>`): it can block before the first update, but a check on the whole answer has to collect the updates first.
+- **Real personal data detection**: the patterns of `MaskPersonalData` are a demo. Agent Framework integrates Microsoft Purview as a middleware for data security and compliance checks ([Purview](https://learn.microsoft.com/agent-framework/integrations/by-component/middleware/purview?pivots=programming-language-csharp)).
+- **The three levels of middleware**: agent run (this lab), function calling (Lab 03, scenario 4) and `IChatClient` (Lab 11). See [Agent Middleware](https://learn.microsoft.com/agent-framework/concepts/agents/middleware/?pivots=programming-language-csharp).
 - **Harness agent**: `chatClient.AsHarnessAgent(...)` preconfigures the same approval flow with the "don't ask again" middleware and optional auto-approval rules. See [Using function tools with human in the loop approvals](https://learn.microsoft.com/agent-framework/agents/tools/tool-approval?pivots=programming-language-csharp).
 
 ## Coming from an older version of the lab?

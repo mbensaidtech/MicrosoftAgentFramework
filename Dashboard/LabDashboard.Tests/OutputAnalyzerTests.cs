@@ -171,17 +171,20 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 2: Function tools calling - using reflection ===",
-        "Tools that will be available to the agent: GetEmployeeInfo, GetMeetingRooms, BookMeetingRoom",
-        "",
+        "=== Scenario 2: Function tools calling - a plugin that declares its tools ===",
+        "Tools declared by the plugin: get_meeting_rooms, book_meeting_room",
+        "[Tool] get_meeting_rooms returned: Available Meeting Rooms:",
+        "[Tool] book_meeting_room returned: Cannot book: 2025-12-16 is in the past (today is 2026-10-25).",
+        "[Tool] book_meeting_room returned: Booking confirmed!",
         "1. **Innovation Lab (ROOM-A)**",
-        "The **Innovation Lab (ROOM-A)** has been successfully booked for the employee with ID **EMP001**.",
+        "- The booking for **ROOM-A** on **2025-12-16** could not be confirmed as the date is in the past.",
+        "- The booking for **ROOM-B** on **2026-10-26** has been successfully confirmed for the employee with ID **EMP002**.",
         "",
         "-------------------------------------------------------------------------------",
         "",
         "Token Usage:",
-        "  Input tokens: 1110",
-        "  Output tokens: 235",
+        "  Input tokens: 1186",
+        "  Output tokens: 159",
         "  Total tokens: 1345",
         "",
         "-------------------------------------------------------------------------------",
@@ -203,7 +206,7 @@ public class OutputAnalyzerTests
         "=== Scenario 4: Function calling middleware ===",
         "[Middleware] Calling get_employee_info(employeeId: EMP003)",
         "[Middleware] get_employee_info returned: Employee Found:",
-        "[Middleware] Calling book_meeting_room(roomId: ROOM-B, employeeId: EMP003, date: 2026-10-15, startTime: 14:00, endTime: 15:00, subject: Design Review)",
+        "[Middleware] Calling book_meeting_room(roomId: ROOM-B, employeeId: EMP003, date: 2026-10-27, startTime: 14:00, endTime: 15:00, subject: Design Review)",
         "[Middleware] book_meeting_room returned: Booking confirmed!",
         "- **Name:** Charlie Brown",
         "",
@@ -227,7 +230,8 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 2: Function tools calling - using reflection ===",
+        "=== Scenario 2: Function tools calling - a plugin that declares its tools ===",
+        "Tools declared by the plugin: ",
         "",
         "-------------------------------------------------------------------------------",
         "",
@@ -253,16 +257,16 @@ public class OutputAnalyzerTests
     public void A_lab03_answer_without_tool_data_fails_its_checks()
     {
         LabDefinition lab03 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab03")!;
-        // The agent answered without calling the tools: no employee data, no booking, no notification id, no middleware trace.
+        // The agent answered without calling the tools: no employee data, no tool result, no notification id, no middleware trace.
         string[] output =
         [
             "=== Scenario 1: Function tools calling - basic ===",
             "Tools available to the agent:",
             "- get_employee_info: ",
             "I don't have access to employee records.",
-            "=== Scenario 2: Function tools calling - using reflection ===",
-            "Tools that will be available to the agent: GetEmployeeInfo, GetMeetingRooms, BookMeetingRoom, SearchEmployees",
-            "I cannot list the rooms.",
+            "=== Scenario 2: Function tools calling - a plugin that declares its tools ===",
+            "Tools declared by the plugin: get_meeting_rooms, book_meeting_room, cancel_all_bookings",
+            "The room ROOM-A has been booked for 2025-12-16.",
             "=== Scenario 3: Function tools calling - static tools with DI ===",
             "It appears that there was an error while trying to send the notification 'Meeting at 3pm tomorrow'.",
             "=== Scenario 4: Function calling middleware ===",
@@ -460,35 +464,29 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===",
+        "=== Scenario 2: Bound the chat history with a chat reducer ===",
+        "",
+        "",
         "User: Hello, my name is Ada. What is the capital of France?",
-        "",
-        "",
         "Agent: The capital of France is Paris.",
-        "Chat history stored in the vector store under the key: 58cc7732b4d04a34a96c81bb0915bcac",
-        "Serialized session:",
-        "{",
-        "  \"stateBag\": {",
-        "    \"VectorChatHistoryProvider\": {",
-        "      \"sessionDbKey\": \"58cc7732b4d04a34a96c81bb0915bcac\"",
-        "    }",
-        "  }",
-        "}",
+        "Messages kept in the session: 2 (input tokens of this run: 47)",
         "",
-        "-------------------------------------------------------------------------------",
         "",
-        "Restoring the session from the saved JSON...",
+        "User: And what is the capital of Italy?",
+        "Agent: The capital of Italy is Rome.",
+        "Messages kept in the session: 4 (input tokens of this run: 73)",
+        "",
+        "",
         "User: What is the population of that city? And what is my name?",
-        "",
-        "",
-        "Agent: As of 2023, the population of Paris is approximately 2.1 million. Your name is Ada.",
+        "Agent: As of 2023, Rome's population is approximately 2.8 million. I don't know your name.",
+        "Messages kept in the session: 4 (input tokens of this run: 73)",
         "",
         "-------------------------------------------------------------------------------",
         "",
         "Token Usage (follow-up):",
-        "  Input tokens: 79",
+        "  Input tokens: 73",
         "  Output tokens: 23",
-        "  Total tokens: 102",
+        "  Total tokens: 96",
         "",
         "-------------------------------------------------------------------------------",
         "",
@@ -536,7 +534,7 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===",
+        "=== Scenario 2: Bound the chat history with a chat reducer ===",
         "",
         "-------------------------------------------------------------------------------",
         "",
@@ -558,7 +556,7 @@ public class OutputAnalyzerTests
     public void A_lab05_conversation_that_lost_its_history_fails_its_checks()
     {
         LabDefinition lab05 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab05")!;
-        // The follow-up questions were asked in new sessions, the vector store session also serialized its messages,
+        // The follow-up questions were asked in new sessions, the history of scenario 2 was not bounded (no reducer: the name is still known),
         // and the restarted agent of scenario 3 used another key.
         string[] output =
         [
@@ -571,19 +569,16 @@ public class OutputAnalyzerTests
             "}",
             "Restoring the session from the saved JSON...",
             "Agent: I don't know which city you mean, and I don't know your name.",
-            "=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===",
-            "Chat history stored in the vector store under the key: 846e2685bdcf4ff4921c7627b50aefb6",
-            "Serialized session:",
-            "{",
-            "  \"stateBag\": {",
-            "    \"VectorChatHistoryProvider\": {",
-            "      \"sessionDbKey\": \"846e2685bdcf4ff4921c7627b50aefb6\",",
-            "      \"messages\": []",
-            "    }",
-            "  }",
-            "}",
-            "Restoring the session from the saved JSON...",
-            "Agent: Paris has about 2.1 million inhabitants, but I don't know your name.",
+            "=== Scenario 2: Bound the chat history with a chat reducer ===",
+            "User: Hello, my name is Ada. What is the capital of France?",
+            "Agent: The capital of France is Paris.",
+            "Messages kept in the session: 2 (input tokens of this run: 47)",
+            "User: And what is the capital of Italy?",
+            "Agent: The capital of Italy is Rome.",
+            "Messages kept in the session: 4 (input tokens of this run: 73)",
+            "User: What is the population of that city? And what is my name?",
+            "Agent: Rome has about 2.8 million inhabitants, and your name is Ada.",
+            "Messages kept in the session: 6 (input tokens of this run: 98)",
             "=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===",
             "Serialized session:",
             "{",
@@ -609,7 +604,7 @@ public class OutputAnalyzerTests
         Assert.Equal(
             ["Scenario 1 · Token Usage (follow-up)", "Scenario 2 · Token Usage (follow-up)", "Scenario 3 · Token Usage (follow-up)"],
             usage.Reports.Select(r => r.Label));
-        Assert.Equal(300L, usage.Total!.Value); // 102 + 102 + 96
+        Assert.Equal(294L, usage.Total!.Value); // 102 + 96 + 96
     }
 
     [Fact]
@@ -1163,6 +1158,25 @@ public class OutputAnalyzerTests
         "  Input tokens: 879",
         "  Output tokens: 175",
         "  Total tokens: 1054",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Guardrails with an agent run middleware ===",
+        "User: What is the salary of the employee EMP002?",
+        "[Guardrail] Request blocked: forbidden topic 'salary'. The agent was not called.",
+        "Agent: I can't help with salaries or passwords. Please contact the HR department directly.",
+        "Token usage: none, the model was not called",
+        "User: My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001.",
+        "[Guardrail] Request: 2 personal data item(s) masked before the agent sees them",
+        "[Guardrail] Answer: 0 personal data item(s) masked",
+        "Agent: Employee EMP001, Alice Martin, was part of the Engineering department and left the company on December 31, 2025.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (1 runs):",
+        "  Input tokens: 432",
+        "  Output tokens: 44",
+        "  Total tokens: 476",
     ];
 
     // Standard output of the Lab09 exercise as delivered (TODOs not done yet): no prompt, no approval, no tool.
@@ -1181,6 +1195,10 @@ public class OutputAnalyzerTests
         "",
         "=== Scenario 2: Several approval requests decided by a policy ===",
         "User: The employees EMP001 and EMP002 asked us to erase their data. Look up both employees, then delete the data of each of them.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Guardrails with an agent run middleware ===",
     ];
 
     [Fact]
@@ -1202,6 +1220,7 @@ public class OutputAnalyzerTests
         // Scenario 1: the user approved but the tool never ran (the approval was sent without the session).
         // Scenario 2: the harmless tool was surfaced as an approval request, the policy decisions are inverted,
         // and the deletion of EMP002 was executed although it was rejected.
+        // Scenario 3: no guardrail around the agent.
         string[] output =
         [
             "=== Scenario 1: Human approval at the console ===",
@@ -1226,18 +1245,24 @@ public class OutputAnalyzerTests
             "Tool result (get_employee_info): Employee EMP002: Bob Lee, Finance, currently employed.",
             "Tool result (delete_employee_data): Tool call invocation rejected. EMP002 (Bob Lee) is still employed: only the data of former employees can be deleted.",
             "Tool result (delete_employee_data): Sensitive operation executed: All data for employee 'EMP002' has been permanently deleted. This action cannot be undone.",
+            // Scenario 3: the guardrail was not applied: the model answered the forbidden question and saw the personal data.
+            "=== Scenario 3: Guardrails with an agent run middleware ===",
+            "User: What is the salary of the employee EMP002?",
+            "Agent: I don't have access to salary information.",
+            "Token usage: 312",
+            "Agent: I will call you back at ada.lovelace@example.com about EMP001.",
         ];
 
         Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab09.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Labels_the_two_lab09_token_usage_blocks_with_their_scenario()
+    public void Labels_the_three_lab09_token_usage_blocks_with_their_scenario()
     {
         TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab09SolutionOutput));
 
-        Assert.Equal(["Scenario 1 · Token Usage (2 runs)", "Scenario 2 · Token Usage (2 runs)"], usage.Reports.Select(r => r.Label));
-        Assert.Equal(1409L, usage.Total!.Value); // 355 + 1054
+        Assert.Equal(["Scenario 1 · Token Usage (2 runs)", "Scenario 2 · Token Usage (2 runs)", "Scenario 3 · Token Usage (1 runs)"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(1885L, usage.Total!.Value); // 355 + 1054 + 476
     }
 
     // Standard output of the Lab10 solution, as decoded by the dashboard (spinner lines removed). The [server] lines are the
@@ -1797,7 +1822,7 @@ public class OutputAnalyzerTests
         "Memories of user 'ada' cleared (6 deleted)",
         "First session",
         "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
-        "[Memory] No memory of user 'ada' yet: nothing added to the instructions",
+        "[Memory] No memory of user 'ada' yet: nothing added to the request",
         "[Memory] 5 memories extracted and stored for user 'ada' (extraction run: 265 tokens):",
         "  + The user's name is Ada.",
         "  + The user works as a software developer.",
@@ -1816,7 +1841,7 @@ public class OutputAnalyzerTests
         "",
         "New session (empty chat history)",
         "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
-        "[Memory] 5 memories of user 'ada' added to the instructions",
+        "[Memory] 5 memories of user 'ada' added to the request",
         "[Memory] No new memory for user 'ada' (extraction run: 256 tokens)",
         "Agent: Hello, Ada! It's great to hear from you. For dinner, how about a delicious vegetarian stir-fry with tofu, colorful veggies, and rice? You can toss in some teriyaki sauce for extra flavor!",
         "",
@@ -1832,11 +1857,11 @@ public class OutputAnalyzerTests
         "-------------------------------------------------------------------------------",
         "",
         "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
-        "[Memory] 5 memories of user 'ada' added to the instructions",
+        "[Memory] 5 memories of user 'ada' added to the request",
         "[Memory] No user message in this run: nothing to extract",
         "Agent: Hello, Ada! I'm your friendly personal assistant, and I'm here to help you with anything you need. How can I assist you today?",
         "Type a message, or an empty line / 'exit' to end the chat.",
-        "You: [Memory] 5 memories of user 'ada' added to the instructions",
+        "You: [Memory] 5 memories of user 'ada' added to the request",
         "[Memory] 1 memory extracted and stored for user 'ada' (extraction run: 254 tokens):",
         "  + The user works remotely on Fridays.",
         "Agent: That's great to hear, Ada! Working remotely on Fridays can be a nice way to wrap up the week. Do you have any special plans for your remote workday, or do you like to keep it flexible?",
@@ -1976,7 +2001,7 @@ public class OutputAnalyzerTests
             "=== Scenario 1: Remember the user from one session to another ===",
             "New session (empty chat history)",
             "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
-            "[Memory] 5 memories of user 'ada' added to the instructions",
+            "[Memory] 5 memories of user 'ada' added to the request",
             "[Memory] No new memory for user 'ada' (extraction run: 256 tokens)",
             .. answer.Split('|'),
             "",

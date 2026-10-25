@@ -11,13 +11,13 @@ namespace AIAgentWithAIContextProvider;
 public static class MemoryConsole
 {
     /// <summary>
-    /// Written by the provider before the model call: the memories added to the instructions of the run.
+    /// Written by the provider before the model call: the memories added to the request of the run (a message).
     /// </summary>
     public static void WriteMemoriesProvided(string userId, IReadOnlyCollection<string> memories)
     {
         ColoredConsole.WriteSystemLine(memories.Count == 0
-            ? $"[Memory] No memory of user '{userId}' yet: nothing added to the instructions"
-            : $"[Memory] {Count(memories)} of user '{userId}' added to the instructions");
+            ? $"[Memory] No memory of user '{userId}' yet: nothing added to the request"
+            : $"[Memory] {Count(memories)} of user '{userId}' added to the request");
     }
 
     /// <summary>

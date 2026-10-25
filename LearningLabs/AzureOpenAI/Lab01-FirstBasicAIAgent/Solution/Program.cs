@@ -4,6 +4,7 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using OpenAI;
 using OpenAI.Chat;
+using OpenAI.Responses;
 using AIExtensions = Microsoft.Extensions.AI;
 using CommonUtilities;
 
@@ -12,8 +13,8 @@ using FirstBasicAIAgent;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3], [4], [5] or [1, 2, 3, 4, 5] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2, 3, 4, 5];
+// Set to: [1], [2], [3], [4], [5], [6] or [1, 2, 3, 4, 5, 6] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2, 3, 4, 5, 6];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -178,6 +179,38 @@ if (ShouldRunScenario(5))
     ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {streamedResponse.Usage?.InputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {streamedResponse.Usage?.OutputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {streamedResponse.Usage?.TotalTokenCount}");
+}
+
+#endregion
+
+#region Scenario 6: Responses API - The same agent on the API that Microsoft recommends
+
+if (ShouldRunScenario(6))
+{
+    ColoredConsole.WriteDividerLine();
+
+    // Step 1: Create the same geography agent on the Responses API, from the same OpenAIClient.
+    // With Chat Completions, the deployment is chosen by GetChatClient(...); with Responses, it is the model of each request.
+    // GetResponsesClient() is still flagged [Experimental] (OPENAI001) by the OpenAI SDK.
+#pragma warning disable OPENAI001
+    AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(
+        model: settings.ChatDeploymentName,
+        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
+        name: "GeographyAgent");
+#pragma warning restore OPENAI001
+
+    // Step 2: Run it exactly like the Chat Completions agents: RunAsync and AgentResponse do not change
+    AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");
+
+    // Step 3: Display the answer, the id of the response (stored by the service by default) and the token usage
+    ColoredConsole.WriteInfoLine("=== Scenario 6: Responses API ===");
+    ColoredConsole.WritePrimaryLogLine(responsesResponse.Text);
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");
+    ColoredConsole.WritePrimaryLogLine("Token Usage (Responses API): ");
+    ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {responsesResponse.Usage?.InputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {responsesResponse.Usage?.OutputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {responsesResponse.Usage?.TotalTokenCount}");
 }
 
 #endregion

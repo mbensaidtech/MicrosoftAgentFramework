@@ -5,14 +5,15 @@
       "number": "01",
       "track": "Azure OpenAI",
       "title": "First Basic AI Agent",
-      "summary": "Create your first agent on Azure OpenAI, give it instructions, read token usage and stream a response.",
+      "summary": "Create your first agent on Azure OpenAI, give it instructions, read token usage, stream a response, and run the same agent on the Responses API recommended by Microsoft.",
       "level": "Beginner",
       "objectives": [
         "Connect to Azure OpenAI through the v1 API (API key or Microsoft Entra ID)",
         "Turn a ChatClient into an AIAgent with AsAIAgent()",
         "Give an agent instructions and a name",
         "Run an agent with a prompt or with ChatMessages",
-        "Read token usage, including after a streamed run"
+        "Read token usage, including after a streamed run",
+        "Run the same agent on the Responses API and choose between Chat Completions and Responses"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent",
       "startProject": "Start/FirstBasicAIAgent.csproj",
@@ -53,6 +54,21 @@
           "id": "scenario5-usage",
           "description": "Scenario 5 - token usage of the streamed run displayed",
           "pattern": "(?is)=== Scenario 5:.*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario6",
+          "description": "Scenario 6 - the agent on the Responses API answered",
+          "pattern": "^=== Scenario 6:[^\\n]*===\\n\\S"
+        },
+        {
+          "id": "scenario6-response-id",
+          "description": "Scenario 6 - the response was stored by the service (resp_... id)",
+          "pattern": "(?is)^=== Scenario 6:.*?^Response id \\(stored by the service\\): resp_\\S+\\s*$"
+        },
+        {
+          "id": "scenario6-usage",
+          "description": "Scenario 6 - token usage of the Responses API run displayed",
+          "pattern": "(?is)=== Scenario 6:.*?input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -60,13 +76,14 @@
           "track": "Azure OpenAI",
           "title": "Premier agent IA",
           "level": "Débutant",
-          "summary": "Créez votre premier agent sur Azure OpenAI, donnez-lui des instructions, lisez la consommation de tokens et diffusez une réponse en streaming.",
+          "summary": "Créez votre premier agent sur Azure OpenAI, donnez-lui des instructions, lisez la consommation de tokens, diffusez une réponse en streaming et exécutez le même agent sur l'API Responses recommandée par Microsoft.",
           "objectives": [
             "Se connecter à Azure OpenAI via l'API v1 (clé API ou Microsoft Entra ID)",
             "Transformer un ChatClient en AIAgent avec AsAIAgent()",
             "Donner des instructions et un nom à un agent",
             "Exécuter un agent avec un prompt ou avec des ChatMessage",
-            "Lire la consommation de tokens, y compris après une exécution en streaming"
+            "Lire la consommation de tokens, y compris après une exécution en streaming",
+            "Exécuter le même agent sur l'API Responses et choisir entre Chat Completions et Responses"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -75,7 +92,10 @@
             "scenario3": "Scénario 3 - l'agent a répondu aux ChatMessage",
             "scenario4": "Scénario 4 - consommation de tokens affichée",
             "scenario5": "Scénario 5 - la réponse en streaming a été affichée",
-            "scenario5-usage": "Scénario 5 - consommation de tokens du streaming affichée"
+            "scenario5-usage": "Scénario 5 - consommation de tokens du streaming affichée",
+            "scenario6": "Scénario 6 - l'agent sur l'API Responses a répondu",
+            "scenario6-response-id": "Scénario 6 - la réponse a été stockée par le service (id resp_...)",
+            "scenario6-usage": "Scénario 6 - consommation de tokens de l'exécution sur l'API Responses affichée"
           }
         }
       }
@@ -177,12 +197,12 @@
       "number": "03",
       "track": "Azure OpenAI",
       "title": "AI Agent With Function Tools",
-      "summary": "Give an agent .NET methods it can call: register tools one by one, discover them with reflection, inject services into tools and trace every tool call with a middleware.",
+      "summary": "Give an agent .NET methods it can call: register tools one by one, write a plugin that declares its tools and checks the arguments chosen by the model, inject services into tools and trace every tool call with a middleware.",
       "level": "Beginner",
       "objectives": [
         "Turn .NET methods into tools with AIFunctionFactory.Create() and describe them with [Description]",
         "Give tools to an agent with AsAIAgent(..., tools: ...)",
-        "Discover tools with reflection",
+        "Write a plugin that declares its tools and checks the arguments chosen by the model",
         "Let tools resolve services with an IServiceProvider parameter and AsAIAgent(..., services: ...)",
         "Trace every tool call with a function calling middleware (AsBuilder().Use(...))"
       ],
@@ -213,13 +233,18 @@
         },
         {
           "id": "scenario2-tools",
-          "description": "Scenario 2 - reflection found exactly the three public methods",
-          "pattern": "^Tools that will be available to the agent: GetEmployeeInfo, GetMeetingRooms, BookMeetingRoom\\s*$"
+          "description": "Scenario 2 - the plugin declared exactly its two tools",
+          "pattern": "^Tools declared by the plugin: get_meeting_rooms, book_meeting_room\\s*$"
         },
         {
           "id": "scenario2",
-          "description": "Scenario 2 - the agent listed the rooms and booked ROOM-A",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?Innovation Lab(?:(?!^=== Scenario).)*?\\b(?:booked|confirmed)\\b"
+          "description": "Scenario 2 - the plugin refused the booking in the past and explained why to the model",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Tool\\] book_meeting_room returned: Cannot book: 2025-12-16 is in the past"
+        },
+        {
+          "id": "scenario2-booked",
+          "description": "Scenario 2 - the booking of tomorrow was confirmed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Tool\\] book_meeting_room returned: Booking confirmed!"
         },
         {
           "id": "scenario2-usage",
@@ -257,11 +282,11 @@
           "track": "Azure OpenAI",
           "title": "Agent IA avec function tools",
           "level": "Débutant",
-          "summary": "Donnez à un agent des méthodes .NET qu'il peut appeler : enregistrez les outils un par un, découvrez-les par réflexion, injectez des services dans les outils et tracez chaque appel d'outil avec un middleware.",
+          "summary": "Donnez à un agent des méthodes .NET qu'il peut appeler : enregistrez les outils un par un, écrivez un plugin qui déclare ses outils et vérifie les arguments choisis par le modèle, injectez des services dans les outils et tracez chaque appel d'outil avec un middleware.",
           "objectives": [
             "Transformer des méthodes .NET en outils avec AIFunctionFactory.Create() et les décrire avec [Description]",
             "Donner des outils à un agent avec AsAIAgent(..., tools: ...)",
-            "Découvrir des outils par réflexion",
+            "Écrire un plugin qui déclare ses outils et vérifie les arguments choisis par le modèle",
             "Permettre aux outils de résoudre des services avec un paramètre IServiceProvider et AsAIAgent(..., services: ...)",
             "Tracer chaque appel d'outil avec un middleware d'appel de fonction (AsBuilder().Use(...))"
           ],
@@ -270,8 +295,9 @@
             "scenario1-tools": "Scénario 1 - chaque outil a la description issue de [Description]",
             "scenario1": "Scénario 1 - l'agent a répondu avec les données renvoyées par get_employee_info",
             "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
-            "scenario2-tools": "Scénario 2 - la réflexion a trouvé exactement les trois méthodes publiques",
-            "scenario2": "Scénario 2 - l'agent a listé les salles et réservé ROOM-A",
+            "scenario2-tools": "Scénario 2 - le plugin a déclaré exactement ses deux outils",
+            "scenario2": "Scénario 2 - le plugin a refusé la réservation dans le passé et expliqué pourquoi au modèle",
+            "scenario2-booked": "Scénario 2 - la réservation de demain a été confirmée",
             "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
             "scenario3": "Scénario 3 - la notification a été enregistrée et relue via le repository injecté",
             "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
@@ -381,7 +407,7 @@
       "number": "05",
       "track": "Azure OpenAI",
       "title": "AI Agent with Sessions",
-      "summary": "Hold multi-turn conversations in an AgentSession, save them and resume them later: chat history in the session, in a vector store, then in MongoDB with a custom ChatHistoryProvider. Scenario 3 needs the lab's MongoDB container (docker compose up -d).",
+      "summary": "Hold multi-turn conversations in an AgentSession, save them and resume them later: chat history in the session, bounded by a chat reducer, then in MongoDB with a custom ChatHistoryProvider. Scenario 3 needs the lab's MongoDB container (docker compose up -d).",
       "level": "Intermediate",
       "objectives": [
         "Create a session with CreateSessionAsync() and run the agent in it",
@@ -389,7 +415,7 @@
         "Read the chat history kept by the default InMemoryChatHistoryProvider",
         "Plug a custom ChatHistoryProvider with ChatClientAgentOptions.ChatHistoryProvider",
         "Keep the per-session state of a provider in AgentSession.StateBag (ProviderSessionState<T>)",
-        "Store the chat history in a vector store and in MongoDB"
+        "Bound the chat history with a chat reducer, and store it in MongoDB"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab05-AIAgentWithThreads",
       "startProject": "Start/AIAgentWithThreads.csproj",
@@ -422,14 +448,14 @@
           "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
         },
         {
-          "id": "scenario2-key",
-          "description": "Scenario 2 - the serialized session only contains the key shown by the VectorChatHistoryProvider",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Chat history stored in the vector store under the key: ([0-9a-f]{32})\\s*^Serialized session:\\s*\\{\\s*\"stateBag\":\\s*\\{\\s*\"VectorChatHistoryProvider\":\\s*\\{\\s*\"sessionDbKey\":\\s*\"\\1\"\\s*\\}\\s*\\}\\s*\\}"
+          "id": "scenario2-bounded",
+          "description": "Scenario 2 - the chat reducer kept the history bounded: 2 messages after the first turn, never more than 4",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Messages kept in the session: 2 \\((?:(?!^=== Scenario).)*?^Messages kept in the session: 4 \\((?:(?!^=== Scenario).)*?^Messages kept in the session: 4 \\("
         },
         {
-          "id": "scenario2-followup",
-          "description": "Scenario 2 - the follow-up answer, reloaded from the vector store, knows Paris and Ada",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Restoring the session from the saved JSON\\.\\.\\.(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+          "id": "scenario2-forgotten",
+          "description": "Scenario 2 - the last answer knows the city of the previous turn (Rome) but not the name given in the first turn",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?User: What is the population of that city\\? And what is my name\\?\\s*$\\s*^Agent: (?![^\\n]*\\bAda\\b)[^\\n]*\\bRome\\b"
         },
         {
           "id": "scenario2-usage",
@@ -457,14 +483,14 @@
           "track": "Azure OpenAI",
           "title": "Agent IA avec sessions",
           "level": "Intermédiaire",
-          "summary": "Menez des conversations multi-tours dans une AgentSession, sauvegardez-les et reprenez-les plus tard : historique dans la session, dans un vector store, puis dans MongoDB avec un ChatHistoryProvider personnalisé. Le scénario 3 nécessite le conteneur MongoDB du lab (docker compose up -d).",
+          "summary": "Menez des conversations multi-tours dans une AgentSession, sauvegardez-les et reprenez-les plus tard : historique dans la session, borné par un réducteur, puis dans MongoDB avec un ChatHistoryProvider personnalisé. Le scénario 3 nécessite le conteneur MongoDB du lab (docker compose up -d).",
           "objectives": [
             "Créer une session avec CreateSessionAsync() et y exécuter l'agent",
             "Sauvegarder et reprendre une session avec SerializeSessionAsync() et DeserializeSessionAsync()",
             "Lire l'historique conservé par l'InMemoryChatHistoryProvider par défaut",
             "Brancher un ChatHistoryProvider personnalisé avec ChatClientAgentOptions.ChatHistoryProvider",
             "Conserver l'état par session d'un provider dans AgentSession.StateBag (ProviderSessionState<T>)",
-            "Stocker l'historique dans un vector store et dans MongoDB"
+            "Borner l'historique avec un réducteur, et le stocker dans MongoDB"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -472,8 +498,8 @@
             "scenario1-serialized": "Scénario 1 - la session sérialisée contient les messages de l'InMemoryChatHistoryProvider",
             "scenario1-followup": "Scénario 1 - après la restauration, la réponse de suivi connaît la ville (Paris) et le prénom (Ada)",
             "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
-            "scenario2-key": "Scénario 2 - la session sérialisée ne contient que la clé affichée par le VectorChatHistoryProvider",
-            "scenario2-followup": "Scénario 2 - la réponse de suivi, rechargée depuis le vector store, connaît Paris et Ada",
+            "scenario2-bounded": "Scénario 2 - le réducteur a borné l'historique : 2 messages après le premier tour, jamais plus de 4",
+            "scenario2-forgotten": "Scénario 2 - la dernière réponse connaît la ville du tour précédent (Rome) mais pas le nom donné au premier tour",
             "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
             "scenario3-restart": "Scénario 3 - un nouvel agent a restauré la session avec la clé enregistrée dans la session sérialisée",
             "scenario3-followup": "Scénario 3 - le nouvel agent, avec l'historique venu de MongoDB, connaît Paris et Ada",
@@ -705,7 +731,8 @@
         "Fill and search a VectorStoreCollection (UpsertAsync, SearchAsync, VectorSearchResult<T>)",
         "Expose a semantic search as a function tool of an agent (agentic RAG)",
         "Add RAG to an agent with TextSearchProvider and ChatClientAgentOptions.AIContextProviders",
-        "Compare both approaches: tool calls, injected context, token usage"
+        "Compare both approaches: tool calls, injected context, token usage",
+        "Treat the retrieved content as untrusted data (indirect prompt injection)"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab07-AgenticRAG-VectorStore",
       "startProject": "Start/AgenticRAG.csproj",
@@ -785,7 +812,8 @@
             "Remplir et interroger une VectorStoreCollection (UpsertAsync, SearchAsync, VectorSearchResult<T>)",
             "Exposer une recherche sémantique comme function tool d'un agent (RAG agentique)",
             "Ajouter du RAG à un agent avec TextSearchProvider et ChatClientAgentOptions.AIContextProviders",
-            "Comparer les deux approches : appels d'outil, contexte injecté, consommation de tokens"
+            "Comparer les deux approches : appels d'outil, contexte injecté, consommation de tokens",
+            "Traiter le contenu récupéré comme une donnée non fiable (injection de prompt indirecte)"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -912,15 +940,16 @@
       "id": "azureopenai-lab09",
       "number": "09",
       "track": "Azure OpenAI",
-      "title": "AI Agent With Function Tools and Human Approval",
-      "summary": "Make an agent pause before a sensitive tool runs: wrap the tool in ApprovalRequiredAIFunction, read the approval requests from the response, answer them in the same session (a person at the console, then a policy with a reason) and see what the tools really returned.",
+      "title": "Control an Agent: Human Approval and Guardrails",
+      "summary": "Make an agent pause before a sensitive tool runs: wrap the tool in ApprovalRequiredAIFunction, read the approval requests from the response, answer them in the same session (a person at the console, then a policy with a reason) and see what the tools really returned. Then wrap the agent in an agent run middleware that blocks a forbidden request and masks personal data.",
       "level": "Intermediate",
       "objectives": [
         "Mark a tool as requiring approval with ApprovalRequiredAIFunction",
         "Read the ToolApprovalRequestContent items from response.Messages and show the function call to approve",
         "Answer with CreateResponse(approved, reason) in a user ChatMessage and continue the run in the same AgentSession (approval binding)",
         "Run the approval loop until the agent no longer asks, with a human decision or a policy decision",
-        "Read the tool results and the rejections from the response messages, and the token usage of the whole flow"
+        "Read the tool results and the rejections from the response messages, and the token usage of the whole flow",
+        "Add guardrails with an agent run middleware: answer without calling the agent, mask personal data in the request and in the answer"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab09-AIAgentWithFunctionToolsHumanApproval",
       "startProject": "Start/AIAgentWithFunctionToolsHumanApproval.csproj",
@@ -972,20 +1001,41 @@
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
           "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3-blocked",
+          "description": "Scenario 3 - the guardrail blocked the forbidden question: the model was not called",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Request blocked: forbidden topic 'salary'\\. The agent was not called\\.\\s*$(?:(?!^=== Scenario).)*?^Token usage: none, the model was not called"
+        },
+        {
+          "id": "scenario3-masked",
+          "description": "Scenario 3 - the guardrail masked the e-mail and the phone number of the request before the agent saw them",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Request: 2 personal data item\\(s\\) masked before the agent sees them"
+        },
+        {
+          "id": "scenario3-answer",
+          "description": "Scenario 3 - the answer gives the status of EMP001 and contains no personal data",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Answer: \\d+ personal data item\\(s\\) masked\\s*$\\s*^Agent: (?![^\\n]*@example\\.com)[^\\n]*\\b(?:Alice|EMP001)\\b"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
         "fr": {
           "track": "Azure OpenAI",
-          "title": "Agent IA avec function tools et approbation humaine",
+          "title": "Contrôler un agent : approbation humaine et garde-fous",
           "level": "Intermédiaire",
-          "summary": "Faites marquer une pause à un agent avant l'exécution d'un outil sensible : enveloppez l'outil dans ApprovalRequiredAIFunction, lisez les demandes d'approbation dans la réponse, répondez-y dans la même session (une personne à la console, puis une politique avec un motif) et voyez ce que les outils ont réellement renvoyé.",
+          "summary": "Faites marquer une pause à un agent avant l'exécution d'un outil sensible : enveloppez l'outil dans ApprovalRequiredAIFunction, lisez les demandes d'approbation dans la réponse, répondez-y dans la même session (une personne à la console, puis une politique avec un motif) et voyez ce que les outils ont réellement renvoyé. Enveloppez ensuite l'agent dans un middleware d'exécution qui bloque une demande interdite et masque les données personnelles.",
           "objectives": [
             "Marquer un outil comme nécessitant une approbation avec ApprovalRequiredAIFunction",
             "Lire les ToolApprovalRequestContent dans response.Messages et afficher l'appel de fonction à approuver",
             "Répondre avec CreateResponse(approved, reason) dans un ChatMessage utilisateur et poursuivre le run dans la même AgentSession (liaison des approbations)",
             "Exécuter la boucle d'approbation jusqu'à ce que l'agent ne demande plus rien, avec une décision humaine ou une décision de politique",
-            "Lire les résultats d'outils et les rejets dans les messages de la réponse, et la consommation de tokens de tout le flux"
+            "Lire les résultats d'outils et les rejets dans les messages de la réponse, et la consommation de tokens de tout le flux",
+            "Ajouter des garde-fous avec un middleware d'exécution : répondre sans appeler l'agent, masquer les données personnelles de la requête et de la réponse"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -996,7 +1046,11 @@
             "scenario2-policy": "Scénario 2 - la politique a approuvé la suppression d'EMP001 (ancien employé) et rejeté celle d'EMP002 (toujours employé)",
             "scenario2-executed": "Scénario 2 - la suppression approuvée (EMP001) a été exécutée",
             "scenario2-rejected": "Scénario 2 - la suppression rejetée (EMP002) n'a pas été exécutée : le modèle a reçu le rejet et son motif",
-            "scenario2-usage": "Scénario 2 - consommation de tokens affichée"
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
+            "scenario3-blocked": "Scénario 3 - le garde-fou a bloqué la question interdite : le modèle n'a pas été appelé",
+            "scenario3-masked": "Scénario 3 - le garde-fou a masqué l'e-mail et le numéro de téléphone de la requête avant que l'agent ne les voie",
+            "scenario3-answer": "Scénario 3 - la réponse donne le statut d'EMP001 et ne contient aucune donnée personnelle",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
           }
         }
       }
@@ -1212,11 +1266,11 @@
       "number": "12",
       "track": "Azure OpenAI",
       "title": "AI Agent with an AI Context Provider",
-      "summary": "Give an agent a long-term memory of its user: a custom AIContextProvider adds the memories stored in MongoDB to the instructions before each run, and extracts the new facts from the user message after it, with another agent and structured output. The memories follow the user from one session to another. Needs the lab's MongoDB container (docker compose up -d); scenario 2 is a chat that waits for your messages.",
+      "summary": "Give an agent a long-term memory of its user: a custom AIContextProvider adds the memories stored in MongoDB to each run, as a message framed as data (not as instructions), and extracts the new facts from the user message after it, with another agent and structured output. The memories follow the user from one session to another. Needs the lab's MongoDB container (docker compose up -d); scenario 2 is a chat that waits for your messages.",
       "level": "Intermediate",
       "objectives": [
         "Write a custom AIContextProvider: ProvideAIContextAsync before the model call, StoreAIContextAsync after a successful run",
-        "Return additional instructions for a run with AIContext",
+        "Return additional context for a run with AIContext: a message framed as data, kept out of the chat history",
         "Attach the provider to the agent with ChatClientAgentOptions.AIContextProviders (one instance shared by all the sessions)",
         "Keep the per-session state of the provider (the user id) in the session with ProviderSessionState<T> and a state initializer",
         "Extract facts from the user message with another agent and structured output (RunAsync<T>)",
@@ -1236,7 +1290,7 @@
         {
           "id": "scenario1-provide-empty",
           "description": "Scenario 1 - after the memories of 'ada' were cleared, the provider ran before the first model call and found no memory",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories of user 'ada' cleared \\(\\d+ deleted\\)\\s*$(?:(?!^=== Scenario).)*?^First session\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] No memory of user 'ada' yet: nothing added to the instructions\\s*$"
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories of user 'ada' cleared \\(\\d+ deleted\\)\\s*$(?:(?!^=== Scenario).)*?^First session\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] No memory of user 'ada' yet: nothing added to the request\\s*$"
         },
         {
           "id": "scenario1-extracted",
@@ -1251,7 +1305,7 @@
         {
           "id": "scenario1-recall",
           "description": "Scenario 1 - in a new session (empty chat history), the provider added the memories and the answer uses them: the name Ada and one of her preferences (vegetarian, the Alps, Lyon)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^New session \\(empty chat history\\)\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the instructions\\s*$(?:(?!^=== Scenario).)*?^Agent: (?=(?:(?!^Token Usage).)*?\\bAda\\b)(?=(?:(?!^Token Usage).)*?\\b(?:vegetarian|tofu|Alps|Lyon)\\b)"
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^New session \\(empty chat history\\)\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$(?:(?!^=== Scenario).)*?^Agent: (?=(?:(?!^Token Usage).)*?\\bAda\\b)(?=(?:(?!^Token Usage).)*?\\b(?:vegetarian|tofu|Alps|Lyon)\\b)"
         },
         {
           "id": "scenario1-usage",
@@ -1261,7 +1315,7 @@
         {
           "id": "scenario2-greeting",
           "description": "Scenario 2 - the agent spoke first (RunAsync without a message): the provider added the memories, had nothing to extract, and the greeting uses the name Ada",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the instructions\\s*$\\s*^\\[Memory\\] No user message in this run: nothing to extract\\s*$\\s*^Agent: (?=(?:(?!^Type a message).)*?\\bAda\\b)"
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$\\s*^\\[Memory\\] No user message in this run: nothing to extract\\s*$\\s*^Agent: (?=(?:(?!^Type a message).)*?\\bAda\\b)"
         }
       ],
       "translations": {
@@ -1269,10 +1323,10 @@
           "track": "Azure OpenAI",
           "title": "Agent IA avec un AI Context Provider",
           "level": "Intermédiaire",
-          "summary": "Donnez à un agent une mémoire à long terme de son utilisateur : un AIContextProvider personnalisé ajoute aux instructions, avant chaque run, les souvenirs stockés dans MongoDB, et extrait après le run les nouveaux faits du message de l'utilisateur, avec un autre agent et une sortie structurée. Les souvenirs suivent l'utilisateur d'une session à l'autre. Nécessite le conteneur MongoDB du lab (docker compose up -d) ; le scénario 2 est une conversation qui attend vos messages.",
+          "summary": "Donnez à un agent une mémoire à long terme de son utilisateur : un AIContextProvider personnalisé ajoute à chaque run, sous forme de message présenté comme des données (et non d'instructions), les souvenirs stockés dans MongoDB, et extrait après le run les nouveaux faits du message de l'utilisateur, avec un autre agent et une sortie structurée. Les souvenirs suivent l'utilisateur d'une session à l'autre. Nécessite le conteneur MongoDB du lab (docker compose up -d) ; le scénario 2 est une conversation qui attend vos messages.",
           "objectives": [
             "Écrire un AIContextProvider personnalisé : ProvideAIContextAsync avant l'appel du modèle, StoreAIContextAsync après un run réussi",
-            "Renvoyer des instructions supplémentaires pour un run avec AIContext",
+            "Renvoyer du contexte supplémentaire pour un run avec AIContext : un message présenté comme des données, tenu hors de l'historique",
             "Brancher le provider sur l'agent avec ChatClientAgentOptions.AIContextProviders (une instance partagée par toutes les sessions)",
             "Conserver l'état par session du provider (l'id de l'utilisateur) dans la session avec ProviderSessionState<T> et un initialiseur d'état",
             "Extraire des faits du message de l'utilisateur avec un autre agent et une sortie structurée (RunAsync<T>)",

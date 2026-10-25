@@ -4,7 +4,7 @@
 
 In this lab, you will create your first AI Agent using **Microsoft Agent Framework** with **Azure OpenAI**.
 
-You will learn how to connect to Azure OpenAI, create agents with different configurations, read token usage, and stream a response.
+You will learn how to connect to Azure OpenAI, create agents with different configurations, read token usage, stream a response, and run the same agent on the **Responses API**, the API that Microsoft recommends for new Azure OpenAI applications.
 
 ## What You Will Learn
 
@@ -15,6 +15,7 @@ You will learn how to connect to Azure OpenAI, create agents with different conf
 - How to use `ChatMessage`s for fine-grained control over a run
 - How to read token usage from a response (including reasoning tokens)
 - How to stream a response with `RunStreamingAsync()` and still get its token usage
+- How to create the same agent on the **Responses API** (`GetResponsesClient().AsAIAgent(model: ...)`), and how to choose between Chat Completions and Responses
 
 ## Prerequisites
 
@@ -142,6 +143,13 @@ Open `Start/Program.cs` and complete the TODOs:
 | **TODO 20** | Stream the answer | • `agent.RunStreamingAsync(string message)` returns `IAsyncEnumerable<AgentResponseUpdate>` <br> • `await foreach (AgentResponseUpdate update in agent.RunStreamingAsync("...")) { Console.Write(update.Text); }` <br> • Keep each update in a `List<AgentResponseUpdate> updates` <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
 | **TODO 21** | Display the token usage of the streamed run | • `AgentResponse streamedResponse = updates.ToAgentResponse();` combines all the updates into one response <br> • Then read `streamedResponse.Usage` as in TODO 18 |
 
+#### Scenario 6: Responses API
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 22** | Create the agent on the Responses API | • `AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: "...", name: "GeographyAgent");` <br> • Same `OpenAIClient` as before: only the API changes. With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` around it <br> • `AsAIAgent(model: ...)` for a `ResponsesClient` comes from the `OpenAI.Responses` namespace (already imported) |
+| **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) |
+
 ---
 
 ### Step 3: Run and Test
@@ -177,6 +185,22 @@ To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (fo
 | `ToAgentResponse()` | Combines streamed updates into a single `AgentResponse` (text, messages, usage) |
 | `ChatMessage` | Message with a role (System/User/Assistant) and content (from `Microsoft.Extensions.AI`) |
 | `Usage` | Token consumption metrics (Input/Output/Reasoning/Total) |
+| `GetResponsesClient()` / `ResponsesClient` | Client for the **Responses API**; `AsAIAgent(model: deployment, ...)` creates the same kind of `ChatClientAgent` on it |
+| `ResponseId` | Id of the response given by the service (`resp_...` with the Responses API, `chatcmpl-...` with Chat Completions) |
+
+## Chat Completions or Responses?
+
+Microsoft recommends the **Responses API** for new Azure OpenAI applications: *"Responses is the recommended primary client: it supports the full set of hosted tools"* ([Azure OpenAI provider](https://learn.microsoft.com/agent-framework/integrations/by-component/model-providers/azure-openai?pivots=programming-language-csharp)). The agent hides the difference (`RunAsync`, `AgentResponse`, tools and middleware are the same), but the choice matters:
+
+| | Chat Completions (`GetChatClient`) | Responses (`GetResponsesClient`) |
+|---|---|---|
+| Conversation history | Kept by **Agent Framework** (in the session, or in your own storage) | Can be kept by the **service** (default `store: true`): the session holds a conversation id |
+| Hosted tools (code interpreter, file search, hosted MCP) | No | Yes |
+| Background responses (long runs, continuation tokens) | No | Yes |
+| History reduction and compaction by Agent Framework | Yes | No when the service keeps the history |
+| Models | Widest compatibility | Models and regions that support the Responses API |
+
+**The next labs use Chat Completions** on purpose: sessions, persistence and context providers (Labs 05, 07, 12) teach how Agent Framework manages the history, which requires the history to stay on the client side. Everything else you learn works the same with Responses. Lab 05 shows what changes when the service keeps the conversation.
 
 ## Optional: Using the Console Spinner
 
@@ -205,6 +229,7 @@ The spinner displays an animated indicator with elapsed time: `⠋ Running agent
 |-----------|---------|
 | `OpenAI` | `OpenAIClient`, `OpenAIClientOptions` |
 | `OpenAI.Chat` | `ChatClient` and the `AsAIAgent()` extension method |
+| `OpenAI.Responses` | `ResponsesClient` and its `AsAIAgent(model: ...)` extension method |
 | `System.ClientModel` | `ApiKeyCredential` |
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
@@ -253,6 +278,15 @@ Token Usage (streaming):
   Input tokens: 38
   Output tokens: 120
   Total tokens: 158
+----------------------------------------
+=== Scenario 6: Responses API ===
+The surface area of Italy is approximately 301,340 square kilometers (116,347 square miles).
+----------------------------------------
+Response id (stored by the service): resp_0c48cf898ad0...
+Token Usage (Responses API):
+  Input tokens: 41
+  Output tokens: 21
+  Total tokens: 62
 ```
 
 Answers vary from one run to another.
@@ -265,6 +299,7 @@ Answers vary from one run to another.
 | `401 Unauthorized` with an API key | Check the key (user secret `AzureOpenAI:APIKey`) and that it belongs to the resource of the endpoint |
 | `401` / `403` with Entra ID | Run `az login` and make sure your identity has the **Cognitive Services OpenAI User** role on the resource |
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
+| Scenario 6 fails with `404` or *"unsupported"* | The deployment (model or region) does not support the Responses API: use a deployment that supports it, or remove `6` from `scenariosToRun` |
 
 ## Provided Files
 
@@ -290,10 +325,8 @@ The following files should be modified:
 
 ## Going Further
 
-- **Responses API**: the same client can create an agent on the Responses API, which Microsoft recommends for new Azure OpenAI apps:
-  `client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: "...")`.
-  By default the conversation history is then stored by the service; the next labs use the Chat Completions API so that Agent Framework manages the history (sessions, persistence).
-- **Microsoft Foundry Agent Service**: the official getting-started samples use `Microsoft.Agents.AI.Foundry` (`AIProjectClient.AsAIAgent(...)`).
+- **Responses without storage**: `client.GetResponsesClient().AsIChatClientWithStoredOutputDisabled(model: ...).AsAIAgent(...)` keeps the Responses API but asks the service not to store the responses: the history is then managed by Agent Framework, as with Chat Completions (official sample `Agent_With_AzureOpenAIResponses`).
+- **Microsoft Foundry**: the official getting-started samples create the agent from a Foundry project: `new AIProjectClient(new Uri(endpoint), new DefaultAzureCredential()).AsAIAgent(model: ..., instructions: ...)` (package `Microsoft.Agents.AI.Foundry`, preview). Everything after the creation of the agent is the same: that is the point of the `AIAgent` abstraction.
 
 ## Coming from an older version of the lab?
 

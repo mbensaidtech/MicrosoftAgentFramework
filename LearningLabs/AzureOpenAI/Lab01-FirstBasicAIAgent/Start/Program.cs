@@ -4,6 +4,7 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using OpenAI;
 using OpenAI.Chat;
+using OpenAI.Responses;
 using AIExtensions = Microsoft.Extensions.AI;
 using CommonUtilities;
 
@@ -12,8 +13,8 @@ using FirstBasicAIAgent;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3], [4], [5] or [1, 2, 3, 4, 5] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2, 3, 4, 5];
+// Set to: [1], [2], [3], [4], [5], [6] or [1, 2, 3, 4, 5, 6] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2, 3, 4, 5, 6];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -149,6 +150,29 @@ if (ShouldRunScenario(5))
 
     // TODO 21: Combine the updates into a single AgentResponse and display its token usage
     // Hint: AgentResponse streamedResponse = updates.ToAgentResponse();
+}
+
+#endregion
+
+#region Scenario 6: Responses API - The same agent on the API that Microsoft recommends
+
+if (ShouldRunScenario(6))
+{
+    ColoredConsole.WriteDividerLine();
+
+    // TODO 22: Create the same geography agent as scenario 2 on the Responses API, from the same OpenAIClient
+    // Hint: client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: ..., name: "GeographyAgent")
+    // Note: GetResponsesClient() is flagged experimental (OPENAI001), keep the pragma around it.
+#pragma warning disable OPENAI001
+    // AIAgent responsesAgent = ...
+#pragma warning restore OPENAI001
+
+    ColoredConsole.WriteInfoLine("=== Scenario 6: Responses API ===");
+
+    // TODO 23: Run the agent with "Hello, what is the surface area of Italy?", then display the answer,
+    // the id of the response (stored by the service) and the token usage
+    // Hint: AgentResponse responsesResponse = await responsesAgent.RunAsync(...).WithSpinner("Running agent");
+    //       responsesResponse.ResponseId, responsesResponse.Usage
 }
 
 #endregion

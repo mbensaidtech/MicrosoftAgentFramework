@@ -4,13 +4,11 @@
 
 In this lab, you will build multi-turn conversations with **Microsoft Agent Framework** and **Azure OpenAI**, save them, and resume them later with their full context.
 
-A conversation lives in an **`AgentSession`**. The messages of the conversation (the *chat history*) are kept by a **`ChatHistoryProvider`** attached to the agent. You will run the same conversation three times, and only change where the chat history is stored:
+A conversation lives in an **`AgentSession`**. The messages of the conversation (the *chat history*) are kept by a **`ChatHistoryProvider`** attached to the agent. You will run the same conversation three times, and change where the chat history is kept, and how much of it:
 
-1. **In the session itself** — the default `InMemoryChatHistoryProvider`: the serialized session contains the whole conversation.
-2. **In a vector store** — a custom `ChatHistoryProvider`: the serialized session only contains a key, the messages stay in the store.
-3. **In MongoDB** — the same pattern with a real database: the conversation survives the application, a new agent resumes it.
-
-In each scenario, you ask a first question, **serialize** the session, save it as text, **restore** it, and ask a follow-up question that only makes sense with the history ("that city", "my name").
+1. **In the session itself** — the default `InMemoryChatHistoryProvider`: the serialized session contains the whole conversation. You **serialize** the session, save it as text, **restore** it, and ask a follow-up question that only makes sense with the history ("that city", "my name").
+2. **Bounded** — the same provider with a **chat reducer** that keeps only the last messages: the cost of each run stops growing, and the agent forgets the beginning of the conversation.
+3. **In MongoDB** — a custom `ChatHistoryProvider` on a real database: the serialized session only contains a key, the conversation survives the application, a new agent resumes it.
 
 ## What You Will Learn
 
@@ -19,7 +17,9 @@ In each scenario, you ask a first question, **serialize** the session, save it a
 - Where the chat history lives with the default `InMemoryChatHistoryProvider`, and how to read it (`GetService<InMemoryChatHistoryProvider>()`, `GetMessages(session)`)
 - How to plug a custom `ChatHistoryProvider` with `ChatClientAgentOptions.ChatHistoryProvider`
 - How a provider keeps its per-session state (a storage key) in the session: `AgentSession.StateBag` and `ProviderSessionState<T>`
-- How to store the chat history in a vector store (`InMemoryVectorStore`) and in MongoDB
+- How to store the chat history in MongoDB with your own `ChatHistoryProvider`
+- How to **bound** the chat history with a chat reducer (`MessageCountingChatReducer`), and what it costs: the agent forgets
+- What changes when the **service** keeps the conversation (Responses API), and how to protect stored sessions
 
 ## Prerequisites
 
@@ -39,7 +39,6 @@ Lab05-AIAgentWithThreads/
 ├── Start/                                  <-- Your working folder
 │   ├── Program.cs                          <-- Complete the TODOs here
 │   ├── Stores/
-│   │   ├── VectorChatHistoryProvider.cs    <-- ChatHistoryProvider on a vector store (scenario 2)
 │   │   └── MongoChatHistoryProvider.cs     <-- ChatHistoryProvider on MongoDB (scenario 3)
 │   ├── MongoDB/
 │   │   └── docker-compose.yml              <-- Local MongoDB for scenario 3
@@ -110,15 +109,14 @@ Scenarios 1 and 2 do not need MongoDB. To skip scenario 3, set `scenariosToRun` 
 
 ### Step 3: Look at the provided files
 
-- `Stores/VectorChatHistoryProvider.cs` — a `ChatHistoryProvider` adapted from the official sample `Agent_Step04_3rdPartyChatHistoryStorage`. It overrides two methods:
-  - `ProvideChatHistoryAsync` — called **before** each run: loads the last 10 messages of the session from the vector store. The agent sends them to the model before the new message.
-  - `StoreChatHistoryAsync` — called **after** each successful run: stores the new messages (`RequestMessages` + `ResponseMessages`).
+- `Stores/MongoChatHistoryProvider.cs` — a `ChatHistoryProvider` on a MongoDB collection (`chat_history`), with the official MongoDB driver, adapted from the official sample `Agent_Step04_3rdPartyChatHistoryStorage`. It overrides two methods:
+  - `ProvideChatHistoryAsync` — called **before** each run: loads the last 10 messages of the session from MongoDB. The agent sends them to the model before the new message.
+  - `StoreChatHistoryAsync` — called **after** each successful run: stores the new messages (`RequestMessages` + `ResponseMessages`). Each message is a document: `SessionId`, `Timestamp`, `Order`, `Role`, `MessageText` and the serialized `ChatMessage`.
 
   The provider instance is shared by all the sessions of the agent, so it keeps **no session data in its fields**. The key of the conversation (`SessionDbKey`) is stored **in the session**, through `ProviderSessionState<State>`: `GetOrInitializeState(session)` reads it from `AgentSession.StateBag`, or creates a new key the first time. That is why the key is saved and restored with the session.
-- `Stores/MongoChatHistoryProvider.cs` — the same pattern on a MongoDB collection (`chat_history`), with the official MongoDB driver. Each message is a document: `SessionId`, `Timestamp`, `Order`, `Role`, `MessageText` and the serialized `ChatMessage`.
 - `ConfigurationHelper.cs` — `ConnectToMongoDbAsync()` connects to the database of the configuration and checks that MongoDB answers (clear error message when it is not started).
-- `SessionConsole.cs` — `WriteSerializedSession(json)` displays a serialized session and `WriteTokenUsage(response)` the token usage of a run. `Program.cs` imports them with `using static`, so you can call them directly.
-- `Program.cs` — the constants `AgentName`, `AgentInstructions`, `FirstQuestion` and `FollowUpQuestion` are shared by the three scenarios.
+- `SessionConsole.cs` — `WriteSerializedSession(json)` displays a serialized session, `WriteTurn(question, response, storedMessages)` one turn of a conversation (scenario 2) and `WriteTokenUsage(response)` the token usage of a run. `Program.cs` imports them with `using static`, so you can call them directly.
+- `Program.cs` — the constants `AgentName`, `AgentInstructions`, `FirstQuestion`, `IntermediateQuestion` (scenario 2) and `FollowUpQuestion` are shared by the three scenarios, and displayed at the start.
 
 ### Step 4: Complete the Program.cs
 
@@ -153,21 +151,18 @@ An agent created without a `ChatHistoryProvider` uses an `InMemoryChatHistoryPro
 
 ---
 
-#### Scenario 2: Custom ChatHistoryProvider - chat history in a vector store
+#### Scenario 2: Bound the chat history with a chat reducer
 
-Same conversation, but the messages are stored in a vector store by the provided `VectorChatHistoryProvider`. The session only keeps the key of the conversation.
+Without a limit, every run sends the **whole** history back to the model: the cost of a conversation grows with each turn, until it no longer fits in the context window. A **chat reducer** keeps the history bounded. `MessageCountingChatReducer(2)` keeps the last 2 messages (the official sample [`Agent_Step13_ChatReduction`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/Agents/Agent_Step13_ChatReduction) does the same). The conversation has three turns: the last question needs "that city" (the previous turn, kept) and "my name" (the first turn, dropped).
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 10** | Create the vector store | • `VectorStore vectorStore = new InMemoryVectorStore();` (in memory: lost when the application stops) |
-| **TODO 11** | Create the agent with the custom provider | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = AgentName, ChatOptions = new() { Instructions = AgentInstructions }, ChatHistoryProvider = new VectorChatHistoryProvider(vectorStore) });` <br> • With `ChatClientAgentOptions`, the instructions go to `ChatOptions.Instructions` |
-| **TODO 12** | Create a session and ask the first question | • Same code as TODO 5 |
-| **TODO 13** | Display the key of the conversation | • `VectorChatHistoryProvider chatHistoryProvider = agent.GetService<VectorChatHistoryProvider>()!;` <br> • `ColoredConsole.WriteInfoLine($"Chat history stored in the vector store under the key: {chatHistoryProvider.GetSessionDbKey(session)}");` <br> • `GetService<T>()` finds the provider attached to the agent; the key itself is read from the session |
-| **TODO 14** | Serialize, save and restore the session | • Same code as TODO 7 and TODO 8 <br> • The JSON now only contains `"VectorChatHistoryProvider": { "sessionDbKey": "..." }` |
-| **TODO 15** | Ask the follow-up question in the restored session | • Same code as TODO 9: the provider reloads the history from the vector store |
-
----
-
+| **TODO 10** | Create the agent with a bounded history | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = AgentName, ChatOptions = new() { Instructions = AgentInstructions }, ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { ChatReducer = new AIExtensions.MessageCountingChatReducer(2) }) });` <br> • With `ChatClientAgentOptions`, the instructions go to `ChatOptions.Instructions` <br> • The chat reducers of `Microsoft.Extensions.AI` are still **experimental** (`MEAI001`): keep the `#pragma` around the code |
+| **TODO 11** | Get the provider and create a session | • `InMemoryChatHistoryProvider chatHistory = agent.GetService<InMemoryChatHistoryProvider>()!;` <br> • `AgentSession session = await agent.CreateSessionAsync();` |
+| **TODO 12** | First turn | • `AgentResponse response = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");` <br> • `WriteTurn(FirstQuestion, response, chatHistory.GetMessages(session).Count);` |
+| **TODO 13** | Second turn | • Same with `IntermediateQuestion` (`response = ...`): the session now holds 4 messages |
+| **TODO 14** | Third turn | • Same with `FollowUpQuestion`: before the run, the reducer keeps the last 2 messages of the history. The agent knows "that city" (Rome) but **not** the name given in the first turn |
+| **TODO 15** | Display token usage | • `WriteTokenUsage(response);` the input tokens stay flat from the second turn on |
 #### Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
 
 Same pattern with `MongoChatHistoryProvider`. This time, you simulate a **restart of the application**: the follow-up question is asked to a **new** agent, with a new provider and a new MongoDB connection. The only things kept are the saved JSON and the documents in MongoDB.
@@ -221,14 +216,32 @@ To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (fo
    DeserializeSessionAsync(json)   → AgentSession               → RunAsync(..., resumedSession)
 ```
 
-| | Scenario 1 — `InMemoryChatHistoryProvider` | Scenario 2 — vector store | Scenario 3 — MongoDB |
+| | Scenario 1 — `InMemoryChatHistoryProvider` | Scenario 2 — with a chat reducer | Scenario 3 — MongoDB |
 |---|---|---|---|
-| Where are the messages? | In the session (`StateBag`) | In the `InMemoryVectorStore` of the process | In the `chat_history` collection |
-| What does the serialized session contain? | The whole conversation | The key (`sessionDbKey`) | The key (`sessionDbKey`) |
-| Survives the application? | Yes, if you save the JSON | No: the vector store is in memory | Yes: JSON + MongoDB |
-| Size of the saved session | Grows with the conversation | Constant | Constant |
+| Where are the messages? | In the session (`StateBag`) | In the session, the last ones only | In the `chat_history` collection |
+| What does the serialized session contain? | The whole conversation | The last messages | The key (`sessionDbKey`) |
+| Survives the application? | Yes, if you save the JSON | Yes, if you save the JSON | Yes: JSON + MongoDB |
+| Cost of a run | Grows with the conversation | Bounded | Bounded (last 10 messages) |
 
-The token usage shows the cost of a conversation: the input tokens of the follow-up question include the whole history sent back to the model. The providers of this lab only send the **10 most recent messages** to keep long conversations within the model limits.
+The token usage shows the cost of a conversation: the input tokens of a run include the history sent back to the model. Scenario 2 bounds it with a reducer; the MongoDB provider of scenario 3 keeps every message but only sends the **10 most recent ones**. Both choices trade memory for cost: what is not sent is forgotten (Lab 12 shows how to keep **facts** about the user beyond the conversation).
+
+### When the service keeps the conversation (Responses API)
+
+With Chat Completions (this lab), the history is kept by Agent Framework: in the session, or in your own store. With the **Responses API** (Lab 01, scenario 6), the service can keep the conversation itself: the session then holds a conversation id, not the messages (`ChatClientAgentSession.ConversationId`), and each run only sends the new message ([Storage](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/storage?pivots=programming-language-csharp)). Consequences:
+
+- no chat history provider and no reducer: the service manages the size of the conversation; Agent Framework compaction has no effect on it;
+- the conversation lives in the service, tied to its id (and to your Azure resource): you cannot move it to another model provider;
+- saving and restoring a session still works the same way (`SerializeSessionAsync` / `DeserializeSessionAsync`), it just saves the id.
+
+To keep the Responses API but manage the history yourself, ask the service not to store it: `GetResponsesClient().AsIChatClientWithStoredOutputDisabled(model: ...)` (official sample `Agent_With_AzureOpenAIResponses`).
+
+### Security of stored sessions
+
+A saved session is a conversation: treat it as personal data, and as **untrusted input** when you restore it ([Agent Safety](https://learn.microsoft.com/agent-framework/concepts/agents/safety?pivots=programming-language-csharp)).
+
+- **Bind each session to its user**: *"Treat AgentSession as an opaque state object and restore it with the same agent/provider configuration … bind each stored session to the authenticated user or tenant"* ([Storage](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/storage?pivots=programming-language-csharp)). A session id or a conversation id is **not** a proof of ownership: check the user before restoring.
+- **Never restore a session sent by a client as is**: a modified session can inject messages (and roles) into the history.
+- **Protect the store**: authentication and encryption at rest for MongoDB, a retention policy, and a way for users to delete their conversations.
 
 ## Key Concepts
 
@@ -243,7 +256,8 @@ The token usage shows the cost of a conversation: the input tokens of the follow
 | `ProviderSessionState<T>` | Helper that stores the typed state of a provider in `StateBag` (`GetOrInitializeState`, `SaveState`) |
 | `ChatClientAgentOptions` | Advanced agent options: `Name`, `ChatOptions` (`Instructions`, tools...), `ChatHistoryProvider` |
 | `agent.GetService<T>()` | Finds a service of the agent, such as its chat history provider |
-| `VectorStore` / `InMemoryVectorStore` | `Microsoft.Extensions.VectorData` abstraction of a store of records, and its in-memory implementation |
+| Chat reducer (`IChatReducer`) | Reduces a chat history; set it with `InMemoryChatHistoryProviderOptions.ChatReducer`. `MessageCountingChatReducer(n)` keeps the last `n` messages (and the first system message); experimental (`MEAI001`) |
+| `ChatReducerTriggerEvent` | When the reducer runs: before the history is given to a run (default, `BeforeMessagesRetrieval`) or after messages are added (`AfterMessageAdded`) |
 
 ## Namespaces Reference
 
@@ -256,8 +270,7 @@ The token usage shows the cost of a conversation: the input tokens of the follow
 | `Azure.Identity` | `DefaultAzureCredential` |
 | `Microsoft.Agents.AI` | `AIAgent`, `AgentSession`, `AgentResponse`, `ChatClientAgentOptions`, `ChatHistoryProvider`, `InMemoryChatHistoryProvider`, `ProviderSessionState<T>` |
 | `Microsoft.Extensions.AI` | `ChatMessage` (imported as `AIExtensions`, because `OpenAI.Chat` also has a `ChatMessage`) |
-| `Microsoft.Extensions.VectorData` | `VectorStore`, `[VectorStoreKey]`, `[VectorStoreData]` |
-| `CommunityToolkit.VectorData.InMemory` | `InMemoryVectorStore` |
+| `Microsoft.Extensions.AI` (aliased as `AIExtensions`) | `MessageCountingChatReducer` (scenario 2), `ChatMessage` |
 | `MongoDB.Driver` | `IMongoDatabase` |
 | `System.Text.Json` | `JsonElement`, `JsonSerializer` |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
@@ -267,6 +280,8 @@ The token usage shows the cost of a conversation: the input tokens of the follow
 ```
 Endpoint: https://your-resource.openai.azure.com/
 Deployment: your-deployment-name
+GlobalAgent instructions: You are a global agent that can answer questions about any topic. The response should be very short and concise.
+Questions: "Hello, my name is Ada. What is the capital of France?", then "What is the population of that city? And what is my name?" (scenario 2 asks "And what is the capital of Italy?" in between)
 ----------------------------------------
 === Scenario 1: Session with the default in-memory chat history ===
 User: Hello, my name is Ada. What is the capital of France?
@@ -293,19 +308,22 @@ Token Usage (follow-up):
   Output tokens: 17
   Total tokens: 96
 ----------------------------------------
-=== Scenario 2: Custom ChatHistoryProvider - chat history in a vector store ===
+=== Scenario 2: Bound the chat history with a chat reducer ===
 User: Hello, my name is Ada. What is the capital of France?
 Agent: The capital of France is Paris.
-Chat history stored in the vector store under the key: 846e2685bdcf4ff4921c7627b50aefb6
-Serialized session:
-{
-  "stateBag": {
-    "VectorChatHistoryProvider": {
-      "sessionDbKey": "846e2685bdcf4ff4921c7627b50aefb6"
-    }
-  }
-}
-...
+Messages kept in the session: 2 (input tokens of this run: 47)
+User: And what is the capital of Italy?
+Agent: The capital of Italy is Rome.
+Messages kept in the session: 4 (input tokens of this run: 73)
+User: What is the population of that city? And what is my name?
+Agent: As of 2023, Rome's population is approximately 2.8 million. I don't know your name.
+Messages kept in the session: 4 (input tokens of this run: 73)
+----------------------------------------
+Token Usage (follow-up):
+  Input tokens: 73
+  Output tokens: 23
+  Total tokens: 96
+----------------------------------------
 === Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===
 ...
 Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...
@@ -339,7 +357,6 @@ The following files are provided and should not be modified:
 - `ConfigurationHelper.cs` - Loads and validates the configuration, connects to MongoDB
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
 - `MongoDbSettings.cs` - Settings class for MongoDB
-- `Stores/VectorChatHistoryProvider.cs` - `ChatHistoryProvider` on a vector store
 - `Stores/MongoChatHistoryProvider.cs` - `ChatHistoryProvider` on MongoDB
 - `SessionConsole.cs` - Display helpers
 - `MongoDB/docker-compose.yml` - Local MongoDB
@@ -353,18 +370,16 @@ The following files should be modified:
 
 | Package | Why |
 |---------|-----|
-| `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` for OpenAI clients (brings `OpenAI`, `Microsoft.Extensions.AI` and `Microsoft.Extensions.VectorData.Abstractions`) |
+| `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` for OpenAI clients (brings `OpenAI` and `Microsoft.Extensions.AI`) |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 | `Microsoft.Extensions.Configuration.*` | `appsettings.json`, user secrets and environment variables, bound to the settings classes |
-| `CommunityToolkit.VectorData.InMemory` | `InMemoryVectorStore` (scenario 2), the vector store of the official sample `Agent_Step04_3rdPartyChatHistoryStorage` |
 | `MongoDB.Driver` | Official MongoDB driver (scenario 3) |
 
 ## Going Further
 
-- **Bound the history of the default provider**: `new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { ChatReducer = new MessageCountingChatReducer(20) })` reduces the history kept in the session (see [Storage](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/storage?pivots=programming-language-csharp) and the official sample `AgentWithMemory_Step05_BoundedChatHistory`). The chat reducers of `Microsoft.Extensions.AI` are still experimental (diagnostic `MEAI001`).
-- **Other stores**: any `Microsoft.Extensions.VectorData` connector can replace `InMemoryVectorStore` in `VectorChatHistoryProvider` (the official samples also use Azure Cosmos DB and Qdrant connectors).
-- **Service-managed history**: with the Responses API, the service can store the conversation itself; the session then holds a conversation id instead of messages (`ChatClientAgentSession.ConversationId`). See [Storage](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/storage?pivots=programming-language-csharp).
-- **Production**: index the `SessionId` field of the MongoDB collection, enable authentication on MongoDB, and in a multi-user application bind each stored session to its user before resuming it.
+- **Summarize instead of dropping**: the compaction framework of Agent Framework can summarize the old messages with a smaller model, or collapse old tool results, instead of dropping them (`CompactionProvider`, `SummarizationCompactionStrategy`...). It is still experimental (`MAAI001`), see [Compaction](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/compaction?pivots=programming-language-csharp) and the official sample `Agent_Step18_CompactionPipeline`.
+- **Other stores**: the official samples also store the chat history in a vector store (`Agent_Step04_3rdPartyChatHistoryStorage`) or in Azure Cosmos DB (`CosmosChatHistoryProvider`, package `Microsoft.Agents.AI.CosmosNoSql`, preview).
+- **Production**: index the `SessionId` field of the MongoDB collection, enable authentication on MongoDB, and bind each stored session to its user (see [Security of stored sessions](#security-of-stored-sessions)).
 - **Memory beyond the conversation**: context providers can add long-term memories or documents to each run — this is the topic of Lab 12.
 
 ## Coming from an older version of the lab?
@@ -380,7 +395,7 @@ The following files should be modified:
 | `AddMessagesAsync` / `GetMessagesAsync` / `Serialize` of the store | `StoreChatHistoryAsync` / `ProvideChatHistoryAsync`; the state is serialized with the session |
 | `ChatClientAgentOptions.Instructions` | `ChatClientAgentOptions.ChatOptions.Instructions` |
 | Extract the thread id from the serialized state, rebuild an `AgentThreadState` JSON (`models/AgentThreadState.cs`, `ExtractThreadIdFromState`) | Save the whole serialized session and restore it as is; read the key with the provider (`GetSessionDbKey(session)`) |
-| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` (preview) | `CommunityToolkit.VectorData.InMemory` (stable) / official `MongoDB.Driver` 3.x |
+| `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` (preview) | Official `MongoDB.Driver` 3.x (the vector store scenario became the chat reducer scenario) |
 | Agent name and instructions in `appsettings.json` (`AzureOpenAI:Agents:GlobalAgent`) | Constants at the top of `Program.cs` |
 | MongoDB with a password in `appsettings.json` + Mongo Express | MongoDB without authentication bound to `127.0.0.1`, no secret in `appsettings.json`; `mongosh` to look at the data |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
