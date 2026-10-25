@@ -698,6 +698,24 @@ public class OutputAnalyzerTests
         "  Input tokens: 612",
         "  Output tokens: 181",
         "  Total tokens: 793",
+
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: A conversation with a remote agent ===",
+        "Generated API key: Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI",
+        "Context id after turn 1: 3aec061b267945b48faaa1fac1c27a91",
+        "Same session: Here is the API key you requested, exactly as it is:",
+        "",
+        "**Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI**",
+        "",
+        "The key is valid.",
+        "  -> Answer contains the key of turn 1: yes",
+        "Context id after turn 2: 3aec061b267945b48faaa1fac1c27a91",
+        "New conversation: The generated API key is: **Meknesl_w9qApEb0EBkvgPF9J3oLkrGlYGswIpAvCE16O0B90.MiszCP8Y7Au0_zuYRgoH13JSW6dttyeWN-6vWG4DQBM**",
+        "",
+        "It is valid.",
+        "  -> Answer contains the key of turn 1: no",
     ];
 
     // Standard output of the Lab06 client exercise as delivered (TODOs not done yet), with the companion server running.
@@ -717,6 +735,10 @@ public class OutputAnalyzerTests
         "-------------------------------------------------------------------------------",
         "",
         "=== Scenario 3: A remote agent as a function tool of a local agent ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: A conversation with a remote agent ===",
     ];
 
     // What the checks of the Lab06 server read: the output of the server solution, then of the companion client (real run).
@@ -729,6 +751,7 @@ public class OutputAnalyzerTests
         "",
         "=== Scenario 1: A2A server with two agents ===",
         "APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops.",
+        "Session store: in memory (development only), one per agent.",
         "AuthAgent:         http://localhost:5071/a2a/authAgent",
         "  Agent card:      http://localhost:5071/a2a/authAgent/.well-known/agent-card.json",
         "CustomerToneAgent: http://localhost:5071/a2a/customerToneAgent",
@@ -784,6 +807,24 @@ public class OutputAnalyzerTests
         "  Input tokens: 675",
         "  Output tokens: 172",
         "  Total tokens: 847",
+
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: A conversation with a remote agent ===",
+        "Generated API key: Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI",
+        "Context id after turn 1: 3aec061b267945b48faaa1fac1c27a91",
+        "Same session: Here is the API key you requested, exactly as it is:",
+        "",
+        "**Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI**",
+        "",
+        "The key is valid.",
+        "  -> Answer contains the key of turn 1: yes",
+        "Context id after turn 2: 3aec061b267945b48faaa1fac1c27a91",
+        "New conversation: The generated API key is: **Meknesl_w9qApEb0EBkvgPF9J3oLkrGlYGswIpAvCE16O0B90.MiszCP8Y7Au0_zuYRgoH13JSW6dttyeWN-6vWG4DQBM**",
+        "",
+        "It is valid.",
+        "  -> Answer contains the key of turn 1: no",
     ];
 
     // Standard output of the Lab06 server exercise as delivered: it exits before listening, so the companion client never runs.
@@ -829,6 +870,41 @@ public class OutputAnalyzerTests
         Assert.Equal(
             ["scenario1-card", "scenario1-valid", "scenario1-tampered", "scenario3-tool", "scenario3-key"],
             OutputAnalyzer.EvaluateExpectations(lab.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+    }
+
+    // Scenario 4 against a server without session store (real run): same contextId, but the agent generated a new key.
+    private static readonly string[] Lab06Scenario4WithoutSessionStore =
+    [
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: A conversation with a remote agent ===",
+        "Generated API key: Meknes7_RYd5MP018Oqz4FwYmC2Nn7SqRUtflbLYwO7yO3E-8.Zv7BAY81pWaBFcU6MJZMcVxUqR-g82VEAPC0HS9POuI",
+        "Context id after turn 1: 98985267997b4f8ab4ecd7c2c4d92bf0",
+        "Same session: The generated API key is: **Meknes63GQQ6bAE6aasaJ8pWD1en_AlGDsT9rN31jiviTbyDs.odYFYIr7-cYVsI12aoidssUQW7hfLinUZnCd4gXk6oA**",
+        "",
+        "It is valid.",
+        "  -> Answer contains the key of turn 1: no",
+        "Context id after turn 2: 98985267997b4f8ab4ecd7c2c4d92bf0",
+        "New conversation: The API key generated is: **MeknesbVPMnBLr3ubCqFkCJdGu7HmSlP_ie4cBEQmkm4RbS44.wi45Scyc3uAZlSZRwIJW1WUZsbelStqET2utjkt6IEs**",
+        "",
+        "It is valid.",
+        "  -> Answer contains the key of turn 1: no",
+    ];
+
+    [Fact]
+    public void Lab06_conversation_checks_fail_when_the_server_keeps_no_session()
+    {
+        LabDefinition client = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab06-client")!;
+        LabDefinition server = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab06-server")!;
+        string[] clientOutput = [.. Lab06ClientSolutionOutput.TakeWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal)), .. Lab06Scenario4WithoutSessionStore.SkipWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal))];
+        string[] serverOutput = [.. Lab06ServerSolutionOutput
+            .Where(line => !line.StartsWith("Session store:", StringComparison.Ordinal))
+            .TakeWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal)), .. Lab06Scenario4WithoutSessionStore.SkipWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal))];
+
+        // The context id is the same on both turns: only the answer tells whether the server kept the conversation
+        Assert.Equal(["scenario4-remembered"], OutputAnalyzer.EvaluateExpectations(client.Expectations, clientOutput).Where(r => !r.Passed).Select(r => r.Id));
+        Assert.Equal(["session-store", "conversation"], OutputAnalyzer.EvaluateExpectations(server.Expectations, serverOutput).Where(r => !r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2021,5 +2097,154 @@ public class OutputAnalyzerTests
         Assert.Equal(["Scenario 1 · Token Usage (new session, with memories)"], usage.Reports.Select(r => r.Label));
         Assert.Equal(119L, usage.Input!.Value);
         Assert.Equal(209L, usage.Total!.Value);
+    }
+
+    // Standard output of the MultiAgentSystem Lab01 solution, as decoded by the dashboard (spinner lines removed).
+    private static readonly string[] MultiAgentLab01SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Delegation by code - a reviewer agent checks the answer ===",
+        "Customer: I bought headphones 10 days ago. They are unused and still in their original packaging. Can I return them and get a refund?",
+        "AfterSalesExpert: Yes, you can return the headphones for a refund since you are within the standard return period of 30 days, and the product is unused and in its original packaging. Please ensure you have the original receipt or proof of purchase.",
+        "Token Usage (AfterSalesExpert):",
+        "  Input tokens: 755",
+        "  Output tokens: 46",
+        "  Total tokens: 801",
+        "Quality review: 10/10",
+        "  Feedback: The answer correctly states the return eligibility based on the return policy and asks for necessary proof of purchase.",
+        "Decision: sent to the customer",
+        "Token Usage (QualityReviewer):",
+        "  Input tokens: 954",
+        "  Output tokens: 28",
+        "  Total tokens: 982",
+        "Answer written by hand (wrong on purpose): Of course! You can return any product within 90 days, even used, and we refund you in cash within 24 hours.",
+        "Quality review: 1/10",
+        "  Feedback: The answer contradicts the rules by stating a 90-day return period, allowing used items, and suggesting a cash refund within 24 hours.",
+        "Decision: held back for a human agent (score below 7)",
+        "Token Usage (QualityReviewer):",
+        "  Input tokens: 935",
+        "  Output tokens: 37",
+        "  Total tokens: 972",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Delegation by the model - specialist agents as tools ===",
+        "Tool ask_order_specialist: Asks the order specialist about an order: product, status, purchase and delivery dates. Include the order number in the query.",
+        "  Parameters: {\"type\":\"object\",\"properties\":{\"query\":{\"description\":\"Input query to invoke the agent.\",\"type\":\"string\"}},\"required\":[\"query\"]}",
+        "Tool ask_after_sales_expert: Asks the after-sales expert about the rules of the store: returns, refunds, exchanges, warranty and delivery problems. The expert does not see the conversation: give it all the facts it needs.",
+        "  Parameters: {\"type\":\"object\",\"properties\":{\"query\":{\"description\":\"Input query to invoke the agent.\",\"type\":\"string\"}},\"required\":[\"query\"]}",
+        "Customer: Hello, my order ORD-1042 arrived yesterday and the laptop screen is broken. What can I do?",
+        "[Delegation] ask_order_specialist(query: \"Get details for order number ORD-1042 including product details, status, purchase date, and delivery date.\")",
+        "[Delegation] ask_order_specialist returned: - **Product**: ZenBook 14 laptop (electronics)",
+        "[Delegation] ask_after_sales_expert(query: \"What is the process for returning a broken item and getting a refund or exchange? The customer has reported a broken laptop screen upon delivery.\")",
+        "[Delegation] ask_after_sales_expert returned: For a broken item received, such as a laptop screen, the customer should report the damage within 48 hours. They need to provide documentation, including photos of the damage and packaging. The action for damaged items in transit is either a full refund or a free replacement. If they prefer an exchange, it will be processed per the standard exchange policy within 30 days.",
+        "FrontDesk: I'm sorry to hear about the issue with your laptop. Your order, the ZenBook 14, was delivered on October 24, 2026. Since the screen is broken, please report this damage within 48 hours, and ensure you have photos of the damage and the packaging. You can choose between a full refund or a free replacement. If you want an exchange, it can be processed within 30 days. Let me know if you need further assistance with the process!",
+        "Token Usage (FrontDesk only, without the specialists):",
+        "  Input tokens: 644",
+        "  Output tokens: 194",
+        "  Total tokens: 838",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Keep the context of a specialist with a session ===",
+        "Tool TicketSpecialist: Keeps the support ticket of the current customer case up to date. Give it each new fact about the case.",
+        "[Call] TicketSpecialist(query: \"Order ORD-1042: the laptop screen arrived broken.\")",
+        "[Call] TicketSpecialist(query: \"The customer wants a replacement.\")",
+        "[Call] TicketSpecialist(query: \"Order ORD-1042: the laptop screen arrived broken.\")",
+        "[Call] TicketSpecialist(query: \"The customer wants a replacement.\")",
+        "Ticket after the second call - a new session for each call:",
+        "  Order: unknown",
+        "  Problem: unknown",
+        "  Customer request: replacement",
+        "  -> Order number of the first call (ORD-1042) kept: no",
+        "Ticket after the second call - one session for every call:",
+        "  Order: ORD-1042",
+        "  Problem: The laptop screen arrived broken.",
+        "  Customer request: The customer wants a replacement.",
+        "  -> Order number of the first call (ORD-1042) kept: yes",
+        "Token usage: not available, an agent tool returns only the text of the answer.",
+    ];
+
+    // Standard output of the MultiAgentSystem Lab01 exercise as delivered (TODOs not done yet).
+    private static readonly string[] MultiAgentLab01StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Delegation by code - a reviewer agent checks the answer ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Delegation by the model - specialist agents as tools ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Keep the context of a specialist with a session ===",
+    ];
+
+    [Fact]
+    public void Every_multiagent_lab01_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab01")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab.Expectations, MultiAgentLab01SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab.Expectations, MultiAgentLab01StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Multiagent_lab01_checks_fail_when_the_code_does_not_decide_and_the_specialists_are_not_tools()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab01")!;
+        // The reviewer approved the wrong answer, the front desk answered alone, and both tools shared the same session.
+        string[] output =
+        [
+            "=== Scenario 1: Delegation by code - a reviewer agent checks the answer ===",
+            "AfterSalesExpert: Yes, you can return them within 30 days.",
+            "Quality review: 5/10",
+            "Decision: held back for a human agent (score below 7)",
+            "Answer written by hand (wrong on purpose): Of course! You can return any product within 90 days.",
+            "Quality review: 8/10",
+            "Decision: sent to the customer",
+            "=== Scenario 2: Delegation by the model - specialist agents as tools ===",
+            "Tool ask_order_specialist: Asks the order specialist about an order.",
+            "  Parameters: {\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\"},\"orderId\":{\"type\":\"string\"}}}",
+            "[Delegation] ask_order_specialist(query: \"Tell me about the order\")",
+            "FrontDesk: Please contact our customer service.",
+            "=== Scenario 3: Keep the context of a specialist with a session ===",
+            "Ticket after the second call - a new session for each call:",
+            "  Order: ORD-1042",
+            "  -> Order number of the first call (ORD-1042) kept: yes",
+            "Ticket after the second call - one session for every call:",
+            "  Order: unknown",
+            "  -> Order number of the first call (ORD-1042) kept: no",
+        ];
+
+        Assert.Equal(
+            ["scenario1-answer"],
+            OutputAnalyzer.EvaluateExpectations(lab.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Labels_the_multiagent_lab01_token_usage_with_the_agent_of_each_run()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(MultiAgentLab01SolutionOutput));
+
+        // One report per direct call of scenario 1 and one for the front desk of scenario 2; the specialists called as tools report nothing
+        Assert.Equal(
+            [
+                "Scenario 1 · Token Usage (AfterSalesExpert)",
+                "Scenario 1 · Token Usage (QualityReviewer)",
+                "Scenario 1 · Token Usage (QualityReviewer)",
+                "Scenario 2 · Token Usage (FrontDesk only, without the specialists)",
+            ],
+            usage.Reports.Select(r => r.Label));
     }
 }

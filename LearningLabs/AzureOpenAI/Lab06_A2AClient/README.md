@@ -6,11 +6,12 @@ In this lab, you will call remote agents with the **Agent-to-Agent (A2A) protoco
 
 The remote agents run on the A2A server of **Lab06_A2AServer**: the **AuthAgent** (generates and validates API keys with its own tools) and the **CustomerToneAgent** (detects the tone of a customer message). Your program never sees their tools, their model or their secrets: it discovers them, sends them messages in natural language, and receives their answers. For your code, a remote agent is just another `AIAgent`.
 
-You will implement three scenarios:
+You will implement four scenarios:
 
 - **Scenario 1**: Discover the AuthAgent from its **agent card**, then generate and validate an API key
 - **Scenario 2**: Connect to the CustomerToneAgent **by URL** (direct configuration, no agent card)
 - **Scenario 3**: Give the remote AuthAgent to a **local** Azure OpenAI agent as a **function tool**
+- **Scenario 4**: Have a **conversation** with the remote AuthAgent: a session keeps the same A2A `contextId`, and the server keeps the history
 
 > **Preview packages**: the A2A package of Agent Framework (`Microsoft.Agents.AI.A2A`) and the A2A SDK it uses (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.26.0 (`1.26.0-preview.261023.1`). Every other package is stable.
 
@@ -21,6 +22,8 @@ You will implement three scenarios:
 - How to call a remote agent with `RunAsync()`, exactly like a local agent
 - The difference between **discovery** (agent card) and **direct configuration** (URL known in advance)
 - How to use a remote agent as a tool of a local agent with `AsAIFunction()`
+- How to have a conversation with a remote agent: a session is an A2A `contextId`, and the conversation only exists if the **server** keeps it
+- When to call a remote agent directly or as a tool, and what a network adds: failures, timeouts, authentication of the calling agent
 
 ## Prerequisites
 
@@ -115,7 +118,8 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 - `AgentConsole.cs` — display helpers, imported with `using static`:
   - `WriteAgentCard(card)` — the name, version, description, skills and supported interfaces of an agent card;
   - `FindApiKey(text)` — the remote agent answers in natural language: this finds the key (`Meknes<random>.<signature>`) in its answer;
-  - `WriteToolCalls(response)` and `WriteTokenUsage(response)` — the tools called during a run and its token usage (as in Lab 03 and Lab 04).
+  - `WriteToolCalls(response)` and `WriteTokenUsage(response)` — the tools called during a run and its token usage (as in Lab 03 and Lab 04);
+  - `WriteContextId(turn, session)` — the A2A `contextId` of a session (scenario 4).
 
 ### Step 3: Complete the Program.cs
 
@@ -171,6 +175,21 @@ When you already know the URL of an agent (configuration, private registry), you
 
 ---
 
+#### Scenario 4: A conversation with a remote agent
+
+Until now, each `RunAsync` without a session started a new conversation with the remote agent. To continue a conversation, create a **session**: the first answer of the server carries a `contextId`, and every following request of the session sends it back. On the server, the history of each `contextId` lives in a **session store**: Lab06_A2AServer registers one for each agent (its TODO 8). Without it, the server keeps nothing — same `contextId` or not ([official sample `A2AClientServer`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/05-end-to-end/A2AClientServer): *"Create a session so requests share the same A2A protocol context"*).
+
+The second turn asks for "the key you just generated" without giving it. The code checks that the answer contains **exactly** the key of turn 1: a remote agent without the conversation can generate a new key and say "it is valid", which proves nothing.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 13** | Create the remote AuthAgent and a session | • Same as TODO 10: `A2ACardResolver cardResolver = new(new Uri($"{authAgentSettings.Url}/"));` then `AIAgent authAgent = await cardResolver.GetAIAgentAsync().WithSpinner("Reading the agent card");` <br> • `AgentSession session = await authAgent.CreateSessionAsync();` |
+| **TODO 14** | First turn: generate a key | • `AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key", session).WithSpinner("Calling the remote agent");` <br> • `string apiKey = FindApiKey(generateResponse.Text);` <br> • `ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");` <br> • `WriteContextId("turn 1", session);` |
+| **TODO 15** | Second turn, same session: ask for the key again and check it | • `const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";` <br> • `AgentResponse followUpResponse = await authAgent.RunAsync(FollowUpQuestion, session).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");` <br> • `ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");` <br> • `WriteContextId("turn 2", session);` — the same id as turn 1 |
+| **TODO 16** | The same question without the session | • `AgentResponse newConversationResponse = await authAgent.RunAsync(FollowUpQuestion).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}");` <br> • The same `-> Answer contains the key of turn 1` line with `newConversationResponse` |
+
+---
+
 ### Step 4: Run and Test
 
 With the server running (Step 0):
@@ -202,12 +221,49 @@ Scenario 1  A2ACardResolver.GetAgentCardAsync() ──GET──▶  /a2a/authAge
 Scenario 2  new A2AClient(url).AsAIAgent(name, ...) ──POST (JSON-RPC)──▶ /a2a/customerToneAgent
 Scenario 3  local agent (Azure OpenAI, your model)
             └─ tool "AuthAgent" = authAgent.AsAIFunction() ──POST──▶ AuthAgent (server model + tools)
+Scenario 4  session = authAgent.CreateSessionAsync()
+            RunAsync(..., session) ──POST (no contextId)──▶ AuthAgent ──▶ new contextId, history saved
+                                   ◀── answer + contextId ──             in the session store
+            RunAsync(..., session) ──POST (same contextId)──▶ AuthAgent ──▶ history loaded from the store
 ```
 
 1. **Discovery** — the client reads the agent card: identity, skills, and `SupportedInterfaces` (URL + binding: `JSONRPC` or `HTTP+JSON` + protocol version `1.0`).
 2. **Client** — `AsAIAgent()` creates an `A2AAgent` (an `AIAgent`) on top of an A2A client for one of these interfaces.
 3. **Message** — `RunAsync()` sends your text as an A2A message. The server runs its agent (model call, tools) and answers with an A2A message, which becomes an `AgentResponse`.
 4. **Nothing is shared but messages**: the client never sees the tools, the signing secret or the Azure OpenAI credentials of the server. That is why only the server can tell a real key from a tampered one.
+5. **Conversation** — a session carries the `contextId` chosen by the server on the first answer. The history stays on the server: *"The remote agent manages its own conversation state (keyed by context ID). [...] If the remote agent restarts and loses state, your conversation context may be lost."* ([Agent-to-Agent](https://learn.microsoft.com/agent-framework/journey/agent-to-agent?pivots=programming-language-csharp)).
+
+## Direct call or agent as a tool?
+
+A remote agent is an `AIAgent`: the two ways to delegate of the MultiAgentSystem lab [Lab01-UseAgentAsTool](../../MultiAgentSystem/Lab01-UseAgentAsTool/README.md) apply as they are.
+
+| | Direct call (scenarios 1, 2, 4) | Agent as a tool (scenario 3) |
+|---|---|---|
+| Who decides to call the remote agent | Your code | The model of your local agent |
+| What comes back | The `AgentResponse` of the remote agent | Only the text of its answer, inside the run of the local agent |
+| Conversation | A session (`contextId`) that your code keeps | A new conversation for each call, unless the tool is created with `AsAIFunction(session: ...)` |
+| Use it for | A remote step that your code must run and check | A remote specialist that the local agent consults when needed |
+
+When all the agents live in the same process and are maintained by the same team, agents as tools are simpler: *"A2A adds value when you cross a process, service, or organizational boundary."*
+
+## What a network changes
+
+- **Latency and failures**: *"Every A2A call is an HTTP request."* A remote agent can be down, slow or replaced by a new version: *"You need to handle network failures, timeouts, retries, and versioning"* ([Agent-to-Agent](https://learn.microsoft.com/agent-framework/journey/agent-to-agent?pivots=programming-language-csharp)). An unreachable server is an exception in your code (see *Troubleshooting*); an `HttpClient` gives up after its `Timeout` (100 seconds by default). For tasks that take minutes, see *Long-running tasks* in *Going further*.
+- **Conversation state**: it lives on the server, in the session store of the agent. With the in-memory store of Lab06_A2AServer, a restart of the server loses every conversation.
+- **Authentication of the calling agent**: in production, the server requires a token. Give the client an `HttpClient` that sends it, for the card and for the messages ([authentication guide of the official sample](https://github.com/microsoft/agent-framework/blob/main/dotnet/samples/05-end-to-end/A2AClientServer/AUTHENTICATION.md)):
+
+  ```csharp
+  using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+  using var httpClient = new HttpClient(handler);
+  httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+  A2ACardResolver cardResolver = new(agentUri, httpClient);
+  AgentCard card = await cardResolver.GetAgentCardAsync();
+  AIAgent remoteAgent = card.AsAIAgent(httpClient);
+  ```
+
+  The server then isolates the conversations by caller: a `contextId` is not a proof of identity (see *Security* in Lab06_A2AServer).
+- **The answer is untrusted data**: a remote agent belongs to another team or organization. Check what your code uses (scenario 1 checks the key with the server; scenario 4 compares it with the key of turn 1).
 
 In scenarios 1 and 2, your program makes **no** model call: the models run on the server. Only scenario 3 uses your Azure OpenAI deployment (and prints a token usage): the remote calls it makes are not included in that usage.
 
@@ -221,6 +277,7 @@ In scenarios 1 and 2, your program makes **no** model call: the models run on th
 | `AgentCard.AsAIAgent()` | Creates an `AIAgent` for the agent of a card (name, description and interface from the card) |
 | `A2AClient` | A2A client for one URL, with the JSON-RPC binding; `AsAIAgent(name, description)` creates an `AIAgent` from it (direct configuration) |
 | `A2AAgent` | The `AIAgent` returned by these methods: `RunAsync()`, `RunStreamingAsync()`, `CreateSessionAsync()` work as for any agent |
+| `AgentSession` / `A2AAgentSession` | The session of a remote agent: its `ContextId` is the A2A conversation id, chosen by the server and sent back with every request of the session |
 | `AsAIFunction()` | Turns an `AIAgent` (local or remote) into an `AIFunction` that another agent can call |
 | `A2AClientOptions.PreferredBindings` | Chooses the protocol binding among the interfaces of the card (see *Going further*) |
 
@@ -233,7 +290,8 @@ In scenarios 1 and 2, your program makes **no** model call: the models run on th
 | `System.ClientModel` | `ApiKeyCredential` |
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
-| `Microsoft.Agents.AI` | `AIAgent`, `AgentResponse`, `AsAIFunction()` |
+| `Microsoft.Agents.AI` | `AIAgent`, `AgentResponse`, `AgentSession`, `AsAIFunction()` |
+| `Microsoft.Agents.AI.A2A` | `A2AAgentSession` (in `AgentConsole.cs`) |
 | `A2A` | `A2ACardResolver`, `AgentCard`, `A2AClient`, and the `AsAIAgent()` / `GetAIAgentAsync()` extension methods of Agent Framework |
 | `Microsoft.Extensions.AI` | `FunctionCallContent` (in `AgentConsole.cs`) |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
@@ -270,9 +328,21 @@ Token Usage:
   Input tokens: 689
   Output tokens: 184
   Total tokens: 873
+----------------------------------------
+=== Scenario 4: A conversation with a remote agent ===
+Generated API key: Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI
+Context id after turn 1: 3aec061b267945b48faaa1fac1c27a91
+Same session: Here is the API key you requested, exactly as it is:
+**Meknes89JCH9LZV6dxG5fBipadJb-YT2WR5cx3zTlZhYQTyvk._hCm1ngpLmSMPRkNhyyzMR09QBO88BoH0N0dsLAkumI**
+The key is valid.
+  -> Answer contains the key of turn 1: yes
+Context id after turn 2: 3aec061b267945b48faaa1fac1c27a91
+New conversation: The generated API key is: **Meknesl_w9qApEb0EBkvgPF9J3oLkrGlYGswIpAvCE16O0B90.MiszCP8Y7Au0_zuYRgoH13JSW6dttyeWN-6vWG4DQBM**
+It is valid.
+  -> Answer contains the key of turn 1: no
 ```
 
-The keys are random and the wording of the answers varies. The explanation given for the tampered key may be wrong (the tool only returns `false`): what matters is *not valid*.
+The keys are random and the wording of the answers varies. The explanation given for the tampered key may be wrong (the tool only returns `false`): what matters is *not valid*. In scenario 4, the new conversation often generates **another** key and calls it valid: the remote agent did not refuse, it answered a different question.
 
 ## Troubleshooting
 
@@ -288,6 +358,7 @@ The keys are random and the wording of the answers varies. The explanation given
 | `'RemoteAgents:AuthAgent:Url' must be an absolute http:// or https:// URL` | Use for example `http://localhost:5000/a2a/authAgent` |
 | Scenario 3: `401 Unauthorized` / `403` from Azure OpenAI | API key: check the user secret `AzureOpenAI:APIKey`. Entra ID: run `az login` and check the **Cognitive Services OpenAI User** role |
 | Scenario 3: no `Tool called:` line | The local model answered without the tool: check `tools: [authAgent.AsAIFunction()]` |
+| Scenario 4: `-> Answer contains the key of turn 1: no` for the same session | The server keeps no conversation: check the session store of Lab06_A2AServer (its TODO 8), and that the server was not restarted between the two turns. Check also that both turns pass `session` |
 
 ## Provided Files
 
@@ -316,7 +387,7 @@ The following files should be modified:
 
 - **Choose the protocol binding**: `authAgentCard.AsAIAgent(options: new A2AClientOptions { PreferredBindings = [ProtocolBindingNames.HttpJson] })` (official sample `A2AAgent_ProtocolSelection`). With the cards of this server, the lab observed JSON-RPC by default.
 - **One tool per skill**: instead of one tool for the whole agent, create one `AIFunction` per `AgentSkill` of the card (official sample `A2AAgent_Skills`).
-- **Conversations**: `AgentSession session = await authAgent.CreateSessionAsync();` then `RunAsync(message, session)` sends the messages with the same A2A `contextId` (official sample `A2AClientServer`). The server must keep sessions for that (see *Going further* in Lab06_A2AServer).
+- **Continue a conversation later**: keep the `contextId` of the session, then `A2AAgent.CreateSessionAsync(contextId)` creates a session that continues it (as long as the server still has it).
 - **Long-running tasks**: polling with continuation tokens (`A2AAgent_PollingForTaskCompletion`) and stream reconnection (`A2AAgent_StreamReconnection`).
 
 ## Coming from an older version of the lab?
@@ -332,7 +403,7 @@ The following files should be modified:
 | `RemoteAuthAgentSettings` (`RemoteAuthAgentSettings` section) | `RemoteAgentSettings` (`RemoteAgents:AuthAgent`, `RemoteAgents:CustomerToneAgent`) |
 | `Microsoft.Extensions.Hosting` (configuration only), `<NoWarn>MEAI001</NoWarn>` | `Microsoft.Extensions.Configuration.*`, no global `NoWarn` |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
-| One scenario (AuthAgent only) | Three scenarios: discovery, direct configuration (CustomerToneAgent), remote agent as a tool |
+| One scenario (AuthAgent only) | Four scenarios: discovery, direct configuration (CustomerToneAgent), remote agent as a tool, conversation |
 
 ## Useful Links
 

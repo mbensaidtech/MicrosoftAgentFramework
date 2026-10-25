@@ -19,6 +19,7 @@ The next lab, **Lab06_A2AClient**, connects to this server.
 - How to expose an agent with the two protocol bindings of A2A v1: **JSON-RPC** (`MapA2AJsonRpc`) and **HTTP+JSON** (`MapA2AHttpJson`)
 - How to describe an agent with an `AgentCard` (skills, `SupportedInterfaces`) and publish it at `.well-known/agent-card.json` (`MapWellKnownAgentCard`)
 - How to give a hosted agent function tools, exactly as in Lab 03
+- How the server keeps a conversation for each A2A `contextId` with a **session store**, and why it keeps nothing by default
 - Why the model and the tools run on the **server**: a client only sends messages
 
 ## Prerequisites
@@ -132,10 +133,11 @@ TODO 1 to 3 are the same as in Lab 01.
 | **TODO 5** | Create the tools of the AuthAgent | • `APIKeySettings apiKeySettings = ConfigurationHelper.GetAPIKeySettings();` <br> • `APIKeyTools apiKeyTools = new(apiKeySettings);` <br> • `if (!apiKeyTools.IsSecretConfigured) { ColoredConsole.WriteSecondaryLogLine("APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops."); }` |
 | **TODO 6** | Wrap the two methods as AI tools (Lab 03) | • `IList<AITool> tools = [AIFunctionFactory.Create(apiKeyTools.GenerateAPIKey, "generate_api_key"), AIFunctionFactory.Create(apiKeyTools.ValidateAPIKey, "validate_api_key")];` |
 | **TODO 7** | Create the two agents | • `AIAgent authAgent = chatClient.AsAIAgent(instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. When you generate a key, return the key exactly as produced by the tool.", name: "AuthAgent", tools: tools);` <br> • `AIAgent customerToneAgent = chatClient.AsAIAgent(instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.", name: "CustomerToneAgent");` |
-| **TODO 8** | Register an A2A server for each agent, then build the app | • `builder.AddA2AServer(authAgent);` <br> • `builder.AddA2AServer(customerToneAgent);` <br> • `var app = builder.Build();` <br> • `AddA2AServer` registers, for the agent **name**, the A2A request handler and a task store |
-| **TODO 9** | Map both protocol bindings of each agent | • `app.MapA2AJsonRpc(authAgent, AuthAgentPath);` <br> • `app.MapA2AHttpJson(authAgent, AuthAgentPath);` <br> • Same two lines for `customerToneAgent` and `CustomerToneAgentPath` |
-| **TODO 10** | Publish the agent cards | • `app.MapWellKnownAgentCard(AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}"), AuthAgentPath);` <br> • `app.MapWellKnownAgentCard(AgentCards.CreateCustomerToneAgentCard($"{serverSettings.BaseUrl}{CustomerToneAgentPath}"), CustomerToneAgentPath);` <br> • With a path, the card is served at `<path>/.well-known/agent-card.json` |
-| **TODO 11** | Run the server | • `await app.RunAsync(serverSettings.BaseUrl);` — it runs until `Ctrl+C` |
+| **TODO 8** | Give each agent a session store | • `builder.Services.AddKeyedSingleton<AgentSessionStore>(authAgent.Name, new InMemoryAgentSessionStore());` <br> • Same line for `customerToneAgent` <br> • `ColoredConsole.WriteSecondaryLogLine("Session store: in memory (development only), one per agent.");` <br> • The store is registered under the agent **name**: that is where the A2A hosting looks for it. Keep the lines between the `#pragma` of the skeleton (`MAAI001`, see *Conversations* below) |
+| **TODO 9** | Register an A2A server for each agent, then build the app | • `builder.AddA2AServer(authAgent);` <br> • `builder.AddA2AServer(customerToneAgent);` <br> • `var app = builder.Build();` <br> • `AddA2AServer` registers, for the agent **name**, the A2A request handler and a task store |
+| **TODO 10** | Map both protocol bindings of each agent | • `app.MapA2AJsonRpc(authAgent, AuthAgentPath);` <br> • `app.MapA2AHttpJson(authAgent, AuthAgentPath);` <br> • Same two lines for `customerToneAgent` and `CustomerToneAgentPath` |
+| **TODO 11** | Publish the agent cards | • `app.MapWellKnownAgentCard(AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}"), AuthAgentPath);` <br> • `app.MapWellKnownAgentCard(AgentCards.CreateCustomerToneAgentCard($"{serverSettings.BaseUrl}{CustomerToneAgentPath}"), CustomerToneAgentPath);` <br> • With a path, the card is served at `<path>/.well-known/agent-card.json` |
+| **TODO 12** | Run the server | • `await app.RunAsync(serverSettings.BaseUrl);` — it runs until `Ctrl+C` |
 
 ---
 
@@ -190,6 +192,17 @@ POST /a2a/authAgent/message:send                              └─▶ AIAgent 
 2. **Message** — the client sends an A2A message (`role`, `parts`) with one of the bindings. `MapA2AJsonRpc` and `MapA2AHttpJson` translate both into the same request for the A2A server of the agent.
 3. **Run** — the A2A server runs the `AIAgent` on the **server**: the model call, the tool loop and the tools (`GenerateAPIKey`, `ValidateAPIKey`) all happen here. The client never sees the tools, the signing secret or the Azure OpenAI credentials.
 4. **Answer** — by default (`AgentRunMode.ReturnMessage`), the answer is one A2A `Message`. Long-running agents can return an A2A **task** instead (see *Going further*).
+5. **Conversation** — the answer carries a `contextId`, chosen by the server for a new conversation. A client that wants to continue the conversation sends it back with its next message; the server then loads the session of this `contextId` from the **session store** of the agent.
+
+## Conversations: the session store
+
+**By default, the server keeps no conversation.** When no session store is registered for an agent, the A2A hosting uses a `NoopAgentSessionStore`, which stores nothing (Agent Framework 1.26.0 source: the store is looked up with `GetKeyedService<AgentSessionStore>(agent.Name)`, and `NoopAgentSessionStore` is the fallback). Every request then starts a new conversation, even when the client sends the same `contextId`. Scenario 4 of Lab06_A2AClient shows it: without a store, the client sends the same `contextId` on both turns, but the AuthAgent no longer knows the key it generated in turn 1 — it generates a new one and calls it valid.
+
+TODO 8 registers an `InMemoryAgentSessionStore` for each agent, under the agent name. Things to know:
+
+- **Development only**: the sessions live in the memory of the process. They are lost when the server stops, and they are not shared between several instances of the server. In production, use a persistent implementation of `AgentSessionStore`.
+- **Experimental**: `AgentSessionStore` and `InMemoryAgentSessionStore` are flagged `[Experimental("MAAI001")]` in Agent Framework 1.26.0 (the A2A hosting packages are previews anyway). The lab disables the warning only around the two lines.
+- **A `contextId` is not an identity**: anyone who knows a `contextId` can continue its conversation. The official guide says: *"Never use a caller-supplied context or task ID as proof of ownership."* See *Security* below.
 
 ## Key Concepts
 
@@ -201,6 +214,9 @@ POST /a2a/authAgent/message:send                              └─▶ AIAgent 
 | `AgentInterface` | Where and how to call the agent: `Url`, `ProtocolBinding`, `ProtocolVersion` |
 | Protocol bindings | `JSONRPC` (JSON-RPC 2.0, method `SendMessage`) and `HTTP+JSON` (REST, `POST .../message:send`); A2A v1 also defines gRPC |
 | `AddA2AServer(agent)` | Registers the A2A request handler and the task store of an agent, keyed by the agent name |
+| `contextId` | Identifier of an A2A conversation, chosen by the server and sent back by the client to continue it |
+| `AgentSessionStore` | Where the hosting keeps the session of each conversation. Registered with `AddKeyedSingleton<AgentSessionStore>(agentName, ...)`; without it, `NoopAgentSessionStore` keeps nothing |
+| `InMemoryAgentSessionStore` | Session store in the memory of the process: development and tests only |
 | `MapA2AJsonRpc` / `MapA2AHttpJson` | Map the endpoints of one binding for an agent at a path |
 | `MapWellKnownAgentCard(card, path)` | Serves the card at `<path>/.well-known/agent-card.json` (from the `A2A.AspNetCore` package) |
 
@@ -213,9 +229,10 @@ POST /a2a/authAgent/message:send                              └─▶ AIAgent 
 | `System.ClientModel` | `ApiKeyCredential` |
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
-| `Microsoft.Agents.AI` | `AIAgent`, `AsAIAgent()` |
+| `Microsoft.Agents.AI` | `AIAgent`, `AsAIAgent()`, `AgentSessionStore` |
+| `Microsoft.Agents.AI.Hosting` | `InMemoryAgentSessionStore` |
 | `Microsoft.Extensions.AI` | `AITool`, `AIFunctionFactory` |
-| `Microsoft.Extensions.DependencyInjection` | `AddA2AServer()` |
+| `Microsoft.Extensions.DependencyInjection` | `AddA2AServer()`, `AddKeyedSingleton()` |
 | `Microsoft.AspNetCore.Builder` | `WebApplication`, `MapA2AJsonRpc()`, `MapA2AHttpJson()` |
 | `A2A` | `AgentCard`, `AgentSkill`, `AgentInterface`, `ProtocolBindingNames` |
 | `A2A.AspNetCore` | `MapWellKnownAgentCard()` |
@@ -229,6 +246,7 @@ Deployment: your-deployment-name
 ----------------------------------------
 === Scenario 1: A2A server with two agents ===
 APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops.
+Session store: in memory (development only), one per agent.
 AuthAgent:         http://localhost:5000/a2a/authAgent
   Agent card:      http://localhost:5000/a2a/authAgent/.well-known/agent-card.json
 CustomerToneAgent: http://localhost:5000/a2a/customerToneAgent
@@ -240,7 +258,7 @@ info: Microsoft.Hosting.Lifetime[0]
       Application started. Press Ctrl+C to shut down.
 ```
 
-The delivered Start project prints the header and the endpoints (without the `APIKeySettings` notice of TODO 5), then exits: the server only listens once TODO 11 is done.
+The delivered Start project prints the header and the endpoints (without the notices of TODO 5 and TODO 8), then exits: the server only listens once TODO 12 is done.
 
 ## Troubleshooting
 
@@ -261,8 +279,14 @@ The delivered Start project prints the header and the endpoints (without the `AP
 This lab server is for local development:
 
 - it has **no authentication**: anyone who can reach the port can use the agents (and your Azure OpenAI quota). Keep it on `localhost`;
-- by default, the A2A tasks and sessions are looked up by `contextId` / `taskId` only. In production, register an agent isolation key provider (for example `builder.Services.UseClaimsBasedAgentIsolation(...)`), as the official sample recommends;
-- the signing secret and the Azure OpenAI key stay on the server; the agent card must never contain secrets.
+- the A2A tasks and sessions are looked up by `contextId` / `taskId` only: anyone who knows a `contextId` can read the rest of the conversation through the agent. These ids come from the caller: *"Never use a caller-supplied context or task ID as proof of ownership."*
+
+In production, follow the [authentication guide of the official sample](https://github.com/microsoft/agent-framework/blob/main/dotnet/samples/05-end-to-end/A2AClientServer/AUTHENTICATION.md):
+
+- **authenticate the calling agent** (for example `builder.Services.AddAuthentication("Bearer").AddJwtBearer(...)`) and protect the endpoints and the card: `app.MapA2AHttpJson(agent, path).RequireAuthorization("InvokeAgent")`;
+- **isolate the conversations by identity**: `builder.Services.UseClaimsBasedAgentIsolation(new() { ClaimType = "sub" })` partitions the sessions and the tasks with a claim of the authenticated caller, in addition to the `contextId` (*"Authentication and endpoint authorization do not replace isolation of retained caller data."*);
+- **authorize in the tools**: *"Agent instructions and tool descriptions do not enforce permissions. Enforce authorization in the host and in the tool implementation."*;
+- keep the signing secret and the Azure OpenAI key on the server; the agent card must never contain secrets.
 
 ## Provided Files
 
@@ -290,7 +314,6 @@ The following files should be modified:
 
 ## Going Further
 
-- **Multi-turn conversations**: by default the server does not keep the sessions of the agents between requests. Register a session store for an agent, for example `builder.Services.AddKeyedSingleton<AgentSessionStore>("AuthAgent", new InMemoryAgentSessionStore());`, so that the messages that share a `contextId` share the history (see the official sample `A2AClientServer`).
 - **Long-running tasks**: `builder.AddA2AServer(agent, options => options.AgentRunMode = ...)` lets the server answer with A2A tasks that the client polls or streams (`A2AServerRegistrationOptions` is still experimental). Client side: samples `A2AAgent_PollingForTaskCompletion`, `A2AAgent_StreamReconnection`.
 - **Agents registered with the hosting builder**: `builder.AddAIAgent("name", instructions: ...)` then `agentBuilder.AddA2AServer()` and `app.MapA2AJsonRpc(agentBuilder, path)`.
 - **A2A Inspector**: a web tool of the A2A project to browse a card and chat with the agent ([a2a-inspector](https://github.com/a2aproject/a2a-inspector)).
@@ -310,6 +333,7 @@ The following files should be modified:
 | Agent named `APIKeyAgent` behind the `AuthAgent` card | Agent named `AuthAgent`, like its card |
 | Signing secret and API key in `appsettings.json` | Optional signing secret and API key in user secrets or environment variables |
 | URL `http://localhost:5000` hard-coded in the cards | `A2AServer:BaseUrl` in the configuration |
+| No session store: every request started a new conversation | A session store per agent (TODO 8): the messages that share a `contextId` share the history |
 
 ## Useful Links
 

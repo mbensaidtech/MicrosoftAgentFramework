@@ -4,6 +4,7 @@ using A2A;
 using A2A.AspNetCore;
 using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,23 +92,34 @@ if (ShouldRunScenario(1))
                       "Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.",
         name: "CustomerToneAgent");
 
-    // Step 4: Register an A2A server for each agent (A2A request handler + task store)
+    // Step 4: Give each agent a session store, registered under the name of the agent: the A2A hosting keeps there the
+    // conversation of each contextId. Without a store, it uses a NoopAgentSessionStore, which keeps nothing: every
+    // request starts a new conversation, even with the same contextId.
+    // InMemoryAgentSessionStore is for development: the conversations are lost when the server stops.
+    // AgentSessionStore and InMemoryAgentSessionStore are flagged [Experimental] (MAAI001) in Agent Framework 1.26.0.
+#pragma warning disable MAAI001
+    builder.Services.AddKeyedSingleton<AgentSessionStore>(authAgent.Name, new InMemoryAgentSessionStore());
+    builder.Services.AddKeyedSingleton<AgentSessionStore>(customerToneAgent.Name, new InMemoryAgentSessionStore());
+#pragma warning restore MAAI001
+    ColoredConsole.WriteSecondaryLogLine("Session store: in memory (development only), one per agent.");
+
+    // Step 5: Register an A2A server for each agent (A2A request handler + task store)
     builder.AddA2AServer(authAgent);
     builder.AddA2AServer(customerToneAgent);
 
     var app = builder.Build();
 
-    // Step 5: Expose each agent with both A2A v1 protocol bindings at the same path
+    // Step 6: Expose each agent with both A2A v1 protocol bindings at the same path
     app.MapA2AJsonRpc(authAgent, AuthAgentPath);
     app.MapA2AHttpJson(authAgent, AuthAgentPath);
     app.MapA2AJsonRpc(customerToneAgent, CustomerToneAgentPath);
     app.MapA2AHttpJson(customerToneAgent, CustomerToneAgentPath);
 
-    // Step 6: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
+    // Step 7: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
     app.MapWellKnownAgentCard(AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}"), AuthAgentPath);
     app.MapWellKnownAgentCard(AgentCards.CreateCustomerToneAgentCard($"{serverSettings.BaseUrl}{CustomerToneAgentPath}"), CustomerToneAgentPath);
 
-    // Step 7: Display the endpoints, then run the server until Ctrl+C
+    // Step 8: Display the endpoints, then run the server until Ctrl+C
     ColoredConsole.WritePrimaryLogLine($"AuthAgent:         {serverSettings.BaseUrl}{AuthAgentPath}");
     ColoredConsole.WritePrimaryLogLine($"  Agent card:      {serverSettings.BaseUrl}{AuthAgentPath}/.well-known/agent-card.json");
     ColoredConsole.WritePrimaryLogLine($"CustomerToneAgent: {serverSettings.BaseUrl}{CustomerToneAgentPath}");

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using A2A;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.A2A;
 using Microsoft.Extensions.AI;
 using CommonUtilities;
 
@@ -41,6 +42,13 @@ public static partial class AgentConsole
             ColoredConsole.WriteSecondaryLogLine($"Tool called: {call.Name}");
         }
     }
+
+    /// <summary>
+    /// Displays the A2A context id of a session: the id of the conversation, chosen by the server on the first
+    /// request and sent with every following request of the session.
+    /// </summary>
+    public static void WriteContextId(string turn, AgentSession session) =>
+        ColoredConsole.WriteSecondaryLogLine($"Context id after {turn}: {(session as A2AAgentSession)?.ContextId ?? "(none)"}");
 
     /// <summary>
     /// Displays the token usage of an agent run.

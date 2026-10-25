@@ -13,9 +13,9 @@ using static A2AClient.AgentConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
+// Set to: [1], [2], [3], [4] or [1, 2, 3, 4] to run specific scenarios
 // All scenarios need the A2A server of Lab06_A2AServer (http://localhost:5000)
-HashSet<int> scenariosToRun = [1, 2, 3];
+HashSet<int> scenariosToRun = [1, 2, 3, 4];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -131,6 +131,44 @@ if (ShouldRunScenario(3))
     WriteToolCalls(response);
     ColoredConsole.WriteAssistantLine($"Assistant: {response.Text}");
     WriteTokenUsage(response);
+}
+
+#endregion
+
+#region Scenario 4: Have a conversation with a remote agent
+
+if (ShouldRunScenario(4))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 4: A conversation with a remote agent ===");
+
+    // Step 1: Create the remote AuthAgent from its agent card (as in scenario 1)
+    A2ACardResolver cardResolver = new(new Uri($"{authAgentSettings.Url}/"));
+    AIAgent authAgent = await cardResolver.GetAIAgentAsync().WithSpinner("Reading the agent card");
+
+    // Step 2: Create a session. Every request sent with it carries the same A2A contextId:
+    // the server uses it to find the conversation in its session store (Lab06_A2AServer)
+    AgentSession session = await authAgent.CreateSessionAsync();
+
+    // Step 3: First turn: ask for a new API key
+    AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key", session).WithSpinner("Calling the remote agent");
+    string apiKey = FindApiKey(generateResponse.Text);
+    ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");
+    WriteContextId("turn 1", session);
+
+    // Step 4: Second turn, in the same session: refer to the key without giving it again.
+    // The code checks that the answer contains the exact key of turn 1: a model without the conversation could
+    // generate a new key and say "it is valid", which proves nothing
+    const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";
+    AgentResponse followUpResponse = await authAgent.RunAsync(FollowUpQuestion, session).WithSpinner("Calling the remote agent");
+    ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");
+    ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
+    WriteContextId("turn 2", session);
+
+    // Step 5: The same question without the session: a new conversation, in which no key was generated
+    AgentResponse newConversationResponse = await authAgent.RunAsync(FollowUpQuestion).WithSpinner("Calling the remote agent");
+    ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}");
+    ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(newConversationResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
 }
 
 #endregion

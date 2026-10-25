@@ -13,9 +13,9 @@ using static A2AClient.AgentConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
+// Set to: [1], [2], [3], [4] or [1, 2, 3, 4] to run specific scenarios
 // All scenarios need the A2A server of Lab06_A2AServer (http://localhost:5000)
-HashSet<int> scenariosToRun = [1, 2, 3];
+HashSet<int> scenariosToRun = [1, 2, 3, 4];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -111,6 +111,35 @@ if (ShouldRunScenario(3))
 
     // TODO 12: Run the local agent, then display the tools it called, its answer and the token usage
     // Hint: WriteToolCalls(response) and WriteTokenUsage(response) are provided in AgentConsole.cs
+}
+
+#endregion
+
+#region Scenario 4: Have a conversation with a remote agent
+
+if (ShouldRunScenario(4))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 4: A conversation with a remote agent ===");
+
+    // TODO 13: Create the remote AuthAgent from its agent card (as in TODO 10), then create a session
+    // Hint: AgentSession session = await authAgent.CreateSessionAsync();
+    //       every request sent with this session carries the same A2A contextId
+    // AIAgent authAgent = ...
+    // AgentSession session = ...
+
+    // TODO 14: First turn, with the session: ask for a new API key, display it and the context id
+    // Hint: await authAgent.RunAsync("Generate a new API key", session); string apiKey = FindApiKey(...);
+    //       ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}"); WriteContextId("turn 1", session)
+
+    // TODO 15: Second turn, with the same session: ask for the key again without giving it, and check the answer
+    // Hint: const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";
+    //       ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");
+    //       ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
+    //       WriteContextId("turn 2", session)
+
+    // TODO 16: The same question without the session (a new conversation), and the same check
+    // Hint: ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}"), then the "-> Answer contains..." line
 }
 
 #endregion

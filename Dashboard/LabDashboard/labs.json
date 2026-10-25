@@ -513,13 +513,14 @@
       "number": "06",
       "track": "Azure OpenAI",
       "title": "A2A Server (Agent-to-Agent)",
-      "summary": "Host two agents with the A2A protocol v1 in ASP.NET Core: an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings and described by their agent cards. The dashboard checks your server with the reference client.",
+      "summary": "Host two agents with the A2A protocol v1 in ASP.NET Core: an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings, described by their agent cards, and given a session store so that clients can have conversations. The dashboard checks your server with the reference client.",
       "level": "Intermediate",
       "objectives": [
         "Host agents in ASP.NET Core with builder.AddA2AServer(agent)",
         "Expose an agent with both A2A v1 bindings: MapA2AJsonRpc() and MapA2AHttpJson()",
         "Describe an agent with an AgentCard (skills, SupportedInterfaces) and publish it with MapWellKnownAgentCard()",
-        "Give a hosted agent function tools: the model and the tools run on the server"
+        "Give a hosted agent function tools: the model and the tools run on the server",
+        "Keep a conversation for each A2A contextId with a session store per agent (nothing is kept by default)"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab06_A2AServer",
       "startProject": "Start/A2AServer.csproj",
@@ -586,6 +587,16 @@
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage of the local agent displayed",
           "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "session-store",
+          "description": "The server registered a session store for each agent",
+          "pattern": "^Session store: in memory \\(development only\\), one per agent\\.\\s*$"
+        },
+        {
+          "id": "conversation",
+          "description": "The client continued a conversation: the server kept the history of the contextId (scenario 4 of the client)",
+          "pattern": "(?s)^Same session: (?:(?!^=== Scenario|^New conversation:).)*?^\\s*-> Answer contains the key of turn 1: yes\\s*$"
         }
       ],
       "translations": {
@@ -593,12 +604,13 @@
           "track": "Azure OpenAI",
           "title": "Serveur A2A (Agent-to-Agent)",
           "level": "Intermédiaire",
-          "summary": "Hébergez deux agents avec le protocole A2A v1 dans ASP.NET Core : un AuthAgent avec des outils de clés d'API et un CustomerToneAgent, exposés avec les liaisons JSON-RPC et HTTP+JSON et décrits par leurs cartes d'agent. Le dashboard vérifie votre serveur avec le client de référence.",
+          "summary": "Hébergez deux agents avec le protocole A2A v1 dans ASP.NET Core : un AuthAgent avec des outils de clés d'API et un CustomerToneAgent, exposés avec les liaisons JSON-RPC et HTTP+JSON, décrits par leurs cartes d'agent et dotés d'un magasin de sessions pour que les clients puissent mener des conversations. Le dashboard vérifie votre serveur avec le client de référence.",
           "objectives": [
             "Héberger des agents dans ASP.NET Core avec builder.AddA2AServer(agent)",
             "Exposer un agent avec les deux liaisons d'A2A v1 : MapA2AJsonRpc() et MapA2AHttpJson()",
             "Décrire un agent avec une AgentCard (compétences, SupportedInterfaces) et la publier avec MapWellKnownAgentCard()",
-            "Donner des outils à un agent hébergé : le modèle et les outils s'exécutent sur le serveur"
+            "Donner des outils à un agent hébergé : le modèle et les outils s'exécutent sur le serveur",
+            "Garder une conversation pour chaque contextId A2A avec un magasin de sessions par agent (rien n'est gardé par défaut)"
           ],
           "checks": {
             "config": "Configuration chargée (Azure OpenAI)",
@@ -610,7 +622,9 @@
             "scenario2-tone": "Scénario 2 - le CustomerToneAgent, joint par son URL, a détecté un ton négatif",
             "scenario3-tool": "Scénario 3 - l'agent local a appelé l'AuthAgent distant comme outil",
             "scenario3-key": "Scénario 3 - la réponse de l'agent local contient une clé d'API signée",
-            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée"
+            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée",
+            "session-store": "Le serveur a enregistré un magasin de sessions pour chaque agent",
+            "conversation": "Le client a poursuivi une conversation : le serveur a gardé l'historique du contextId (scénario 4 du client)"
           }
         }
       }
@@ -620,14 +634,15 @@
       "number": "06",
       "track": "Azure OpenAI",
       "title": "A2A Client (Agent-to-Agent)",
-      "summary": "Call the agents of the A2A server: discover the AuthAgent from its agent card, reach the CustomerToneAgent by URL, then give the remote AuthAgent to a local Azure OpenAI agent as a function tool. The dashboard starts the reference server for you.",
+      "summary": "Call the agents of the A2A server: discover the AuthAgent from its agent card, reach the CustomerToneAgent by URL, give the remote AuthAgent to a local Azure OpenAI agent as a function tool, then have a conversation with it in a session. The dashboard starts the reference server for you.",
       "level": "Intermediate",
       "objectives": [
         "Read an agent card with A2ACardResolver.GetAgentCardAsync(): skills and supported interfaces",
         "Create an AIAgent for a remote agent with AgentCard.AsAIAgent() or A2ACardResolver.GetAIAgentAsync()",
         "Connect to an agent by URL (direct configuration) with A2AClient.AsAIAgent()",
         "Call a remote agent with RunAsync(), like a local agent",
-        "Use a remote agent as a function tool of a local agent with AsAIFunction()"
+        "Use a remote agent as a function tool of a local agent with AsAIFunction()",
+        "Have a conversation with a remote agent: a session keeps the same A2A contextId, and the server keeps the history"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab06_A2AClient",
       "startProject": "Start/A2AClient.csproj",
@@ -689,6 +704,26 @@
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage of the local agent displayed",
           "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4-key",
+          "description": "Scenario 4 - the remote agent generated a key in the first turn of the session",
+          "pattern": "(?s)^=== Scenario 4:(?:(?!^=== Scenario).)*?^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
+        },
+        {
+          "id": "scenario4-context",
+          "description": "Scenario 4 - both turns of the session used the same A2A contextId",
+          "pattern": "^Context id after turn 1: (\\S+)\\s*\\n(?s:(?:(?!^=== Scenario).)*?)^Context id after turn 2: \\1\\s*$"
+        },
+        {
+          "id": "scenario4-remembered",
+          "description": "Scenario 4 - in the same session, the remote agent gave back the exact key of the first turn (the server kept the conversation)",
+          "pattern": "(?s)^Same session: (?:(?!^=== Scenario|^New conversation:).)*?^\\s*-> Answer contains the key of turn 1: yes\\s*$"
+        },
+        {
+          "id": "scenario4-new-conversation",
+          "description": "Scenario 4 - without the session, the remote agent did not know the key of the first turn",
+          "pattern": "(?s)^New conversation: (?:(?!^=== Scenario).)*?^\\s*-> Answer contains the key of turn 1: no\\s*$"
         }
       ],
       "translations": {
@@ -696,13 +731,14 @@
           "track": "Azure OpenAI",
           "title": "Client A2A (Agent-to-Agent)",
           "level": "Intermédiaire",
-          "summary": "Appelez les agents du serveur A2A : découvrez l'AuthAgent par sa carte d'agent, joignez le CustomerToneAgent par son URL, puis donnez l'AuthAgent distant comme outil à un agent Azure OpenAI local. Le dashboard démarre le serveur de référence pour vous.",
+          "summary": "Appelez les agents du serveur A2A : découvrez l'AuthAgent par sa carte d'agent, joignez le CustomerToneAgent par son URL, donnez l'AuthAgent distant comme outil à un agent Azure OpenAI local, puis menez une conversation avec lui dans une session. Le dashboard démarre le serveur de référence pour vous.",
           "objectives": [
             "Lire une carte d'agent avec A2ACardResolver.GetAgentCardAsync() : compétences et interfaces prises en charge",
             "Créer un AIAgent pour un agent distant avec AgentCard.AsAIAgent() ou A2ACardResolver.GetAIAgentAsync()",
             "Se connecter à un agent par son URL (configuration directe) avec A2AClient.AsAIAgent()",
             "Appeler un agent distant avec RunAsync(), comme un agent local",
-            "Utiliser un agent distant comme outil d'un agent local avec AsAIFunction()"
+            "Utiliser un agent distant comme outil d'un agent local avec AsAIFunction()",
+            "Mener une conversation avec un agent distant : une session garde le même contextId A2A, et le serveur garde l'historique"
           ],
           "checks": {
             "config": "Configuration chargée (Azure OpenAI)",
@@ -713,7 +749,11 @@
             "scenario2-tone": "Scénario 2 - le CustomerToneAgent, joint par son URL, a détecté un ton négatif",
             "scenario3-tool": "Scénario 3 - l'agent local a appelé l'AuthAgent distant comme outil",
             "scenario3-key": "Scénario 3 - la réponse de l'agent local contient une clé d'API signée",
-            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée"
+            "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée",
+            "scenario4-key": "Scénario 4 - l'agent distant a généré une clé au premier tour de la session",
+            "scenario4-context": "Scénario 4 - les deux tours de la session ont utilisé le même contextId A2A",
+            "scenario4-remembered": "Scénario 4 - dans la même session, l'agent distant a redonné exactement la clé du premier tour (le serveur a gardé la conversation)",
+            "scenario4-new-conversation": "Scénario 4 - sans la session, l'agent distant ne connaissait pas la clé du premier tour"
           }
         }
       }
@@ -1340,6 +1380,124 @@
             "scenario1-recall": "Scénario 1 - dans une nouvelle session (historique vide), le provider a ajouté les souvenirs et la réponse les utilise : le prénom Ada et l'une de ses préférences (végétarienne, les Alpes, Lyon)",
             "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
             "scenario2-greeting": "Scénario 2 - l'agent a parlé en premier (RunAsync sans message) : le provider a ajouté les souvenirs, n'avait rien à extraire, et l'accueil utilise le prénom Ada"
+          }
+        }
+      }
+    },
+    {
+      "id": "multiagent-lab01",
+      "number": "01",
+      "track": "Multi-Agent System",
+      "title": "Delegate a Task to Another Agent",
+      "summary": "Make agents work together: delegate by code to a reviewer agent and decide with its typed review, let a front desk agent delegate to specialist agents turned into tools, and keep the context of a specialist with a session.",
+      "level": "Intermediate",
+      "objectives": [
+        "Delegate by code: call another agent directly with RunAsync<T> and decide with its typed result",
+        "Check a result returned by a model before the code uses it",
+        "Delegate by the model: turn agents into tools with AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
+        "Read the delegations of a run: the query written by the model and the text returned",
+        "Keep the context of a specialist across calls with AsAIFunction(session: ...)",
+        "Know the limits of an agent used as a tool: single query, text only, hidden token usage, approvals that do not come back"
+      ],
+      "path": "LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool",
+      "startProject": "Start/UseAgentAsTool.csproj",
+      "solutionProject": "Solution/UseAgentAsTool.csproj",
+      "timeoutSeconds": 240,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-answer",
+          "description": "Scenario 1 - the after-sales expert answered the customer",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^AfterSalesExpert: \\S"
+        },
+        {
+          "id": "scenario1-approved",
+          "description": "Scenario 1 - the reviewer scored the answer of the expert and the code sent it to the customer",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^Answer written by hand).)*?^Quality review: (?:[7-9]|10)/10\\n(?:(?!^Answer written by hand).)*?^Decision: sent to the customer$"
+        },
+        {
+          "id": "scenario1-held-back",
+          "description": "Scenario 1 - the wrong answer written by hand was held back by the decision of the code",
+          "pattern": "(?s)^Answer written by hand \\(wrong on purpose\\):(?:(?!^=== Scenario).)*?^Quality review: [1-6]/10\\n(?:(?!^=== Scenario).)*?^Decision: held back for a human agent"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage of each agent displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Token Usage \\(AfterSalesExpert\\):\\n\\s*input tokens:?\\s*\\d+(?:(?!^=== Scenario).)*?^Token Usage \\(QualityReviewer\\):\\n\\s*input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-tool-schema",
+          "description": "Scenario 2 - an agent turned into a tool takes a single query parameter",
+          "pattern": "^Tool ask_order_specialist: \\S[^\\n]*\\n\\s*Parameters: \\{[^\\n]*\\\"properties\\\":\\{\\\"query\\\":\\{[^{}]*\\}\\}"
+        },
+        {
+          "id": "scenario2-order",
+          "description": "Scenario 2 - the front desk asked the order specialist with a query that contains the order number",
+          "pattern": "^\\[Delegation\\] ask_order_specialist\\(query: \\\"[^\\n]*ORD-1042[^\\n]*\\\"\\)$"
+        },
+        {
+          "id": "scenario2-after-sales",
+          "description": "Scenario 2 - the front desk asked the after-sales expert, who returned a text",
+          "pattern": "^\\[Delegation\\] ask_after_sales_expert returned: \\S"
+        },
+        {
+          "id": "scenario2-answer",
+          "description": "Scenario 2 - the front desk answered with the options given by the rules (replacement or refund)",
+          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^FrontDesk: (?:(?!^=== Scenario).)*?(?i:replacement|refund)"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage of the front desk displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Token Usage \\(FrontDesk only[^\\n]*\\n\\s*input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3-tool",
+          "description": "Scenario 3 - without options, the tool takes the name and the description of the agent",
+          "pattern": "^Tool TicketSpecialist: Keeps the support ticket"
+        },
+        {
+          "id": "scenario3-without-session",
+          "description": "Scenario 3 - with a new session for each call, the ticket lost the order number given in the first call",
+          "pattern": "^Ticket after the second call - a new session for each call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: no$"
+        },
+        {
+          "id": "scenario3-with-session",
+          "description": "Scenario 3 - with one session for every call, the ticket kept the order number given in the first call",
+          "pattern": "^Ticket after the second call - one session for every call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: yes$"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Système multi-agents",
+          "title": "Confier une tâche à un autre agent",
+          "level": "Intermédiaire",
+          "summary": "Faites travailler des agents ensemble : déléguez par le code à un agent relecteur et décidez avec sa revue typée, laissez un agent d'accueil déléguer à des agents spécialistes transformés en outils, et gardez le contexte d'un spécialiste avec une session.",
+          "objectives": [
+            "Déléguer par le code : appeler directement un autre agent avec RunAsync<T> et décider avec son résultat typé",
+            "Vérifier un résultat renvoyé par un modèle avant que le code ne l'utilise",
+            "Déléguer par le modèle : transformer des agents en outils avec AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
+            "Lire les délégations d'une exécution : la requête écrite par le modèle et le texte renvoyé",
+            "Garder le contexte d'un spécialiste d'un appel à l'autre avec AsAIFunction(session: ...)",
+            "Connaître les limites d'un agent utilisé comme outil : une seule requête, du texte seulement, tokens invisibles, approbations qui ne remontent pas"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-answer": "Scénario 1 - l'expert après-vente a répondu au client",
+            "scenario1-approved": "Scénario 1 - le relecteur a noté la réponse de l'expert et le code l'a envoyée au client",
+            "scenario1-held-back": "Scénario 1 - la réponse fausse écrite à la main a été retenue par la décision du code",
+            "scenario1-usage": "Scénario 1 - consommation de tokens de chaque agent affichée",
+            "scenario2-tool-schema": "Scénario 2 - un agent transformé en outil prend un seul paramètre query",
+            "scenario2-order": "Scénario 2 - l'accueil a interrogé le spécialiste des commandes avec une requête qui contient le numéro de commande",
+            "scenario2-after-sales": "Scénario 2 - l'accueil a interrogé l'expert après-vente, qui a renvoyé un texte",
+            "scenario2-answer": "Scénario 2 - l'accueil a répondu avec les options prévues par les règles (remplacement ou remboursement)",
+            "scenario2-usage": "Scénario 2 - consommation de tokens de l'accueil affichée",
+            "scenario3-tool": "Scénario 3 - sans options, l'outil reprend le nom et la description de l'agent",
+            "scenario3-without-session": "Scénario 3 - avec une nouvelle session à chaque appel, le ticket a perdu le numéro de commande donné au premier appel",
+            "scenario3-with-session": "Scénario 3 - avec une seule session pour tous les appels, le ticket a gardé le numéro de commande donné au premier appel"
           }
         }
       }

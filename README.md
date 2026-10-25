@@ -45,7 +45,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
-> **Agent Framework version:** the 13 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). The **MultiAgentSystem** labs are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 13 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -56,7 +56,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11, Lab12) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11, Lab12; MultiAgentSystem Lab01) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -321,7 +321,7 @@ This lab is split into two parts: start the server, then run the client.
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Host two agents in ASP.NET Core (`AddA2AServer`): an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings (`MapA2AJsonRpc`, `MapA2AHttpJson`) and described by their agent cards (`MapWellKnownAgentCard`) |
+| Scenario 1 | Host two agents in ASP.NET Core (`AddA2AServer`): an AuthAgent with API key tools and a CustomerToneAgent, exposed with the JSON-RPC and HTTP+JSON bindings (`MapA2AJsonRpc`, `MapA2AHttpJson`), described by their agent cards (`MapWellKnownAgentCard`), with a session store per agent so that clients can have conversations (`InMemoryAgentSessionStore`) |
 
 #### Lab 06 - A2A Client
 
@@ -330,6 +330,7 @@ This lab is split into two parts: start the server, then run the client.
 | Scenario 1 | Discover the AuthAgent from its agent card (`A2ACardResolver.GetAgentCardAsync`, `AgentCard.AsAIAgent`), then generate an API key and validate it (and a tampered copy) |
 | Scenario 2 | Connect to the CustomerToneAgent by URL, without an agent card (`A2AClient.AsAIAgent`) |
 | Scenario 3 | Give the remote AuthAgent to a local Azure OpenAI agent as a function tool (`AsAIFunction`) |
+| Scenario 4 | Have a conversation with the remote AuthAgent: a session keeps the same A2A `contextId`, and the server keeps the history (`CreateSessionAsync`) |
 
 ---
 
@@ -409,17 +410,21 @@ This lab is split into two parts: start the server, then run the client.
 
 This part focuses on building **multi-agent systems** where multiple agents collaborate to solve complex problems. You will learn how to orchestrate agents, use agents as tools, and build sophisticated AI workflows.
 
-> ⚠️ **Not migrated yet.** The three MultiAgentSystem labs still target a December 2025 preview of Agent Framework (`1.0.0-preview.251204.1`) and use APIs that no longer exist in the current version (`CreateAIAgent`, `AgentRunResponse`, `AzureOpenAIClient`, `InProcessExecution.StreamAsync`). They are **not part of the recommended learning path** and are not available in the Lab Bench dashboard. Lab 01 (*Use Agent as Tool*) will be reworked on the current API; Lab 02 and Lab 03 (orchestrations and workflows) will be covered in a later phase.
+> **Lab 01** targets Agent Framework **1.26.0** (stable APIs only) and is available in the Lab Bench dashboard.
+>
+> ⚠️ **Lab 02 and Lab 03 are not migrated yet.** They still target a December 2025 preview of Agent Framework (`1.0.0-preview.251204.1`) and use APIs that no longer exist in the current version (`CreateAIAgent`, `AgentRunResponse`, `AzureOpenAIClient`, `InProcessExecution.StreamAsync`). They are **not part of the recommended learning path** and are not available in the dashboard: orchestrations and workflows will be covered in a later phase.
 
 ---
 
-### Lab 01 - Use Agent as Tool
+### Lab 01 - Delegate a Task to Another Agent
 
-**Learn how to use an AI Agent as a tool for another agent**
+**Learn the two ways to delegate a task to another agent: by code, or by the model with an agent turned into a tool**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Create an orchestrator agent that uses specialized agents as tools |
+| Scenario 1 | Delegation by code: the code asks a reviewer agent for a typed review (`RunAsync<T>`) of an answer, and decides with a fixed rule |
+| Scenario 2 | Delegation by the model: a front desk agent consults specialist agents turned into tools (`AsAIFunction`); read the query each one receives and the text it returns |
+| Scenario 3 | Keep the context of a specialist across calls with a session (`AsAIFunction(session: ...)`), compared with a new session for each call |
 
 ---
 
@@ -567,7 +572,7 @@ echo $env:AzureOpenAI__Endpoint
 
 ## Learning Path
 
-We recommend following the **AzureOpenAI** labs (individual agents) in order. The **MultiAgentSystem** labs are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
+We recommend following the **AzureOpenAI** labs (individual agents) in order, then **MultiAgentSystem Lab 01**. MultiAgentSystem Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -582,13 +587,13 @@ We recommend following the **AzureOpenAI** labs (individual agents) in order. Th
                                             │
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│              Part 2: MultiAgentSystem (Multi-Agent Solutions) — NOT MIGRATED YET               │
+│      Part 2: MultiAgentSystem (Multi-Agent Solutions) — Lab02 and Lab03 NOT MIGRATED YET       │
 ├────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  Lab01 → Lab02 → Lab03 → ...                                                                   │
 │    │       │       │                                                                           │
 │    ▼       ▼       ▼                                                                           │
-│  Agent  Sequential Concurrent                                                                  │
-│  as Tool Orchestr. Orchestr.                                                                   │
+│ Delegate Sequential Concurrent                                                                 │
+│ a task   Orchestr. Orchestr.                                                                   │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 

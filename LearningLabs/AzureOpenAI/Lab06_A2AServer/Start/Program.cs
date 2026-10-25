@@ -4,6 +4,7 @@ using A2A;
 using A2A.AspNetCore;
 using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -76,24 +77,31 @@ if (ShouldRunScenario(1))
     // AIAgent authAgent = ...
     // AIAgent customerToneAgent = ...
 
-    // TODO 8: Register an A2A server for each agent (builder.AddA2AServer), then build the application
+    // TODO 8: Give each agent a session store, registered under the name of the agent, and display a notice
+    // Hint: builder.Services.AddKeyedSingleton<AgentSessionStore>(authAgent.Name, new InMemoryAgentSessionStore()), same for
+    //       customerToneAgent, then ColoredConsole.WriteSecondaryLogLine("Session store: in memory (development only), one per agent.")
+    // Note: AgentSessionStore and InMemoryAgentSessionStore are flagged experimental (MAAI001), keep the pragma around them.
+#pragma warning disable MAAI001
+#pragma warning restore MAAI001
+
+    // TODO 9: Register an A2A server for each agent (builder.AddA2AServer), then build the application
     // var app = ...
 
-    // TODO 9: Expose each agent with both A2A v1 protocol bindings at its path (AuthAgentPath, CustomerToneAgentPath)
+    // TODO 10: Expose each agent with both A2A v1 protocol bindings at its path (AuthAgentPath, CustomerToneAgentPath)
     // Hint: app.MapA2AJsonRpc(agent, path) and app.MapA2AHttpJson(agent, path)
 
-    // TODO 10: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
+    // TODO 11: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
     // Hint: app.MapWellKnownAgentCard(card, path) with AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}")
     //       and AgentCards.CreateCustomerToneAgentCard(...)
 
-    // Provided: display the endpoints (the server only listens once TODO 11 runs it)
+    // Provided: display the endpoints (the server only listens once TODO 12 runs it)
     ColoredConsole.WritePrimaryLogLine($"AuthAgent:         {serverSettings.BaseUrl}{AuthAgentPath}");
     ColoredConsole.WritePrimaryLogLine($"  Agent card:      {serverSettings.BaseUrl}{AuthAgentPath}/.well-known/agent-card.json");
     ColoredConsole.WritePrimaryLogLine($"CustomerToneAgent: {serverSettings.BaseUrl}{CustomerToneAgentPath}");
     ColoredConsole.WritePrimaryLogLine($"  Agent card:      {serverSettings.BaseUrl}{CustomerToneAgentPath}/.well-known/agent-card.json");
     ColoredConsole.WriteSecondaryLogLine("Press Ctrl+C to stop the server.");
 
-    // TODO 11: Run the server until Ctrl+C, on the address of the configuration
+    // TODO 12: Run the server until Ctrl+C, on the address of the configuration
     // Hint: await app.RunAsync(serverSettings.BaseUrl);
 }
 
