@@ -124,7 +124,7 @@ if (ShouldRunScenario(3))
 
     // TODO 16: Connect to MongoDB with ConfigurationHelper.ConnectToMongoDbAsync() (start MongoDB first, see the README)
 
-    // TODO 17: Write a function Func<IMongoDatabase, AIAgent> createAgent that creates the agent of TODO 11
+    // TODO 17: Write a function Func<IMongoDatabase, AIAgent> createAgent that creates the agent of TODO 10
     // with a new MongoChatHistoryProvider(mongoDatabase) as ChatHistoryProvider
 
     // TODO 18: Create the agent with createAgent(database), create a session and ask FirstQuestion

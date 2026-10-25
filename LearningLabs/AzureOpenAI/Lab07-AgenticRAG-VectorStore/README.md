@@ -255,11 +255,11 @@ Vector store ready: 20 FAQ entries indexed in the collection 'sav-faq'
 ----------------------------------------
 === Scenario 2: Semantic search - without an agent ===
 Question: Is there a phone number I can call for help?
-1. faq-010 (score 0.5xxx): How do I contact customer support?
+1. faq-010 (score 0.3xxx): How do I contact customer support?
    You can reach our customer support via email at support@example.com, by phone at +33 1 23 45 67 89 ...
-2. faq-004 (score 0.4xxx): Can I change or cancel my order after placing it?
+2. faq-005 (score 0.2xxx): What should I do if I receive a damaged product?
    ...
-3. faq-005 (score 0.3xxx): What should I do if I receive a damaged product?
+3. faq-012 (score 0.2xxx): What if my package is lost or stolen?
    ...
 ----------------------------------------
 === Scenario 3: Agentic RAG - the agent searches the FAQ with a function tool ===
@@ -294,7 +294,7 @@ Token Usage (follow-up):
   Total tokens: 4xx
 ```
 
-Answers, scores and token counts vary from one run to another and from one embedding model to another.
+Answers, scores and token counts vary from one run to another and from one embedding model to another (the scores above come from `text-embedding-3-small`).
 
 ## Troubleshooting
 
@@ -392,7 +392,7 @@ The following files should be modified:
 
 - [Microsoft Agent Framework documentation](https://learn.microsoft.com/agent-framework/overview/?pivots=programming-language-csharp)
 - [Official RAG samples (`AgentWithRAG_Step01` to `Step05`)](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/AgentWithRAG)
-- [Microsoft.Extensions.VectorData: vector stores](https://learn.microsoft.com/dotnet/ai/microsoft-extensions-vectordata-overview)
+- [Microsoft.Extensions.VectorData: vector stores](https://learn.microsoft.com/dotnet/ai/vector-stores/overview)
 - [Azure OpenAI embeddings](https://learn.microsoft.com/azure/ai-services/openai/how-to/embeddings)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 

@@ -64,7 +64,7 @@ public static class MemoryConsole
 
     /// <summary>
     /// Displays the token usage of an agent run.
-    /// The input tokens include the instructions, so the memories added by the provider.
+    /// The input tokens include the message with the memories added by the provider.
     /// </summary>
     public static void WriteTokenUsage(AgentResponse response)
     {

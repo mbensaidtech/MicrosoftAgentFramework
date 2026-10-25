@@ -342,7 +342,7 @@ It is valid.
   -> Answer contains the key of turn 1: no
 ```
 
-The keys are random and the wording of the answers varies. The explanation given for the tampered key may be wrong (the tool only returns `false`): what matters is *not valid*. In scenario 4, the new conversation often generates **another** key and calls it valid: the remote agent did not refuse, it answered a different question.
+The keys are random and the wording of the answers varies. The explanation given for the tampered key may be wrong (the tool only returns `false`): what matters is *not valid*. In scenario 4, the new conversation often generates **another** key (and validates it, with either result): the remote agent did not refuse, it answered a different question.
 
 ## Troubleshooting
 

@@ -43,7 +43,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Embedding deployment | Lab07+ | e.g. `text-embedding-3-small`. Lab07 reads it from `AzureOpenAI:EmbeddingDeploymentName` (`appsettings.json`, user secret or `AzureOpenAI__EmbeddingDeploymentName`). |
 | MongoDB | Lab05, Lab12 | Each lab provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). Lab05 uses `mongodb://localhost:27017`, Lab12 `mongodb://localhost:27018` (set in their `appsettings.json`), so both can run at the same time. |
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
-| Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
+| Visual Studio Code (C# Dev Kit), Visual Studio 2026 (18.0+) or Rider | Editing the exercises | Any editor works with the `dotnet` CLI. Visual Studio 2022 cannot target `net10.0`. |
 
 > **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
@@ -230,9 +230,9 @@ More details (architecture, HTTP API, security, registering a new lab, tests): [
 
 #### Optional: report your progress to the trainer's admin dashboard
 
-In a workshop, the trainer may host the **Admin Dashboard** (a separate Next.js + MongoDB application, kept in its own repository) and give you its URL and a workshop key.
-Set them once (`Dashboard:Reporting:ServerUrl` and `Dashboard:Reporting:WorkshopKey`, see [Reporting to the admin dashboard](Dashboard/README.md#reporting-to-the-admin-dashboard)), choose a username at the first launch, and your Lab Bench reports which labs you run and finish, plus a **Help / Je suis bloqué** button that the trainer sees in real time.
-Nothing is reported when `ServerUrl` is empty (the default), and never your code, your API key or your console output.
+In a workshop, the trainer hosts the **Admin Dashboard** (a separate Next.js + MongoDB application, kept in its own repository). Its URL is already set in the project (`Dashboard:Reporting:ServerUrl` in `Dashboard/LabDashboard/appsettings.json`).
+At the first launch, choose **Join the workshop**, enter a username and the **workshop key** given by the trainer, and your Lab Bench reports which labs you run and finish, plus a **Help / Je suis bloqué** button that the trainer sees in real time. Reporting also needs the admin **API key** given by the trainer (`LABS_ADMIN_API_KEY` or the git-ignored `Dashboard/LabDashboard/appsettings.Local.json`): without it, reporting stays off. See [Reporting to the admin dashboard](Dashboard/README.md#reporting-to-the-admin-dashboard).
+Choose **Work on my own** and nothing is ever reported; in any case, never your code, your API key or your console output.
 The API contract between the two applications is described in [specs/admin-dashboard-progress-tracking/spec.md](specs/admin-dashboard-progress-tracking/spec.md).
 
 ---
@@ -270,8 +270,8 @@ This part focuses on building **individual AI agents** with various capabilities
 |----------|-------------|
 | Scenario 1 | Manual structured output: JSON format described in the instructions, parsed with `JsonSerializer` |
 | Scenario 2 | Automatic structured output with `RunAsync<T>` and `AgentResponse<T>.Result` (Recommended) |
-| Scenario 3 | Response format configured on the agent (`ChatClientAgentOptions` + `ChatResponseFormat.ForJsonSchema<T>()`) |
-| Scenario 4 | Response format for a single run (`AgentRunOptions`) with streaming |
+| Scenario 3 | Response format configured on the agent (`ChatClientAgentOptions` + `ChatResponseFormat.ForJsonSchema<T>()`), enforced by the service in strict mode |
+| Scenario 4 | Response format for a single run (`AgentRunOptions`, strict mode) with streaming |
 
 ---
 
@@ -499,7 +499,7 @@ The `CommonUtilities` project provides shared helper classes used across all lab
 |-------|-------------|
 | `ColoredConsole` | Colored console output methods for better UX |
 | `ConsoleSpinner` | Loading animation for async operations |
-| `MongoDbHealthCheck` | MongoDB connectivity verification |
+| `AzureOpenAIEndpoint` | Converts the Azure OpenAI resource endpoint into its v1 API endpoint (`…/openai/v1/`) |
 
 ---
 

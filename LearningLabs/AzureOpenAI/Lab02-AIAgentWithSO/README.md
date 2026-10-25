@@ -10,7 +10,7 @@ Instead of free text, the agent answers with JSON that matches a .NET type (`Res
 
 - Why describing a JSON format in the instructions is fragile, and how to parse the answer yourself
 - How to get a strongly-typed result with `RunAsync<T>()` and `AgentResponse<T>.Result` (recommended when the type is known at compile time)
-- How to generate a JSON schema from a .NET type with `ChatResponseFormat.ForJsonSchema<T>()`
+- How to generate a JSON schema from a .NET type with `ChatResponseFormat.ForJsonSchema<T>()`, and have the service enforce it (strict mode)
 - How to configure the response format of every run of an agent with `ChatClientAgentOptions`
 - How to set the response format of a single run with `AgentRunOptions`
 - How to get structured output from a streamed run with `RunStreamingAsync()` and `ToAgentResponse()`
@@ -87,7 +87,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs. Keep the labels of the hints (`Successfully parsed structured response:`, `Structured response:`, `JSON response:`, `Deserialized response:`): they are those of the [Expected Output](#expected-output), and the checks of the optional Lab Bench dashboard look for them.
 
 ---
 
@@ -111,7 +111,7 @@ You describe the JSON format in the instructions and parse the answer yourself. 
 |------|-------------|-------|
 | **TODO 4** | Create an agent with JSON format instructions | • `chatClient.AsAIAgent(instructions: "...", name: "RestaurantInfoAgent")` <br> • Use a raw string literal (`"""..."""`) for the instructions: <br> `You are a culinary expert assistant. When asked about a restaurant, always respond with valid JSON in this exact format: { "Name": "restaurant name", "ChefName": "head chef name", "Cuisine": "French\|Italian\|Japanese\|Chinese\|Mexican\|Indian\|Spanish\|American\|Mediterranean\|Thai\|Korean\|Vietnamese\|Other", "MichelinStars": number (0-3), "AveragePricePerPerson": number (in euros), "City": "city name", "Country": "country name", "YearEstablished": number } Only respond with the JSON, no other text.` |
 | **TODO 5** | Run the agent | • `await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.")` <br> • Returns: `AgentResponse` <br> • Optional: chain `.WithSpinner("Running agent")` |
-| **TODO 6** | Parse the JSON and display the restaurant | • `Restaurant? restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions);` <br> • Wrap it in `try { ... } catch (JsonException ex) { ... }` and display `ex.Message` with `ColoredConsole.WriteErrorLine` <br> • If `restaurant is not null`: `WriteRestaurant(restaurant)` |
+| **TODO 6** | Parse the JSON and display the restaurant | • `Restaurant? restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions);` <br> • Wrap it in `try { ... } catch (JsonException ex) { ... }` and display `$"Failed to parse JSON: {ex.Message}"` with `ColoredConsole.WriteErrorLine` <br> • If `restaurant is not null`: `ColoredConsole.WritePrimaryLogLine("Successfully parsed structured response:")`, then `WriteRestaurant(restaurant)` |
 | **TODO 7** | Display token usage | • `WriteTokenUsage(response)` (it reads `response.Usage?.InputTokenCount`, `OutputTokenCount`, `TotalTokenCount`) |
 
 ---
@@ -124,7 +124,7 @@ You describe the JSON format in the instructions and parse the answer yourself. 
 |------|-------------|-------|
 | **TODO 8** | Create an agent with simple instructions | • `chatClient.AsAIAgent(instructions: "You are a culinary expert assistant that answers questions about restaurants.", name: "RestaurantInfoAgent")` |
 | **TODO 9** | Run the agent with `RunAsync<Restaurant>` | • `AgentResponse<Restaurant> response = await restaurantAgent.RunAsync<Restaurant>("Tell me about the restaurant 'Le Bernardin' in New York.");` <br> • Optional: chain `.WithSpinner("Running agent")` |
-| **TODO 10** | Display the strongly-typed result | • `response.Result` is already a `Restaurant`: `WriteRestaurant(response.Result)` |
+| **TODO 10** | Display the strongly-typed result | • `ColoredConsole.WritePrimaryLogLine("Structured response:")` <br> • `response.Result` is already a `Restaurant`: `WriteRestaurant(response.Result)` |
 | **TODO 11** | Display token usage | • `AgentResponse<T>` derives from `AgentResponse`: `WriteTokenUsage(response)` |
 
 ---
@@ -135,9 +135,9 @@ The response format is part of the agent configuration: every run returns JSON t
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 12** | Create an agent with `ChatClientAgentOptions` | • `chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "RestaurantInfoAgent", ChatOptions = new AIExtensions.ChatOptions { ... } })` <br> • `Instructions`: `"You are a culinary expert assistant that answers questions about restaurants."` <br> • `ResponseFormat`: `AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")` <br> • The schema description comes from the `[Description]` of the `Restaurant` class |
+| **TODO 12** | Create an agent with `ChatClientAgentOptions` | • `chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "RestaurantInfoAgent", ChatOptions = new AIExtensions.ChatOptions { ... } })` <br> • `Instructions`: `"You are a culinary expert assistant that answers questions about restaurants."` <br> • `ResponseFormat`: `AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")` <br> • The schema description comes from the `[Description]` of the `Restaurant` class <br> • `AdditionalProperties = new() { ["strict"] = true }`: **strict mode**, an option of the OpenAI provider. The service enforces the schema (exact property names, no extra property); see the note under [Expected Output](#expected-output) |
 | **TODO 13** | Run the agent | • Non-generic `await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.")` |
-| **TODO 14** | Display the JSON, then the deserialized restaurant | • `ColoredConsole.WriteSecondaryLogLine(response.Text)` <br> • `Restaurant restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!;` <br> • `WriteRestaurant(restaurant)` |
+| **TODO 14** | Display the JSON, then the deserialized restaurant | • `ColoredConsole.WritePrimaryLogLine("JSON response:")`, then `ColoredConsole.WriteSecondaryLogLine(response.Text)` <br> • `Restaurant restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!;` <br> • `ColoredConsole.WritePrimaryLogLine("Deserialized response:")`, then `WriteRestaurant(restaurant)` |
 | **TODO 15** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -149,9 +149,9 @@ The response format can also be given **for one run only**, with `AgentRunOption
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 16** | Create an agent with simple instructions | • Same as TODO 8 |
-| **TODO 17** | Define the response format for this run | • `AgentRunOptions runOptions = new() { ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo") };` |
+| **TODO 17** | Define the response format for this run | • `AgentRunOptions runOptions = new() { ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo"), AdditionalProperties = new() { ["strict"] = true } };` <br> • Same strict mode as TODO 12: the `AdditionalProperties` of the run options reach the model call |
 | **TODO 18** | Stream the answer | • `await foreach (AgentResponseUpdate update in restaurantAgent.RunStreamingAsync("Tell me about the restaurant 'Le Bernardin' in New York.", options: runOptions)) { Console.Write(update.Text); updates.Add(update); }` <br> • Declare `List<AgentResponseUpdate> updates = [];` before the loop, and write a new line after it <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
-| **TODO 19** | Deserialize the complete answer | • `AgentResponse response = updates.ToAgentResponse();` combines the updates (text, usage) <br> • `JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!` then `WriteRestaurant(...)` and `WriteTokenUsage(response)` |
+| **TODO 19** | Deserialize the complete answer | • `AgentResponse response = updates.ToAgentResponse();` combines the updates (text, usage) <br> • `JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!`, then `ColoredConsole.WritePrimaryLogLine("Deserialized response:")`, `WriteRestaurant(...)` and `WriteTokenUsage(response)` |
 
 ---
 
@@ -196,6 +196,7 @@ When streaming, there is no `RunStreamingAsync<T>`: use a `ResponseFormat` (on t
 | `ChatClientAgentOptions` | Advanced agent configuration: `Name`, `Description`, `ChatOptions` (instructions, response format, tools...) |
 | `ChatOptions.ResponseFormat` | Response format used by every run of the agent |
 | `AgentRunOptions.ResponseFormat` | Response format for a single run (overrides the agent's one) |
+| `AdditionalProperties = new() { ["strict"] = true }` | Strict mode, an option of the OpenAI provider (in `ChatOptions` or `AgentRunOptions`): the service enforces the schema instead of using it as a guide |
 | `RunStreamingAsync()` / `ToAgentResponse()` | Stream a run, then combine the `AgentResponseUpdate`s into one `AgentResponse` to deserialize it |
 | `[Description]` | `System.ComponentModel` attribute copied into the generated JSON schema |
 | `JsonSerializerOptions.Web` + `JsonStringEnumConverter` | camelCase, case-insensitive names and enums as strings: the same options for the schema and for deserialization |
@@ -282,7 +283,7 @@ Name: Le Bernardin
 
 Answers vary from one run to another (the average price in particular).
 
-> **Note:** with Azure OpenAI, the schema is sent in *non-strict* mode by default. The model follows it, but may add a property that is not in the schema (with `gpt-4o-mini`, often a `"description"`). Deserialization simply ignores unknown properties. See [Going Further](#going-further) to enable strict mode.
+> **Note:** with Azure OpenAI, a schema is sent in *non-strict* mode by default: it only guides the model. The model may add a property that is not in the schema (with `gpt-4o-mini`, often a `"description"`, which the deserialization ignores) or, more rarely, rename one (observed: `headChefName` instead of `chefName`): the deserialization then throws a `JsonException` (*missing required properties*). This is why scenarios 3 and 4 enable **strict mode** (`["strict"] = true`): the service enforces the schema, and the JSON has exactly its properties. Scenario 2 keeps the default mode (see [Going Further](#going-further)).
 
 ## Troubleshooting
 
@@ -295,6 +296,7 @@ Answers vary from one run to another (the average price in particular).
 | `400` mentioning `response_format` / `json_schema` | The deployed model does not support structured outputs: use a more recent model (for example `gpt-4o-mini`) |
 | `Failed to parse JSON` in scenario 1 | Expected from time to time: the format is only described in the instructions. Use scenario 2, 3 or 4 |
 | `JsonException` about `Cuisine` | Enums must be (de)serialized as strings: use `jsonOptions` (it contains `JsonStringEnumConverter`) |
+| `JsonException: ... missing required properties including: 'chefName'` | The schema was sent in non-strict mode and the model renamed a property (see the note under [Expected Output](#expected-output)). Scenario 3 or 4: add `AdditionalProperties = new() { ["strict"] = true }` (TODO 12, TODO 17). Scenario 2: run again, or see [Going Further](#going-further) |
 
 ## Provided Files
 
@@ -322,7 +324,7 @@ The following files should be modified:
 
 ## Going Further
 
-- **Strict schema**: with the OpenAI provider, you can ask the service to strictly enforce the schema (no extra property) by adding the provider-specific option `AdditionalProperties = new() { ["strict"] = true }` to the `ChatOptions` of scenario 3.
+- **Strict mode with `RunAsync<T>`**: scenario 2 sends its schema in the default (non-strict) mode. To have the service enforce it there too, pass the option to the run: `RunAsync<Restaurant>(..., options: new AgentRunOptions { AdditionalProperties = new() { ["strict"] = true } })`.
 - **Raw JSON schema**: when there is no .NET type (schema loaded from configuration, declarative agents), use `ChatResponseFormat.ForJsonSchema(JsonElement.Parse(schemaJson), "RestaurantInfo", "...")` and read the result as a `JsonElement`.
 - **Agents without native structured output**: the official sample `Agent_Step02_StructuredOutput` shows a decorator agent that converts a text answer into structured output with an additional LLM call.
 

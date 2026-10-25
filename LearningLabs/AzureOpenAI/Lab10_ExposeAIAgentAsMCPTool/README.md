@@ -226,7 +226,7 @@ dotnet build
 | VS Code (GitHub Copilot, agent mode): `.vscode/mcp.json` | `{ "servers": { "companyassistant": { "type": "stdio", "command": "dotnet", "args": ["run", "--project", "/ABSOLUTE/PATH/TO/Lab10_ExposeAIAgentAsMCPTool/Solution", "--no-build", "--", "--stdio"] } } }` | `{ "servers": { "companyassistant": { "type": "http", "url": "http://localhost:5100/mcp/companyassistant" } } }` (server started with `--http`) |
 
 Then list the tools (`CompanyAssistant`), and call it with a `query` such as `Get the information of the employee with the ID EMP001`.
-The stdio server inherits the environment of the host: if your settings come from `AzureOpenAI__*` environment variables, set them in the host too (MCP Inspector and `mcp.json` both accept environment variables); user secrets need nothing.
+The stdio server does not necessarily see the environment variables of your shell: MCP Inspector, for example, starts it with a minimal environment (`PATH`, `HOME`...). If your settings come from `AzureOpenAI__*` environment variables, set them in the host (the *Environment Variables* of MCP Inspector, `-e KEY=VALUE` in its `--cli` mode, `"env"` in `mcp.json`), otherwise the server stops with `'AzureOpenAI:Endpoint' is not configured`; user secrets need nothing.
 Legacy **SSE** clients cannot connect: see [How it works](#how-it-works).
 
 ## How it works

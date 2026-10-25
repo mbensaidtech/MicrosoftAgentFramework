@@ -131,7 +131,7 @@ Open `Start/Program.cs` and complete the TODOs:
 | **TODO 15** | Create an AI Agent | • Same pattern: `chatClient.AsAIAgent(instructions: "...", name: "...")` <br> • e.g., a "ColorDecoratorAgent" |
 | **TODO 16** | Run the agent with a question | • `await agent.RunAsync(string message)` <br> • e.g., "What colors match with blue?" |
 | **TODO 17** | Display the response | • `ColoredConsole.WritePrimaryLogLine(response.Text)` |
-| **TODO 18** | Display token usage | • `response.Usage` (type `UsageDetails`, may be `null`) <br> • Properties: `InputTokenCount`, `OutputTokenCount`, `TotalTokenCount` <br> • `ReasoningTokenCount`: part of the output tokens spent on hidden reasoning by reasoning models (`null` or `0` otherwise) <br> • Use null-conditional: `response.Usage?.InputTokenCount` <br> • Display with `ColoredConsole.WriteSecondaryLogLine(...)` |
+| **TODO 18** | Display token usage | • `response.Usage` (type `UsageDetails`, may be `null`) <br> • Properties: `InputTokenCount`, `OutputTokenCount`, `TotalTokenCount` <br> • `ReasoningTokenCount`: part of the output tokens spent on hidden reasoning by reasoning models (`null` or `0` otherwise) <br> • Use null-conditional: `response.Usage?.InputTokenCount` <br> • Display with `ColoredConsole.WriteSecondaryLogLine(...)`, with the labels of the [Expected Output](#expected-output): `$"  Input tokens: {response.Usage?.InputTokenCount}"`, `Output tokens`, `Reasoning tokens (included in output)`, `Total tokens` |
 
 ---
 
@@ -148,7 +148,7 @@ Open `Start/Program.cs` and complete the TODOs:
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 22** | Create the agent on the Responses API | • `AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: "...", name: "GeographyAgent");` <br> • Same `OpenAIClient` as before: only the API changes. With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` around it <br> • `AsAIAgent(model: ...)` for a `ResponsesClient` comes from the `OpenAI.Responses` namespace (already imported) |
-| **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) |
+| **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) <br> • Display it as `ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");` (the label of the [Expected Output](#expected-output)), then the usage as in TODO 18 |
 
 ---
 

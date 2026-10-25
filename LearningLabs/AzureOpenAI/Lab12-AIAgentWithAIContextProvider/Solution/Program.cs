@@ -116,7 +116,7 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteInfoLine($"Memories of user '{UserId}' cleared ({deletedMemories} deleted)");
 
     // Step 2: First conversation - the user introduces herself.
-    // Before the model call, the provider adds the memories to the instructions (none yet);
+    // Before the model call, the provider adds the memories to the request, as a message (none yet);
     // after it, the provider extracts the new facts from the user message and stores them in MongoDB.
     ColoredConsole.WriteInfoLine("First session");
     ColoredConsole.WriteUserLine($"User: {IntroductionMessage}");
@@ -136,7 +136,7 @@ if (ShouldRunScenario(1))
     AgentResponse recallResponse = await memoryAgent.RunAsync(RecallQuestion, newSession);
     ColoredConsole.WriteAssistantLine($"Agent: {recallResponse.Text}");
 
-    // Step 5: Display token usage: the input tokens include the memories added to the instructions
+    // Step 5: Display token usage: the input tokens include the message with the memories added by the provider
     WriteTokenUsage(recallResponse);
 }
 
@@ -182,7 +182,7 @@ if (ShouldRunScenario(2))
 /// An <see cref="AIContextProvider"/> that gives the agent a long-term memory of the user.
 /// <list type="bullet">
 /// <item><description>Before each model call (<see cref="ProvideAIContextAsync"/>): loads the memories of the user from MongoDB
-/// and adds them to the instructions of the run.</description></item>
+/// and adds them to the request of the run, as a message framed as data.</description></item>
 /// <item><description>After each successful run (<see cref="StoreAIContextAsync"/>): extracts the new facts from the user message
 /// with another agent (structured output) and stores them in MongoDB.</description></item>
 /// </list>

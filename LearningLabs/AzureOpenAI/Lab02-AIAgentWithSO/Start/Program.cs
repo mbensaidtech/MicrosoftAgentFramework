@@ -72,7 +72,8 @@ if (ShouldRunScenario(1))
 
     // TODO 6: Parse the JSON text yourself and display the restaurant
     // Hint: JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions) inside a try/catch (JsonException),
-    //       then WriteRestaurant(restaurant)
+    //       then ColoredConsole.WritePrimaryLogLine("Successfully parsed structured response:") and WriteRestaurant(restaurant)
+    //       (in the catch: ColoredConsole.WriteErrorLine($"Failed to parse JSON: {ex.Message}"))
 
     // TODO 7: Display token usage
     // Hint: WriteTokenUsage(response)
@@ -95,7 +96,8 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output with RunAsync<T> ===");
 
     // TODO 10: Display the strongly-typed result
-    // Hint: response.Result is already a Restaurant - WriteRestaurant(response.Result)
+    // Hint: ColoredConsole.WritePrimaryLogLine("Structured response:"), then
+    //       response.Result is already a Restaurant - WriteRestaurant(response.Result)
 
     // TODO 11: Display token usage
     // Hint: AgentResponse<T> is an AgentResponse - WriteTokenUsage(response)
@@ -111,6 +113,7 @@ if (ShouldRunScenario(3))
 
     // TODO 12: Create an agent with ChatClientAgentOptions whose ChatOptions define the instructions and the response format
     // Hint: ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
+    //       and AdditionalProperties = new() { ["strict"] = true } (strict mode: the service enforces the schema)
     // AIAgent restaurantAgent = ...
 
     // TODO 13: Run the agent with the non-generic RunAsync
@@ -119,7 +122,9 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteInfoLine("=== Scenario 3: Structured output configured on the agent ===");
 
     // TODO 14: Display the JSON text (response.Text), then deserialize it and display the restaurant
-    // Hint: JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)
+    // Hint: ColoredConsole.WritePrimaryLogLine("JSON response:") before the JSON text,
+    //       JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions),
+    //       ColoredConsole.WritePrimaryLogLine("Deserialized response:") before WriteRestaurant(restaurant)
 
     // TODO 15: Display token usage
 }
@@ -136,7 +141,7 @@ if (ShouldRunScenario(4))
     // AIAgent restaurantAgent = ...
 
     // TODO 17: Define the response format for this run only
-    // Hint: AgentRunOptions runOptions = new() { ResponseFormat = ... }
+    // Hint: AgentRunOptions runOptions = new() { ResponseFormat = ..., AdditionalProperties = new() { ["strict"] = true } }
 
     ColoredConsole.WriteInfoLine("=== Scenario 4: Structured output with AgentRunOptions and streaming ===");
 
@@ -146,6 +151,7 @@ if (ShouldRunScenario(4))
 
     // TODO 19: Combine the updates into one AgentResponse, deserialize its Text, display the restaurant and the token usage
     // Hint: AgentResponse response = updates.ToAgentResponse();
+    //       ColoredConsole.WritePrimaryLogLine("Deserialized response:") before WriteRestaurant(restaurant)
 }
 
 #endregion

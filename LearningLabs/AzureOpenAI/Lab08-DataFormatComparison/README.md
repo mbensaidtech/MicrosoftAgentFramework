@@ -121,7 +121,7 @@ TODO 1 to 3 are the same as in Lab 01.
 |------|-------------|-------|
 | **TODO 4** | Create the JSON tool and the agent | • `AITool getAllHotelsAsJson = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsJson, "get_all_hotels");` <br> • `AIAgent jsonAgent = chatClient.AsAIAgent(instructions: "You are a hotel data assistant. Call get_all_hotels to get the hotels, then answer with every hotel that matches the request, in the requested order.", name: "HotelJsonAgent", tools: [getAllHotelsAsJson]);` <br> • The tool returns objects: the framework serializes them as JSON (indented, camelCase) in the tool result |
 | **TODO 5** | Run the agent with structured output | • `jsonResponse = await jsonAgent.RunAsync<List<Hotel>>(question).WithSpinner("Running agent");` <br> • The JSON schema of `List<Hotel>` is sent as the response format of the run (Lab 02); `jsonResponse.Result` is already a `List<Hotel>` |
-| **TODO 6** | Display the tool calls and the typed result | • `WriteToolCalls(jsonResponse);` — `Tool called: get_all_hotels()` and `Tool result sent to the model: ... characters` <br> • `WriteHotels(jsonResponse.Result, "Hotels returned by the agent");` <br> • Expected: 43 hotels, `Backpacker Hostel (Bangkok) - 25 USD/night` first |
+| **TODO 6** | Display the tool calls and the typed result | • `WriteToolCalls(jsonResponse);` — `Tool called: get_all_hotels()` and `Tool result sent to the model: ... characters` <br> • `WriteHotels(jsonResponse.Result, "Hotels returned by the agent");` <br> • Expected: up to 43 hotels (the model often skips a few), `Backpacker Hostel (Bangkok) - 25 USD/night` first |
 | **TODO 7** | Display token usage | • `WriteTokenUsage(jsonResponse, "Token Usage (JSON):");` <br> • Total of the model calls of the run: the call that asks for the tool, then the call that answers with the tool result |
 
 ---
@@ -194,7 +194,7 @@ To run only one scenario, edit `scenariosToRun` at the top of `Program.cs` (for 
 | Tokens | The reference | Fewer input **and** output tokens for tabular data |
 | Good for | Nested or optional data, guaranteed shape, small answers | Large flat tables (lists of records with the same columns), cost-sensitive calls |
 
-Typical results with `gpt-4o-mini`: the CSV run uses about half the input tokens and about a third of the output tokens of the JSON run. Measure with your model: token counts depend on the tokenizer and on the answer.
+Typical results with `gpt-4o-mini`: the CSV run uses about a third of the input tokens and less than half of the output tokens of the JSON run. Measure with your model: token counts depend on the tokenizer and on the answer.
 
 ## Key Concepts
 
@@ -240,9 +240,9 @@ Hotels returned by the agent: 43
   ...
 ----------------------------------------
 Token Usage (JSON):
-  Input tokens: 3xxx
+  Input tokens: 4xxx
   Output tokens: 1xxx
-  Total tokens: 5xxx
+  Total tokens: 6xxx
 ----------------------------------------
 === Scenario 2: CSV - the tool returns text, the agent answers in CSV ===
 Question: Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.
@@ -263,12 +263,12 @@ Token Usage (CSV):
 === Comparison: JSON vs CSV ===
                             JSON       CSV   CSV vs JSON
 Tool result (chars)        10348      2765          -73%
-Input tokens                3xxx      1xxx          -5x%
-Output tokens               1xxx       xxx          -6x%
-Total tokens                5xxx      2xxx          -5x%
+Input tokens                4xxx      1xxx          -6x%
+Output tokens               1xxx       xxx          -5x%
+Total tokens                6xxx      2xxx          -6x%
 ```
 
-The sizes of the tool results are exact (same data every time). The token counts and the number of hotels returned vary from one run and one model to another.
+The sizes of the tool results are exact (same data every time). The token counts and the number of hotels returned vary from one run and one model to another, and the model does not always sort the list perfectly.
 
 ## Troubleshooting
 
@@ -280,6 +280,7 @@ The sizes of the tool results are exact (same data every time). The token counts
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
 | `400` mentioning `response_format` / `json_schema` | The deployed model does not support structured outputs: use a more recent model (for example `gpt-4o-mini`) |
 | `Tool called: (none)` | The agent answered without the tool: check that the tool is given to `AsAIAgent(..., tools: [...])` and that the instructions say to call `get_all_hotels` |
+| The dashboard check *cheapest hotel first* fails (scenario 1 or 2) while the other checks pass | Expected from time to time: the model did not sort the list perfectly (for example `Budget Stay Express` 35 USD before `Backpacker Hostel` 25 USD). Your code is not at fault: run again |
 | `The answer is not the expected CSV: ...` in scenario 2 | Expected from time to time: the format is only described in the instructions (code fences are tolerated, a changed header or a missing column is not). Run again, or tighten the instructions |
 | `JsonException` when reading `jsonResponse.Result` | The JSON answer does not match `Hotel` (a required property is missing): with `gpt-4o-mini` this is rare; a truncated answer (`MaxOutputTokens` too low) also causes it |
 | The comparison is not displayed | Both scenarios must run: set `scenariosToRun = [1, 2]` |

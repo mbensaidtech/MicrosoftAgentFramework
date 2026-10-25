@@ -163,6 +163,9 @@ Without a limit, every run sends the **whole** history back to the model: the co
 | **TODO 13** | Second turn | • Same with `IntermediateQuestion` (`response = ...`): the session now holds 4 messages |
 | **TODO 14** | Third turn | • Same with `FollowUpQuestion`: before the run, the reducer keeps the last 2 messages of the history. The agent knows "that city" (Rome) but **not** the name given in the first turn |
 | **TODO 15** | Display token usage | • `WriteTokenUsage(response);` the input tokens stay flat from the second turn on |
+
+---
+
 #### Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
 
 Same pattern with `MongoChatHistoryProvider`. This time, you simulate a **restart of the application**: the follow-up question is asked to a **new** agent, with a new provider and a new MongoDB connection. The only things kept are the saved JSON and the documents in MongoDB.
@@ -269,8 +272,7 @@ A saved session is a conversation: treat it as personal data, and as **untrusted
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
 | `Microsoft.Agents.AI` | `AIAgent`, `AgentSession`, `AgentResponse`, `ChatClientAgentOptions`, `ChatHistoryProvider`, `InMemoryChatHistoryProvider`, `ProviderSessionState<T>` |
-| `Microsoft.Extensions.AI` | `ChatMessage` (imported as `AIExtensions`, because `OpenAI.Chat` also has a `ChatMessage`) |
-| `Microsoft.Extensions.AI` (aliased as `AIExtensions`) | `MessageCountingChatReducer` (scenario 2), `ChatMessage` |
+| `Microsoft.Extensions.AI` (aliased as `AIExtensions`, because `OpenAI.Chat` also has a `ChatMessage`) | `ChatMessage`, `MessageCountingChatReducer` (scenario 2) |
 | `MongoDB.Driver` | `IMongoDatabase` |
 | `System.Text.Json` | `JsonElement`, `JsonSerializer` |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
@@ -345,8 +347,8 @@ Answers vary from one run to another; the keys are new at each run.
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
 | `MongoDB is not reachable ...` | Start MongoDB (`docker compose up -d` in `MongoDB/`), check `docker ps`, or skip scenario 3 with `scenariosToRun = [1, 2]` |
 | `docker compose up` fails with *port is already allocated* | Another MongoDB already uses port 27017: stop it, or point `MongoDb:ConnectionString` to it |
-| The follow-up answer does not know the city or the name | Pass the **restored** session to `RunAsync` (TODO 9, 15, 22), and restore it with the agent that has the same provider |
-| `NullReferenceException` on `GetService<...>()!` | The agent has no provider of this type: check `ChatHistoryProvider = ...` in `ChatClientAgentOptions` (TODO 11, 17) |
+| The follow-up answer does not know the city or the name | Pass the **restored** session to `RunAsync` (TODO 9, 22), and restore it with the agent that has the same provider |
+| `NullReferenceException` on `GetService<...>()!` | The agent has no provider of this type: check `ChatHistoryProvider = ...` in `ChatClientAgentOptions` (TODO 10, 17) |
 | `Only ConversationId or ChatHistoryProvider may be used, but not both` | The service stores the history itself (Responses API with stored responses): use the Chat Completions `ChatClient` of TODO 3 |
 
 ## Provided Files

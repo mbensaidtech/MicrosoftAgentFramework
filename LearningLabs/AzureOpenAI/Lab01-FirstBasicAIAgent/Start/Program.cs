@@ -126,6 +126,7 @@ if (ShouldRunScenario(4))
 
     // TODO 18: Display the consumed tokens
     // Hint: Use response.Usage property (InputTokenCount, OutputTokenCount, ReasoningTokenCount, TotalTokenCount)
+    //       e.g. ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {colorResponse.Usage?.InputTokenCount}") (labels of the README Expected Output)
 }
 
 #endregion
@@ -172,7 +173,8 @@ if (ShouldRunScenario(6))
     // TODO 23: Run the agent with "Hello, what is the surface area of Italy?", then display the answer,
     // the id of the response (stored by the service) and the token usage
     // Hint: AgentResponse responsesResponse = await responsesAgent.RunAsync(...).WithSpinner("Running agent");
-    //       responsesResponse.ResponseId, responsesResponse.Usage
+    //       ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");
+    //       then responsesResponse.Usage as in TODO 18
 }
 
 #endregion

@@ -155,7 +155,7 @@ if (ShouldRunScenario(3))
     // Question: "What is the salary of the employee EMP002?"
     // Hint: the response has no Usage when the middleware answered by itself: display "Token usage: none, the model was not called"
 
-    // TODO 21: Run the guarded agent with a question that contains personal data, then display the answer and WriteTokenUsage([response])
+    // TODO 21: Run the guarded agent with a question that contains personal data, then display the answer and WriteTokenUsage([maskedResponse])
     // Question: "My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001."
 }
 

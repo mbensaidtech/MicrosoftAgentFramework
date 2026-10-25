@@ -386,9 +386,9 @@ Agent: Hello, Ada! It's great to hear from you. For dinner, how about a deliciou
 As for a weekend activity, since you love hiking in the Alps, how about planning a day hike on one of the beautiful trails near Lyon? ...
 ----------------------------------------
 Token Usage (new session, with memories):
-  Input tokens: 119
-  Output tokens: 90
-  Total tokens: 209
+  Input tokens: 132
+  Output tokens: 103
+  Total tokens: 235
 ----------------------------------------
 === Scenario 2: Chat with the agent - it greets you with what it remembers ===
 [Memory] 5 memories of user 'ada' added to the request
@@ -494,9 +494,9 @@ The following files should be modified:
 - [Session](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/session?pivots=programming-language-csharp)
 - [Producing Structured Outputs with agents](https://learn.microsoft.com/agent-framework/agents/structured-output?pivots=programming-language-csharp)
 - [Microsoft Agent Framework documentation](https://learn.microsoft.com/agent-framework/overview/?pivots=programming-language-csharp)
-- [Official sample `04_memory`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/01-get-started/04_memory)
-- [Official sample `Agent_Step17_AdditionalAIContext`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/Agents/Agent_Step17_AdditionalAIContext)
-- [Official samples `AgentWithMemory`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/AgentWithMemory)
+- [Official sample `04_memory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/01-get-started/04_memory)
+- [Official sample `Agent_Step17_AdditionalAIContext`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/Agents/Agent_Step17_AdditionalAIContext)
+- [Official samples `AgentWithMemory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/AgentWithMemory)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 
 ## Solution

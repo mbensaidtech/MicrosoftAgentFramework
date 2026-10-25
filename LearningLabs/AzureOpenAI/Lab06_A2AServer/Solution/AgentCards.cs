@@ -84,8 +84,8 @@ public static class AgentCards
         };
     }
 
-    // The server maps both protocol bindings of A2A v1 at the same URL (MapA2AJsonRpc + MapA2AHttpJson):
-    // clients prefer HTTP+JSON and fall back to JSON-RPC.
+    // The server maps both protocol bindings of A2A v1 at the same URL (MapA2AJsonRpc + MapA2AHttpJson).
+    // The order is the agent's preference: a client uses the first interface it also supports (here JSON-RPC).
     private static List<AgentInterface> CreateInterfaces(string agentUrl) =>
     [
         new AgentInterface { Url = agentUrl, ProtocolBinding = ProtocolBindingNames.JsonRpc, ProtocolVersion = "1.0" },

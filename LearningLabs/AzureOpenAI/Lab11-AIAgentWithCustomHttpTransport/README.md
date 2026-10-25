@@ -171,6 +171,12 @@ protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage 
     // TODO 11
     request.Headers.Add("X-agent-name", "AIAgentWithCustomHttpTransport");
 
+    // Provided: scenario 3 turns the HTTP log off, OpenTelemetry shows the same run as spans
+    if (!WriteTraffic)
+    {
+        return await base.SendAsync(request, cancellationToken);
+    }
+
     // TODO 12
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine($"=== HTTP REQUEST #{number} ===");

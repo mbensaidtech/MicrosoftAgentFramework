@@ -106,7 +106,7 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteUserLine($"User: {IntroductionMessage}");
 
     // TODO 8: Create a session, run the agent with IntroductionMessage in it and display the answer ("Agent: ...")
-    // Before the model call, the provider adds the memories to the instructions; after it, it extracts and stores the new ones.
+    // Before the model call, the provider adds the memories to the request (a message); after it, it extracts and stores the new ones.
 
     // TODO 9: Display the memories stored in MongoDB for the user
     // Hint: WriteStoredMemories(UserId, await memoriesRepository.GetMemoriesAsync(UserId))
@@ -148,7 +148,7 @@ if (ShouldRunScenario(2))
 /// An <see cref="AIContextProvider"/> that gives the agent a long-term memory of the user.
 /// <list type="bullet">
 /// <item><description>Before each model call (<see cref="ProvideAIContextAsync"/>): loads the memories of the user from MongoDB
-/// and adds them to the instructions of the run.</description></item>
+/// and adds them to the request of the run, as a message framed as data.</description></item>
 /// <item><description>After each successful run (<see cref="StoreAIContextAsync"/>): extracts the new facts from the user message
 /// with another agent (structured output) and stores them in MongoDB.</description></item>
 /// </list>

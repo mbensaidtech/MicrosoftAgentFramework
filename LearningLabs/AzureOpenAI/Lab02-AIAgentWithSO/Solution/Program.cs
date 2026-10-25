@@ -146,7 +146,10 @@ if (ShouldRunScenario(3))
         {
             Instructions = "You are a culinary expert assistant that answers questions about restaurants.",
             // JSON schema generated from the Restaurant type (its [Description] becomes the schema description)
-            ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
+            ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo"),
+            // Strict mode (an option of the OpenAI provider): the service enforces the schema - exact property names, no extra property.
+            // Without it, the schema only guides the model, which may rename a property and break the deserialization.
+            AdditionalProperties = new() { ["strict"] = true }
         }
     });
 
@@ -179,10 +182,12 @@ if (ShouldRunScenario(4))
         instructions: "You are a culinary expert assistant that answers questions about restaurants.",
         name: "RestaurantInfoAgent");
 
-    // Step 2: Define the response format for this run only
+    // Step 2: Define the response format for this run only, in strict mode like scenario 3
+    // (the AdditionalProperties of the run options reach the model call, as those of ChatOptions)
     AgentRunOptions runOptions = new()
     {
-        ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
+        ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo"),
+        AdditionalProperties = new() { ["strict"] = true }
     };
 
     // Step 3: Stream the answer: the JSON arrives piece by piece
