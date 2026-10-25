@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
@@ -17,7 +18,9 @@ public static class RagConsole
     /// </summary>
     public static void WriteSearchResult(int rank, VectorSearchResult<FaqRecord> result)
     {
-        ColoredConsole.WritePrimaryLogLine($"{rank}. {result.Record.Id} (score {result.Score:F4}): {result.Record.Question}");
+        // Invariant culture: the score is always written with a dot (0.4521), whatever the culture of the computer
+        ColoredConsole.WritePrimaryLogLine(string.Create(CultureInfo.InvariantCulture,
+            $"{rank}. {result.Record.Id} (score {result.Score:F4}): {result.Record.Question}"));
         ColoredConsole.WriteSecondaryLogLine($"   {result.Record.Answer}");
     }
 

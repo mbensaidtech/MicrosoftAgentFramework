@@ -410,7 +410,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0, MCP C# SDK 2.2.0) |
+| Before (preview) | Now (1.26.0, MCP C# SDK 2.2.0) |
 |------------------|--------------------------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
 | `ChatClientAgent agent = chatClient.CreateAIAgent(agentOptions)` | `AIAgent agent = chatClient.AsAIAgent(instructions, name, description, tools)` |

@@ -1,7 +1,7 @@
 # Plan de migration du lab — MAF 1.22.0 / .NET 10
 
 > Complète [Migration-Manual.md](Migration-Manual.md) (règles, mapping, stratégie de test).
-> Statut au 2026-09-27 : **Phase pilote (Lab01) terminée** — voir [Lab01-Migration-Report.md](Lab01-Migration-Report.md). Vague 1 en cours : **Lab02** ([rapport](Lab02-Migration-Report.md)) et **Lab03** ([rapport](Lab03-Migration-Report.md)) migrés ; **Lab08** migré le 2026-09-30 ([rapport](Lab08-Migration-Report.md), tests d'exécution bloqués par les identifiants Azure, comme Lab07) ; **Lab11** migré le 2026-10-25 ([rapport](Lab11-Migration-Report.md), exécution réelle validée clé API **et** Entra ID) : vague terminée. Vague 2 : **Lab04** migré ([rapport](Lab04-Migration-Report.md)) et **Lab10** migré le 2026-10-25 ([rapport](Lab10-Migration-Report.md), exécution réelle validée clé API **et** Entra ID) : vague terminée. Vague 3 : **Lab05** migré ([rapport](Lab05-Migration-Report.md)) et **Lab07** migré le 2026-09-29 ([rapport](Lab07-Migration-Report.md), tests d'exécution bloqués par les identifiants Azure de l'environnement, cf. manuel §8)  ; phase 0 CommonUtilities faite avec Lab12. Vague 4 : **Lab09** migré le 2026-10-02 ([rapport](Lab09-Migration-Report.md), exécution réelle validée clé API **et** Entra ID — les identifiants fonctionnent de nouveau) et **Lab12** migré le 2026-10-25 ([rapport](Lab12-Migration-Report.md), exécution réelle validée clé API **et** Entra ID, avec la **phase 0** : `MongoDbHealthCheck` et `MongoDB.Driver 2.30.0` retirés de `CommonUtilities`) : vague terminée. Vague 5 : **Lab06** (client **et** serveur) migré le 2026-09-28 ([rapport](Lab06-Migration-Report.md)) ; restent MAS-Lab01/02/03. Régression streaming Azure OpenAI (manuel §8) : **résolue le 2026-10-25** (`Microsoft.Extensions.AI.OpenAI` 10.11.0 explicite dans Lab01, Lab02 et Lab06_A2AServer ; contournement de Lab06_A2AServer supprimé ; Lab01, Lab02 et Lab06 re-testés avec clé API et Entra ID).
+> Statut au 2026-09-27 : **Phase pilote (Lab01) terminée** — voir [Lab01-Migration-Report.md](Lab01-Migration-Report.md). Vague 1 en cours : **Lab02** ([rapport](Lab02-Migration-Report.md)) et **Lab03** ([rapport](Lab03-Migration-Report.md)) migrés ; **Lab08** migré le 2026-09-30 ([rapport](Lab08-Migration-Report.md), tests d'exécution bloqués par les identifiants Azure, comme Lab07) ; **Lab11** migré le 2026-10-25 ([rapport](Lab11-Migration-Report.md), exécution réelle validée clé API **et** Entra ID) : vague terminée. Vague 2 : **Lab04** migré ([rapport](Lab04-Migration-Report.md)) et **Lab10** migré le 2026-10-25 ([rapport](Lab10-Migration-Report.md), exécution réelle validée clé API **et** Entra ID) : vague terminée. Vague 3 : **Lab05** migré ([rapport](Lab05-Migration-Report.md)) et **Lab07** migré le 2026-09-29 ([rapport](Lab07-Migration-Report.md), tests d'exécution bloqués par les identifiants Azure de l'environnement, cf. manuel §8)  ; phase 0 CommonUtilities faite avec Lab12. Vague 4 : **Lab09** migré le 2026-10-02 ([rapport](Lab09-Migration-Report.md), exécution réelle validée clé API **et** Entra ID — les identifiants fonctionnent de nouveau) et **Lab12** migré le 2026-10-25 ([rapport](Lab12-Migration-Report.md), exécution réelle validée clé API **et** Entra ID, avec la **phase 0** : `MongoDbHealthCheck` et `MongoDB.Driver 2.30.0` retirés de `CommonUtilities`) : vague terminée. Vague 5 : **Lab06** (client **et** serveur) migré le 2026-09-28 ([rapport](Lab06-Migration-Report.md)) ; restent MAS-Lab01/02/03. **Montée en 1.26.0 le 2026-10-25** (13 labs AzureOpenAI, [rapport](Upgrade-1.26.0-Report.md), manuel §3 bis). Régression streaming Azure OpenAI (manuel §8) : **résolue le 2026-10-25** (`Microsoft.Extensions.AI.OpenAI` 10.11.0 explicite dans Lab01, Lab02 et Lab06_A2AServer ; contournement de Lab06_A2AServer supprimé ; Lab01, Lab02 et Lab06 re-testés avec clé API et Entra ID).
 
 ---
 
@@ -11,7 +11,7 @@
 2. **Phase 0 — composants communs**, en même temps que le premier lab qui en a besoin (et non avant, pour ne pas casser les labs non migrés).
 3. **Migration par vagues**, dans l'ordre pédagogique, en regroupant les labs qui partagent un même changement conceptuel.
 4. Chaque lab n'est « migré » qu'après la checklist §5 et la stratégie de test du manuel (§7).
-5. Version **figée à 1.22.0** pendant toute la migration (voir le risque « cadence de release » dans le manuel).
+5. Version **figée à 1.22.0** pendant toute la migration (voir le risque « cadence de release » dans le manuel), puis **montée en 1.26.0 le 2026-10-25** dans une vague dédiée (manuel §3 bis).
 
 ## 2. Composants communs
 
@@ -46,7 +46,7 @@
 
 Commune à tous (cocher dans la PR du lab) :
 
-- [ ] `.csproj` Start = Solution ; MAF 1.22.0 ; aucune préversion hors exception documentée ; `UserSecretsId` ; plus de `Azure.AI.OpenAI`, `Microsoft.Extensions.Hosting` (si console)
+- [ ] `.csproj` Start = Solution ; MAF = version cible (1.26.0) ; aucune préversion hors exception documentée ; `UserSecretsId` ; plus de `Azure.AI.OpenAI`, `Microsoft.Extensions.Hosting` (si console)
 - [ ] `ConfigurationHelper.cs`, `AzureOpenAISettings.cs`, `appsettings.json` identiques Start/Solution, sans secret
 - [ ] Client : `OpenAIClient` + `AzureOpenAIEndpoint.ToV1Uri` + clé API **ou** `BearerTokenPolicy`
 - [ ] `AsAIAgent`, `AIAgent`, `AgentResponse`, `AgentSession` (si applicable)

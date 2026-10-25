@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
     <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <!-- Configuration: appsettings.json + user secrets + environment variables, bound to AzureOpenAISettings. -->

@@ -316,7 +316,7 @@ The following files should be modified:
 | Package | Why |
 |---------|-----|
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` for OpenAI clients (brings `OpenAI` and `Microsoft.Extensions.AI`) |
-| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix for scenario 4: Agent Framework 1.22.0 brings 10.10.x, whose streaming fails (*"requires an element of type 'Object', but the target element has type 'Null'"*) on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)) |
+| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix for scenario 4: Agent Framework 1.26.0 still brings 10.10.x, whose streaming fails (*"requires an element of type 'Object', but the target element has type 'Null'"*) on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)) |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 | `Microsoft.Extensions.Configuration.*` | `appsettings.json`, user secrets and environment variables, bound to `AzureOpenAISettings` |
 
@@ -328,7 +328,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0) |
+| Before (preview) | Now (1.26.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
 | `chatClient.CreateAIAgent(...)` | `chatClient.AsAIAgent(...)` |

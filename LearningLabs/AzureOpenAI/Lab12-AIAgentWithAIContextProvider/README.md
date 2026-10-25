@@ -458,7 +458,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0) |
+| Before (preview) | Now (1.26.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
 | `chatClient.CreateAIAgent(...)`, variables typed `ChatClientAgent` | `chatClient.AsAIAgent(...)`, variables typed `AIAgent` |

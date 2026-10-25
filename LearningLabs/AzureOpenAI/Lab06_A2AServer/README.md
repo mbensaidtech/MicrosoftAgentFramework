@@ -11,7 +11,7 @@ A2A is an open protocol that lets agents call each other over HTTP, whatever fra
 
 The next lab, **Lab06_A2AClient**, connects to this server.
 
-> **Preview packages**: the A2A packages of Agent Framework (`Microsoft.Agents.AI.Hosting.A2A.AspNetCore`) and the A2A SDK they use (`A2A` 1.0.0-preview2) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.22.0 (`1.22.0-preview.260918.1`). Every other package is stable.
+> **Preview packages**: the A2A packages of Agent Framework (`Microsoft.Agents.AI.Hosting.A2A.AspNetCore`) and the A2A SDK they use (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.26.0 (`1.26.0-preview.261023.1`). Every other package is stable.
 
 ## What You Will Learn
 
@@ -284,7 +284,7 @@ The following files should be modified:
 | Package | Why |
 |---------|-----|
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` (brings `OpenAI` and `Microsoft.Extensions.AI`) |
-| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.22.0 brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The A2A hosting always streams, so the server needs it |
+| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.26.0 still brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The A2A hosting always streams, so the server needs it |
 | `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (preview) | `AddA2AServer`, `MapA2AJsonRpc`, `MapA2AHttpJson`; brings the A2A SDK v1 (`A2A`, `A2A.AspNetCore`) and `Microsoft.Extensions.Configuration.*` |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 
@@ -297,9 +297,9 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0 / A2A v1) |
+| Before (preview) | Now (1.26.0 / A2A v1) |
 |------------------|------------------|
-| A2A protocol **v0.3** (`A2A` 0.3.3-preview) | A2A protocol **v1** (`A2A` 1.0.0-preview2). **Not compatible**: a v1 client cannot call a v0.3 server (*"'method' field is not a valid A2A method"*). Migrate the client (Lab06_A2AClient) at the same time |
+| A2A protocol **v0.3** (`A2A` 0.3.3-preview) | A2A protocol **v1** (`A2A` 1.0.0-preview3). **Not compatible**: a v1 client cannot call a v0.3 server (*"'method' field is not a valid A2A method"*). Migrate the client (Lab06_A2AClient) at the same time |
 | `app.MapA2A(agent, path, agentCard, taskManager => app.MapWellKnownAgentCard(taskManager, path))` | `builder.AddA2AServer(agent)` + `app.MapA2AJsonRpc(agent, path)` / `app.MapA2AHttpJson(agent, path)` + `app.MapWellKnownAgentCard(card, path)` |
 | `AgentCard.Url` | `AgentCard.SupportedInterfaces` (URL + binding + version) |
 | Cards at `/a2a/authAgent/v1/card` (and a broken `.well-known` route) | Cards at `/a2a/<agent>/.well-known/agent-card.json` |

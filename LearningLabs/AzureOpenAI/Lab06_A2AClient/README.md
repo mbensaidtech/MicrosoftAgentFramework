@@ -12,7 +12,7 @@ You will implement three scenarios:
 - **Scenario 2**: Connect to the CustomerToneAgent **by URL** (direct configuration, no agent card)
 - **Scenario 3**: Give the remote AuthAgent to a **local** Azure OpenAI agent as a **function tool**
 
-> **Preview packages**: the A2A package of Agent Framework (`Microsoft.Agents.AI.A2A`) and the A2A SDK it uses (`A2A` 1.0.0-preview2) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.22.0 (`1.22.0-preview.260918.1`). Every other package is stable.
+> **Preview packages**: the A2A package of Agent Framework (`Microsoft.Agents.AI.A2A`) and the A2A SDK it uses (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.26.0 (`1.26.0-preview.261023.1`). Every other package is stable.
 
 ## What You Will Learn
 
@@ -321,9 +321,9 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0 / A2A v1) |
+| Before (preview) | Now (1.26.0 / A2A v1) |
 |------------------|------------------|
-| A2A protocol **v0.3** (`A2A` 0.3.x) | A2A protocol **v1** (`A2A` 1.0.0-preview2): the client needs the migrated Lab06_A2AServer |
+| A2A protocol **v0.3** (`A2A` 0.3.x) | A2A protocol **v1** (`A2A` 1.0.0-preview3): the client needs the migrated Lab06_A2AServer |
 | `new A2A.A2AClient(uri).GetAIAgent()` | `new A2A.A2AClient(uri).AsAIAgent(name: ..., description: ...)` |
 | `A2ACardResolver.GetAIAgentAsync()` (unused helper) | Scenario 1: `GetAgentCardAsync()` + `AgentCard.AsAIAgent()`; scenario 3: `GetAIAgentAsync()` |
 | Remote agent without a name (direct URL) | Name and description from the card, or given by the client |

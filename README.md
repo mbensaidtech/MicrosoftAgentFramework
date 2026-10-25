@@ -45,8 +45,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
-> **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09**, **AzureOpenAI/Lab10**, **AzureOpenAI/Lab11** and **AzureOpenAI/Lab12**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 13 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). The **MultiAgentSystem** labs are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -133,7 +132,7 @@ The first `dotnet run` restores the NuGet packages and builds the project (inclu
 To only check that your code compiles: `dotnet build LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start`.
 
 > **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal (it listens on `http://localhost:5000` until `Ctrl+C`), then `Lab06_A2AClient` in another.
-> Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.22.0): a migrated client cannot call an old v0.3 server.
+> Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.26.0): a migrated client cannot call an old v0.3 server.
 
 #### 3. Read the result
 

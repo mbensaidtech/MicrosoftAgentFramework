@@ -202,7 +202,7 @@ agent.RunAsync("...")
                              └─ HttpClientHandler → network → Azure OpenAI
 ```
 
-- **The handler sees the final request.** It runs after the SDK pipeline: the URL is the v1 one (`/openai/v1/chat/completions`), the deployment name is the `model` field of the body, and the `User-Agent` shows every layer (`OpenAI/2.13.0 …, MEAI/10.10.0 agent-framework-dotnet/1.22.0 …`). The `Authorization` header is already there: that is why it must be masked (see [Security](#security)).
+- **The handler sees the final request.** It runs after the SDK pipeline: the URL is the v1 one (`/openai/v1/chat/completions`), the deployment name is the `model` field of the body, and the `User-Agent` shows every layer (`OpenAI/2.14.0 …, MEAI/10.10.1 agent-framework-dotnet/1.26.0 …`). The `Authorization` header is already there: that is why it must be masked (see [Security](#security)).
 - **One run, one or more HTTP requests.** Scenario 1 sends one request. In scenario 2, the first response has `"finish_reason": "tool_calls"`; the agent invokes `get_weather` locally, then sends a second request whose messages end with the model's `tool_calls` and a `"role": "tool"` message containing the tool result. The second response contains the final answer.
 - **The token usage of a run is the total of its HTTP responses.** In the run below, scenario 2 shows `Input tokens: 185` = 74 (request #2) + 111 (request #3), and `Output tokens: 31` = 14 + 17. The second request is bigger: it repeats the whole conversation and the tools.
 - **Each attempt goes through the handler.** The SDK retries some failures (for example `429` or `503`): every attempt is a new pass in `SendAsync`, so `HTTP requests sent by this run` can be higher than the number of model calls when the service throttles you.
@@ -257,7 +257,7 @@ User: Hello, what is the capital of France?
 [URL] POST https://your-resource.openai.azure.com/openai/v1/chat/completions
 [Headers]
    Accept: application/json
-   User-Agent: OpenAI/2.13.0 (.NET 10.0.13; macOS 27.0.0),MEAI/10.10.0 agent-framework-dotnet/1.22.0 (...)
+   User-Agent: OpenAI/2.14.0 (.NET 10.0.13; macOS 27.0.0),MEAI/10.10.1 agent-framework-dotnet/1.26.0 (...)
    X-Stainless-Lang: csharp
    ...
    Authorization: Bearer [MASKED]
@@ -424,7 +424,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.22.0) |
+| Before (preview) | Now (1.26.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient(Uri, credential, AzureOpenAIClientOptions)` | `OpenAI` / `OpenAIClient(credential, OpenAIClientOptions)` + Azure OpenAI v1 endpoint |
 | `AzureOpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient), NetworkTimeout = ... }` | `OpenAIClientOptions { Endpoint = ..., Transport = new HttpClientPipelineTransport(httpClient), NetworkTimeout = ... }` (same `ClientPipelineOptions` properties) |
@@ -442,8 +442,8 @@ The following files should be modified:
 
 - [Microsoft Agent Framework documentation](https://learn.microsoft.com/agent-framework/overview/?pivots=programming-language-csharp)
 - [Using function tools with an agent](https://learn.microsoft.com/agent-framework/agents/tools/function-tools?pivots=programming-language-csharp)
-- [Official sample `02_add_tools`](https://github.com/microsoft/agent-framework/tree/dotnet-1.22.0/dotnet/samples/01-get-started/02_add_tools)
-- [Official sample `Agent_MCP_PerRun_AuthHeaders`](https://github.com/microsoft/agent-framework/tree/dotnet-1.22.0/dotnet/samples/02-agents/ModelContextProtocol/Agent_MCP_PerRun_AuthHeaders) (a `DelegatingHandler` in an `HttpClient`)
+- [Official sample `02_add_tools`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/01-get-started/02_add_tools)
+- [Official sample `Agent_MCP_PerRun_AuthHeaders`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/ModelContextProtocol/Agent_MCP_PerRun_AuthHeaders) (a `DelegatingHandler` in an `HttpClient`)
 - [System.ClientModel library for .NET](https://learn.microsoft.com/dotnet/api/overview/azure/system.clientmodel-readme)
 - [`HttpClientPipelineTransport`](https://learn.microsoft.com/dotnet/api/system.clientmodel.primitives.httpclientpipelinetransport), [`ClientPipelineOptions`](https://learn.microsoft.com/dotnet/api/system.clientmodel.primitives.clientpipelineoptions), [`ClientLoggingOptions`](https://learn.microsoft.com/dotnet/api/system.clientmodel.primitives.clientloggingoptions), [`PipelinePolicy`](https://learn.microsoft.com/dotnet/api/system.clientmodel.primitives.pipelinepolicy)
 - [`DelegatingHandler`](https://learn.microsoft.com/dotnet/api/system.net.http.delegatinghandler)
