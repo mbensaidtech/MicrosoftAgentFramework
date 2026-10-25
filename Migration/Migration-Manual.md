@@ -58,7 +58,7 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 |---|---|---|---|
 | preview.251219.1 | Namespaces des classes `Microsoft.Agents.AI.OpenAI` modifiés | #2627 | tous |
 | preview.251219.1 | `AIAgent.Id` non-nullable ; suppression de `DisplayName` | #2719, #2758 | tous (si utilisé) |
-| preview.260108.1 | Pattern `RunCoreAsync`/`RunCoreStreamingAsync` dans `AIAgent` (agents custom) | #2749 | Lab11 (si agent custom) |
+| preview.260108.1 | Pattern `RunCoreAsync`/`RunCoreStreamingAsync` dans `AIAgent` (agents custom) | #2749 | aucun (Lab11 n'a pas d'agent personnalisé : son « custom » est le transport HTTP, vérifié) |
 | preview.260108.1 | Refonte des méthodes de `ChatMessageStore` | #2604 | Lab05 |
 | preview.260121.1 | **`AgentRunResponse` → `AgentResponse`**, **`AgentRunResponseUpdate` → `AgentResponseUpdate`** | #3197 | tous |
 | preview.260121.1 | **`CreateAIAgent` / `GetAIAgent` → `AsAIAgent`** | #3222 | tous |
@@ -539,6 +539,58 @@ Points découverts :
 - **Port** : `McpServer:BaseUrl` = `http://localhost:5100` (5000 évité : AirPlay sur macOS, cf. Lab06) ; port occupé → `IOException: Failed to bind to address … address already in use`.
 - **Usage** : seules les consommations de l'agent client (scénario 3) sont visibles ; celles de l'agent exposé sont faites dans le processus serveur et ne remontent pas par MCP.
 
+### 4.17 Transport HTTP personnalisé (validé sur Lab11)
+
+**Ancienne approche**
+```csharp
+// Azure.AI.OpenAI 2.7.0-beta.2 ; handler dérivé de HttpClientHandler dans son propre fichier (à compléter dans le Start)
+var httpClient = new HttpClient(new CustomHttpClientHandler());            // CustomHttpClientHandler : HttpClientHandler
+AzureOpenAIClient client = new(new Uri(settings.Endpoint), new ApiKeyCredential(settings.APIKey),
+    new AzureOpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient), NetworkTimeout = TimeSpan.FromSeconds(30) });
+// Dans le handler : Authorization affiché sur ses 20 premiers caractères, tous les autres en-têtes en clair (dont api-key)
+```
+
+**Nouvelle approche**
+```csharp
+// Handler = DelegatingHandler (pattern des samples officiels), InnerHandler = le handler réseau
+HttpLoggingHandler loggingHandler = new() { InnerHandler = new HttpClientHandler() };
+using HttpClient httpClient = new(loggingHandler);
+OpenAIClientOptions clientOptions = new()
+{
+    Endpoint = AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint),
+    Transport = new HttpClientPipelineTransport(httpClient),                 // System.ClientModel.Primitives
+    NetworkTimeout = TimeSpan.FromSeconds(30)                                // par tentative
+};
+OpenAIClient client = new(new ApiKeyCredential(settings.APIKey), clientOptions);   // ou BearerTokenPolicy (Entra ID)
+
+internal sealed class HttpLoggingHandler : DelegatingHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        request.Headers.Add("X-agent-name", "...");                         // modifier la requête
+        // journaliser : méthode, URL, en-têtes (Authorization / api-key masqués entièrement), corps
+        long start = Stopwatch.GetTimestamp();
+        HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
+        TimeSpan duration = Stopwatch.GetElapsedTime(start);
+        // journaliser : statut, durée, en-têtes, corps (sauf text/event-stream)
+        return response;
+    }
+}
+```
+
+**Explication** — Le concept est inchangé : `Transport` et `NetworkTimeout` sont des propriétés de `ClientPipelineOptions` (System.ClientModel), dont héritaient `AzureOpenAIClientOptions` et dont hérite `OpenAIClientOptions` ; `HttpClientPipelineTransport(HttpClient)` est stable (System.ClientModel 1.15.0, transitif via OpenAI 2.13.0). Seuls changent le client (endpoint v1) et le handler : **tous les samples officiels 1.22.0 qui injectent un `HttpClient` utilisent un `DelegatingHandler` avec `InnerHandler = new HttpClientHandler()`** (`Agent_Step25_FoundryToolboxMcp`, `Agent_Step26_FoundryToolboxMcpSkills`, `Agent_MCP_PerRun_AuthHeaders`, `LocalHttpSchemeRewriteHandler` des samples d'hébergement Foundry ; un seul dérive de `HttpClientHandler`) et `HttpClientPipelineTransport` (`AgentWebChat`, `Using-E2E-Resilience`). Le handler est placé dans le `HttpClient` : il voit la requête **finale** (après les politiques du SDK : en-têtes, retry, authentification), une fois **par tentative**, et la réponse avant le SDK. Références : samples cités au tag `dotnet-1.22.0`, docs XML `System.ClientModel` 1.15.0 (`ClientPipelineOptions`, `HttpClientPipelineTransport`, `PipelinePosition`), page Learn [System.ClientModel library for .NET](https://learn.microsoft.com/dotnet/api/overview/azure/system.clientmodel-readme).
+
+Points découverts :
+- **Le SDK `OpenAI` envoie la clé API dans `Authorization: Bearer <clé>`** (le SDK Azure l'envoyait dans `api-key`). Tout journal d'en-têtes doit masquer la valeur **entière** (schéma seul : `Bearer [MASKED]`). **Faille de l'ancien lab vérifiée** : avec une clé API, l'ancienne Solution affichait l'en-tête `api-key` **en clair** (compté sans être affiché : 1 ligne contenant la clé complète, 0 masquée) ; et son masquage d'`Authorization` (20 premiers caractères) aurait exposé 13 caractères de la clé avec le SDK `OpenAI`. Lab11 masque dans un helper fourni (`HttpConsole.MaskIfSensitive`) et un check du dashboard échoue si un en-tête d'identifiant apparaît en clair.
+- **Une exécution = une ou plusieurs requêtes HTTP** : avec un outil, la 1ʳᵉ réponse a `"finish_reason": "tool_calls"`, la 2ᵉ requête rejoue la conversation + `tool_calls` + un message `"role": "tool"` (résultat d'outil sérialisé en chaîne JSON, cf. §4.14). `AgentResponse.Usage` = somme des `usage` des réponses (vérifié : 74 + 111 = 185 en entrée, 14 + 17 = 31 en sortie).
+- **Chaque tentative passe par le handler** (vérifié hors ligne : `503` puis `200` → 2 passages pour un seul `RunAsync`). Délai dépassé : `ClientRetryPolicy` par défaut → 4 tentatives puis `AggregateException: Retry failed after 4 tries. (The operation was cancelled because it exceeded the configured timeout of …)` (vérifié) ; sans retry, `TaskCanceledException` avec le même message. `InnerHandler` absent : `InvalidOperationException: The inner handler has not been assigned.` (vérifié).
+- **Lire les corps** : `ReadAsStringAsync` met le contenu en mémoire tampon, le SDK le relit ensuite (requête `MessageBodyAdapter` et réponse, vérifié). Ne pas lire un corps `text/event-stream` (streaming) : le handler attendrait la fin du flux.
+- **Le jeton Entra ID n'est pas obtenu par ce `HttpClient`** (`DefaultAzureCredential` a ses propres moyens) : seules les requêtes Azure OpenAI sont journalisées.
+- **`User-Agent`** : `OpenAI/2.13.0 (…),MEAI/10.10.0 agent-framework-dotnet/1.22.0 (…)` — chaque couche s'identifie (utile pédagogiquement).
+- **Alternatives vérifiées, citées en « Going further »** : journalisation intégrée `ClientPipelineOptions.ClientLoggingOptions` (`LoggerFactory`, `EnableMessageContentLogging`, stable ; en-têtes hors `AllowedHeaderNames` écrits `REDACTED`, `Authorization` compris — vérifié avec `Microsoft.Extensions.Logging.Console`) ; `PipelinePolicy` + `AddPolicy(policy, PipelinePosition.BeforeTransport)` (samples d'hébergement Foundry ; voit déjà `Authorization` — vérifié) ; `IHttpClientFactory` + `AddHttpMessageHandler` ; `UseOpenTelemetry` (`Agent_Step05_Observability`).
+- **Écho de `x-ms-client-request-id`** : Azure OpenAI renvoie en réponse la valeur envoyée (observé), mais ce comportement n'est pas documenté pour Azure OpenAI : non enseigné.
+- **Spinner** : pas de `WithSpinner()` dans un lab dont le handler écrit sur la console (les deux s'entremêleraient).
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -569,6 +621,9 @@ Points découverts :
 | `A2AClient.GetAIAgent()` | Renommé (A2A SDK v1) | Compilation | `IA2AClient.AsAIAgent(name, description)` ; `AgentCard.AsAIAgent()` ; `A2ACardResolver.GetAIAgentAsync()` inchangé (§4.12) | Lab06 ✅ |
 | `app.MapA2A(agent, path, agentCard, taskManager => …)`, `ITaskManager`, `AgentCard.Url` | Supprimés (A2A SDK v1) | Compilation + protocole | `AddA2AServer` + `MapA2AJsonRpc` / `MapA2AHttpJson` + `MapWellKnownAgentCard(card, path)` ; `AgentCard.SupportedInterfaces` (§4.12) | Lab06 ✅ |
 | `Microsoft.Agents.Hosting.AspNetCore` 1.4.9-beta | Inutile (SDK M365 Agents) | Dépendance en préversion | — (supprimé) | Lab06 ✅ |
+| `AzureOpenAIClientOptions { Transport, NetworkTimeout }` | Remplacé avec `AzureOpenAIClient` | Construction du client | `OpenAIClientOptions { Endpoint, Transport = new HttpClientPipelineTransport(httpClient), NetworkTimeout }` (mêmes propriétés héritées de `ClientPipelineOptions`, §4.17) | Lab11 ✅ |
+| Handler d'interception dérivé de `HttpClientHandler` | Toujours disponible, mais les samples officiels utilisent `DelegatingHandler` | Pédagogie | `DelegatingHandler` + `InnerHandler = new HttpClientHandler()` (§4.17) | Lab11 ✅ |
+| Journal d'en-têtes masquant `Authorization` après 20 caractères, `api-key` en clair | Fuite de secret (la clé API complète s'affichait avec le SDK Azure ; avec le SDK `OpenAI`, la clé voyage dans `Authorization: Bearer`) | **Sécurité** | Masquage complet des en-têtes d'identifiant (schéma seul), helper fourni `HttpConsole.MaskIfSensitive` + check du dashboard (§4.17) | Lab11 ✅ |
 | `Microsoft.Extensions.Hosting` (usage « config seulement ») | Surdimensionné | Dépendance inutile | `Microsoft.Extensions.Configuration.Json/UserSecrets/EnvironmentVariables/Binder` | tous les labs console |
 | `Azure.Identity 1.18.0-beta.2` | Préversion | Règle « stable » | `Azure.Identity 1.21.0` | tous |
 | `ToonNet` 1.0.4 / `ToonNetSerializer` 1.0.0 (packages tiers « TOON », Lab08) | Non officiels ; `ToonNetSerializer` n'existe plus sur NuGet (`NU1101`, le Start ne restaurait plus) | Restauration du Start impossible ; règle 12 | Aucun package : outil renvoyant des objets (JSON par le framework) ou du CSV encodé par `HotelCsv.cs` fourni (§4.14) | Lab08 ✅ |
@@ -630,4 +685,6 @@ Points découverts :
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
 - **Culture du poste** : les nombres interpolés dans les chaînes (`decimal`, `double`) suivent la culture courante (fr-FR sur le poste de migration : `55,5`). Tout affichage attendu par les README et les checks du dashboard passe par `CultureInfo.InvariantCulture` (Lab08 `FormatConsole`) ; à vérifier dans les labs suivants qui affichent des montants ou des scores.
 - **Serveurs MCP stdio (Lab10)** : stdout est réservé au protocole ; tout `Console.WriteLine`, et la sortie de build d'un `dotnet run` sans `--no-build`, casse la connexion (§4.16). Les labs qui lancent un serveur stdio doivent pointer sur la `.dll` construite.
+- **Journaux HTTP et secrets (Lab11)** : un handler ou une politique placé dans le pipeline voit la requête **après** l'authentification : `Authorization` contient la clé API (SDK `OpenAI`) ou le jeton Entra ID. Ne jamais en afficher une partie ; le dashboard masque la clé qu'il connaît (`••••`), mais pas un terminal ni un jeton Entra ID.
+- **Streaming (observation du 2026-10-25)** : un `RunStreamingAsync` court (gpt-4o-mini, France Central) a réussi via la sonde Lab11, alors que la régression ci-dessus le faisait échouer depuis le 2026-09-28. À confirmer en re-testant Lab01 scénario 5, Lab02 et Lab06 (hors périmètre de Lab11) avant de retirer le contournement de Lab06_A2AServer.
 - **Analyse graphify** : l'extracteur AST échoue sur 5 `Program.cs` à top-level statements (Lab01/02/03/04/07 Solution) ; sans impact sur la compilation, mais ces fichiers sont sous-représentés dans la carte.

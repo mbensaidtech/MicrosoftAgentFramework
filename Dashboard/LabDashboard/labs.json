@@ -1094,6 +1094,118 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab11",
+      "number": "11",
+      "track": "Azure OpenAI",
+      "title": "AI Agent with a Custom HTTP Transport",
+      "summary": "Give the OpenAI SDK your own HttpClient: a DelegatingHandler adds a header, logs every request and response with the credentials masked, measures each call and counts the requests. See what an agent really sends to Azure OpenAI, including the two requests of a function call.",
+      "level": "Intermediate",
+      "objectives": [
+        "Write an HTTP message handler with DelegatingHandler and its InnerHandler",
+        "Plug your own HttpClient into the OpenAI SDK with OpenAIClientOptions.Transport and HttpClientPipelineTransport",
+        "Add a custom header to every request, measure each call and count the HTTP requests of a run",
+        "Log requests and responses without ever printing a credential (Authorization masked)",
+        "See what an agent sends on the wire: the v1 URL, the deployment in the model field, the instructions, the tools and the tool results",
+        "Understand why one run can send several HTTP requests and why its token usage is their total"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab11-AIAgentWithCustomHttpTransport",
+      "startProject": "Start/AIAgentWithCustomHttpTransport.csproj",
+      "solutionProject": "Solution/AIAgentWithCustomHttpTransport.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-request",
+          "description": "Scenario 1 - the handler logged the request on the Azure OpenAI v1 URL (POST .../openai/v1/chat/completions)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===\\s*$\\s*^\\[URL\\] POST https://\\S+/openai/v1/chat/completions\\s*$"
+        },
+        {
+          "id": "scenario1-header",
+          "description": "Scenario 1 - the handler added the custom header X-agent-name to the request",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?^\\s+X-agent-name: AIAgentWithCustomHttpTransport\\s*$"
+        },
+        {
+          "id": "credentials-masked",
+          "description": "The Authorization header is logged masked (Bearer [MASKED]), and no credential header is logged in clear",
+          "pattern": "(?is)\\A(?=.*?^\\s+Authorization: Bearer \\[MASKED\\]\\s*$)(?!.*?^\\s+(?:Authorization|api-key):(?! (?:\\w+ )?\\[MASKED\\]\\s*$))"
+        },
+        {
+          "id": "scenario1-response",
+          "description": "Scenario 1 - the handler logged the response status and the duration of the call (200 OK in N ms)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP RESPONSE #\\d+ ===\\s*$\\s*^\\[Status\\] 200 OK \\(OK\\) in \\d+ ms\\s*$"
+        },
+        {
+          "id": "scenario1-answer",
+          "description": "Scenario 1 - the agent answered (Paris) and the run sent at least one HTTP request through the handler",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent answer:\\s*$(?:(?!^HTTP requests sent).)*?Paris(?:(?!^=== Scenario).)*?^HTTP requests sent by this run: [1-9]\\d*\\s*$"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-tools",
+          "description": "Scenario 2 - the request sent the tools: the get_weather function in the tools array",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"tools\": \\[(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
+        },
+        {
+          "id": "scenario2-tool-call",
+          "description": "Scenario 2 - a response asked for the tool (finish_reason tool_calls, get_weather)",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP RESPONSE #\\d+ ===(?:(?!^=== HTTP RE).)*?\"finish_reason\": \"tool_calls\"(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
+        },
+        {
+          "id": "scenario2-tool-result",
+          "description": "Scenario 2 - a second request sent the tool result back to the model (role tool, cloudy with a high of 15 degrees Celsius)",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"role\": \"tool\",(?:(?!^=== HTTP RE).)*?\"content\": \"\\\\\"The weather in [^\"\\\\]*Amsterdam[^\"\\\\]* is cloudy with a high of 15 degrees Celsius\\.\\\\\"\""
+        },
+        {
+          "id": "scenario2-answer",
+          "description": "Scenario 2 - the agent answered with the tool data (15) and the run sent at least two HTTP requests",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Agent answer:\\s*$(?:(?!^HTTP requests sent).)*?\\b15\\b(?:(?!^=== Scenario).)*?^HTTP requests sent by this run: (?:[2-9]|[1-9]\\d+)\\s*$"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec un transport HTTP personnalisé",
+          "level": "Intermédiaire",
+          "summary": "Donnez votre propre HttpClient au SDK OpenAI : un DelegatingHandler ajoute un en-tête, journalise chaque requête et chaque réponse en masquant les identifiants, mesure chaque appel et compte les requêtes. Voyez ce qu'un agent envoie réellement à Azure OpenAI, y compris les deux requêtes d'un appel d'outil.",
+          "objectives": [
+            "Écrire un handler de messages HTTP avec DelegatingHandler et son InnerHandler",
+            "Brancher votre propre HttpClient dans le SDK OpenAI avec OpenAIClientOptions.Transport et HttpClientPipelineTransport",
+            "Ajouter un en-tête personnalisé à chaque requête, mesurer chaque appel et compter les requêtes HTTP d'une exécution",
+            "Journaliser les requêtes et les réponses sans jamais afficher d'identifiant (Authorization masqué)",
+            "Voir ce qu'un agent envoie sur le réseau : l'URL v1, le déploiement dans le champ model, les instructions, les outils et les résultats d'outils",
+            "Comprendre pourquoi une exécution peut envoyer plusieurs requêtes HTTP et pourquoi sa consommation de tokens en est le total"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-request": "Scénario 1 - le handler a journalisé la requête sur l'URL v1 d'Azure OpenAI (POST .../openai/v1/chat/completions)",
+            "scenario1-header": "Scénario 1 - le handler a ajouté l'en-tête personnalisé X-agent-name à la requête",
+            "credentials-masked": "L'en-tête Authorization est journalisé masqué (Bearer [MASKED]), et aucun en-tête d'identifiant n'apparaît en clair",
+            "scenario1-response": "Scénario 1 - le handler a journalisé le statut de la réponse et la durée de l'appel (200 OK in N ms)",
+            "scenario1-answer": "Scénario 1 - l'agent a répondu (Paris) et l'exécution a envoyé au moins une requête HTTP via le handler",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-tools": "Scénario 2 - la requête a envoyé les outils : la fonction get_weather dans le tableau tools",
+            "scenario2-tool-call": "Scénario 2 - une réponse a demandé l'outil (finish_reason tool_calls, get_weather)",
+            "scenario2-tool-result": "Scénario 2 - une deuxième requête a renvoyé le résultat de l'outil au modèle (role tool, cloudy with a high of 15 degrees Celsius)",
+            "scenario2-answer": "Scénario 2 - l'agent a répondu avec la donnée de l'outil (15) et l'exécution a envoyé au moins deux requêtes HTTP",
+            "scenario2-usage": "Scénario 2 - consommation de tokens affichée"
+          }
+        }
+      }
     }
   ]
 }

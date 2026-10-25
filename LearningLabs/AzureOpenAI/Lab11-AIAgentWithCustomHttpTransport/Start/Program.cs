@@ -1,17 +1,22 @@
-using Azure.Identity;
-using Azure.AI.OpenAI;
-using Microsoft.Agents.AI;
-using OpenAI.Chat;
-using OpenAI;
+using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Diagnostics;
+using Azure.Identity;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using OpenAI;
+using OpenAI.Chat;
 using CommonUtilities;
+
 using AIAgentWithCustomHttpTransport;
+using AIAgentWithCustomHttpTransport.Tools;
+using static AIAgentWithCustomHttpTransport.HttpConsole;
 
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
-HashSet<int> scenariosToRun = [1];
+// Set to: [1], [2] or [1, 2] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2];
 // ============================================
 
 bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
@@ -23,30 +28,113 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
-// Step 2: Create a custom HTTP client with the custom HTTP handler
-// TODO: Create an HttpClient instance using CustomHttpClientHandler
+// TODO 1: Create the logging handler (HttpLoggingHandler, bottom of this file) and an HttpClient that uses it
+// - HttpLoggingHandler is a DelegatingHandler: set its InnerHandler to a new HttpClientHandler (the handler that talks to the network)
+// - Keep the handler in a variable: the scenarios read its RequestCount
+// HttpLoggingHandler loggingHandler = ...
+// using HttpClient httpClient = ...
 
-// Step 3: Create AzureOpenAIClient with managed identity authentication and the custom HTTP client
-// TODO: Create the AzureOpenAIClient with custom transport options
+// TODO 2: Create the OpenAIClientOptions
+// - Endpoint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
+// - Transport: a new HttpClientPipelineTransport built from httpClient (the OpenAI SDK will send its requests with it)
+// - NetworkTimeout: TimeSpan.FromSeconds(30) (applied to each attempt)
+// OpenAIClientOptions clientOptions = ...
 
-// Step 4: Get a ChatClient for the specific deployment
-// TODO: Get the ChatClient from the AzureOpenAIClient
+// TODO 3: Create the OpenAIClient with these options
+// - If settings.APIKey is set: authenticate with an ApiKeyCredential
+// - Otherwise: authenticate with Microsoft Entra ID using a BearerTokenPolicy built from
+//   DefaultAzureCredential and the scope "https://ai.azure.com/.default"
+// Note: the AuthenticationPolicy constructor is flagged experimental (OPENAI001), keep the pragma around it.
+#pragma warning disable OPENAI001
+// OpenAIClient client = ...
+#pragma warning restore OPENAI001
+
+// TODO 4: Get a ChatClient (Chat Completions API) for the deployment
+// ChatClient chatClient = ...
 
 #endregion
 
-#region Scenario 1: Basic Agent - Simple prompt with default settings
+#region Scenario 1: See the HTTP traffic of an agent run
 
 if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Running Scenario 1: Basic Agent ===");
-    
-    // Once you complete the setup steps above, uncomment the following lines:
-    // ChatClientAgent basicAgent = chatClient.CreateAIAgent();
-    // AgentRunResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?");
-    // ColoredConsole.WritePrimaryLogLine(basicResponse.ToString());
-    
-    ColoredConsole.WriteWarningLine("TODO: Complete steps 2-4 in the Setup region, then uncomment the scenario code above.");
+    ColoredConsole.WriteInfoLine("=== Scenario 1: See the HTTP traffic of an agent run ===");
+    string prompt = "Hello, what is the capital of France?";
+    ColoredConsole.WriteUserLine($"User: {prompt}");
+
+    // TODO 5: Create a basic AI Agent from the ChatClient (no instructions, no name)
+    // AIAgent basicAgent = ...
+
+    // TODO 6: Run the agent with the prompt, counting the HTTP requests sent by the handler during the run
+    // Hint: read loggingHandler.RequestCount before the run; no spinner here (it would write over the HTTP log)
+    // int requestsBefore = ...
+    // AgentResponse basicResponse = ...
+
+    // TODO 7: Display the answer, the number of HTTP requests of the run and the token usage
+    // Hint: basicResponse.Text, loggingHandler.RequestCount - requestsBefore, WriteTokenUsage(basicResponse) (HttpConsole.cs)
+}
+
+#endregion
+
+#region Scenario 2: One agent run, several HTTP requests (function calling)
+
+if (ShouldRunScenario(2))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 2: One agent run, several HTTP requests (function calling) ===");
+    string prompt = "What is the weather like in Amsterdam?";
+    ColoredConsole.WriteUserLine($"User: {prompt}");
+
+    // TODO 8: Create an agent with instructions, a name and the function tool WeatherTools.GetWeather (Tools/WeatherTools.cs)
+    // Hint: tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]
+    // AIAgent weatherAgent = ...
+
+    // TODO 9: Run the agent with the prompt, counting the HTTP requests (same as TODO 6)
+    // int requestsBefore = ...
+    // AgentResponse weatherResponse = ...
+
+    // TODO 10: Display the answer, the number of HTTP requests of the run and the token usage (same as TODO 7)
+}
+
+#endregion
+
+#region Custom HTTP handler: intercepts every request sent by the OpenAI SDK, and its response
+
+/// <summary>
+/// HTTP message handler placed in the HttpClient used by the OpenAI SDK: it sees each HTTP request when it leaves
+/// the SDK (after its retry and authentication policies) and each response before the SDK reads it.
+/// </summary>
+internal sealed class HttpLoggingHandler : DelegatingHandler
+{
+    private int _requestCount;
+
+    /// <summary>Number of HTTP requests sent through this handler since the start of the program.</summary>
+    public int RequestCount => _requestCount;
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        // The same handler can serve several requests at the same time: count them atomically
+        int number = Interlocked.Increment(ref _requestCount);
+
+        // TODO 11: Add the custom header "X-agent-name" with the value "AIAgentWithCustomHttpTransport" to the request
+
+        // TODO 12: Write the HTTP request
+        // - a divider and the title $"=== HTTP REQUEST #{number} ==="
+        // - the method and the URL: request.Method, request.RequestUri
+        // - the headers and the body with the helpers of HttpConsole.cs: WriteHeaders(...), await WriteBodyAsync(...)
+
+        // TODO 13: Send the request to the next handler (the network) and measure the duration
+        // Replace the last line of this method: keep the response of base.SendAsync(...) in a variable,
+        // and measure the call with Stopwatch.GetTimestamp() / Stopwatch.GetElapsedTime(start)
+
+        // TODO 14: Write the HTTP response, then return it to the SDK
+        // - the title $"=== HTTP RESPONSE #{number} ===", the status (code, name, StatusLabel(...)) and the duration
+        // - the headers and the body (same helpers), a divider, then: return response;
+
+        // Until TODO 13 is done, the request is only forwarded to the network
+        return await base.SendAsync(request, cancellationToken);
+    }
 }
 
 #endregion

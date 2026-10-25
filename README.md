@@ -46,7 +46,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09** and **AzureOpenAI/Lab10**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09**, **AzureOpenAI/Lab10** and **AzureOpenAI/Lab11**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -218,7 +218,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab10): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab11): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Lab10: each scenario starts its own MCP server (HTTP on `McpServer:BaseUrl`, `http://localhost:5100` by default, or stdio as a child process) and stops it: the port must be free during the run.
@@ -383,11 +383,12 @@ This lab is split into two parts: start the server, then run the client.
 
 ### Lab 11 - AI Agent with Custom HTTP Transport
 
-**Learn how to customize HTTP communication for debugging and monitoring**
+**Learn how to plug your own `HttpClient` into the OpenAI SDK (`OpenAIClientOptions.Transport`, `HttpClientPipelineTransport`) and intercept every request with a `DelegatingHandler`: add a header, log the traffic with the credentials masked, measure and count the calls**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Intercept and log HTTP requests/responses with custom handler |
+| Scenario 1 | See the HTTP traffic of an agent run: the v1 URL, the headers (custom `X-agent-name` added, `Authorization` masked), the JSON bodies, the status and duration of the call; one request, its token usage |
+| Scenario 2 | One agent run, several HTTP requests: with a function tool, the first response asks for the tool (`tool_calls`), a second request sends the tool result (`"role": "tool"`); the token usage of the run is the total of both |
 
 ---
 
