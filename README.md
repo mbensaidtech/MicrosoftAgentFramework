@@ -408,6 +408,8 @@ This lab is split into two parts: start the server, then run the client.
 
 This part focuses on building **multi-agent systems** where multiple agents collaborate to solve complex problems. You will learn how to orchestrate agents, use agents as tools, and build sophisticated AI workflows.
 
+> ⚠️ **Not migrated yet.** The three MultiAgentSystem labs still target a December 2025 preview of Agent Framework (`1.0.0-preview.251204.1`) and use APIs that no longer exist in the current version (`CreateAIAgent`, `AgentRunResponse`, `AzureOpenAIClient`, `InProcessExecution.StreamAsync`). They are **not part of the recommended learning path** and are not available in the Lab Bench dashboard. Lab 01 (*Use Agent as Tool*) will be reworked on the current API; Lab 02 and Lab 03 (orchestrations and workflows) will be covered in a later phase.
+
 ---
 
 ### Lab 01 - Use Agent as Tool
@@ -564,7 +566,7 @@ echo $env:AzureOpenAI__Endpoint
 
 ## Learning Path
 
-We recommend following the labs in order, starting with the **AzureOpenAI** labs (individual agents) and then moving to the **MultiAgentSystem** labs:
+We recommend following the **AzureOpenAI** labs (individual agents) in order. The **MultiAgentSystem** labs are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -573,13 +575,13 @@ We recommend following the labs in order, starting with the **AzureOpenAI** labs
 │  Lab01 → Lab02 → Lab03 → Lab04 → Lab05 → Lab06 → Lab07 → Lab08 → Lab09 → Lab10 → Lab11 → Lab12│
 │    │       │       │       │       │       │       │       │       │       │       │       │   │
 │    ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼   │
-│  Basic  Struct  Tools    MCP   Threads   A2A    RAG   Format  Human    MCP   Custom  Context  │
+│  Basic  Struct  Tools    MCP   Sessions  A2A    RAG   Format  Human    MCP   Custom  Context  │
 │  Agent  Output  Calling Client                        Optim  Approval Server  HTTP  Provider  │
 └────────────────────────────────────────────────────────────────────────────────────────────────┘
                                             │
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                        Part 2: MultiAgentSystem (Multi-Agent Solutions)                        │
+│              Part 2: MultiAgentSystem (Multi-Agent Solutions) — NOT MIGRATED YET               │
 ├────────────────────────────────────────────────────────────────────────────────────────────────┤
 │  Lab01 → Lab02 → Lab03 → ...                                                                   │
 │    │       │       │                                                                           │

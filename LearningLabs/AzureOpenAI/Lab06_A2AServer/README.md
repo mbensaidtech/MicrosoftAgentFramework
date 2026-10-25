@@ -41,7 +41,6 @@ Lab06_A2AServer/
 │   ├── AgentCards.cs               <-- Agent cards of the two agents (provided)
 │   ├── Tools/
 │   │   └── APIKeyTools.cs          <-- Tools of the AuthAgent (provided)
-│   ├── StreamingWorkaround.cs      <-- Temporary workaround (provided, see Step 2)
 │   ├── ConfigurationHelper.cs
 │   ├── AzureOpenAISettings.cs
 │   ├── A2AServerSettings.cs
@@ -106,7 +105,6 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 - `AgentCards.cs` — the `AgentCard` of each agent: `Name`, `Description`, `Version`, `Skills` (`AgentSkill`: id, name, description, tags, examples) and `SupportedInterfaces`. Each interface is a URL + a protocol binding (`ProtocolBindingNames.JsonRpc`, `ProtocolBindingNames.HttpJson`) + a protocol version (`"1.0"`). The URL of the agent is given by `Program.cs` (`BaseUrl` + path of the agent).
 - `Tools/APIKeyTools.cs` — `GenerateAPIKey()` returns `Meknes<random>.<signature>`; `ValidateAPIKey(apiKey)` checks the prefix and the signature (constant-time comparison). `IsSecretConfigured` tells whether the secret comes from the configuration.
 - `A2AServerSettings.cs`, `APIKeySettings.cs` — the settings above. `ConfigurationHelper.GetA2AServerSettings()` checks that `BaseUrl` is an absolute `http(s)://` URL.
-- `StreamingWorkaround.cs` — **temporary workaround**. The A2A hosting always runs the agents in **streaming** mode. Since the end of September 2026, Azure OpenAI streams content-filter annotations that `Microsoft.Extensions.AI.OpenAI` 10.10.x cannot read ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)): every A2A request then fails with *"Agent handler did not produce any response events"*. `WithNonStreamingResponses()` is a chat client middleware (built with the official `ChatClientBuilder.Use`) that answers the streaming requests with one non-streaming call. When the bug is fixed, delete TODO 4 and create the agents with `chatClient.AsAIAgent(...)`.
 
 ### Step 3: Complete the Program.cs
 
@@ -123,7 +121,6 @@ TODO 1 to 3 are the same as in Lab 01.
 | **TODO 1** | Create the `OpenAIClientOptions` for the Azure OpenAI v1 endpoint | • `OpenAIClientOptions clientOptions = new() { Endpoint = AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) };` |
 | **TODO 2** | Create the `OpenAIClient` | • API key: `new OpenAIClient(new ApiKeyCredential(settings.APIKey), clientOptions)` <br> • Entra ID: `new OpenAIClient(new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"), clientOptions)` <br> • `OpenAIClient client = !string.IsNullOrWhiteSpace(settings.APIKey) ? ... : ...;` between the two `#pragma` lines |
 | **TODO 3** | Get a `ChatClient` for the deployment | • `ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);` |
-| **TODO 4** | Create the chat client of the agents (temporary workaround, Step 2) | • `IChatClient agentChatClient = chatClient.AsIChatClient().WithNonStreamingResponses();` |
 
 ---
 
@@ -131,14 +128,14 @@ TODO 1 to 3 are the same as in Lab 01.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 5** | Create the ASP.NET Core application builder | • `var builder = WebApplication.CreateBuilder(args);` |
-| **TODO 6** | Create the tools of the AuthAgent | • `APIKeySettings apiKeySettings = ConfigurationHelper.GetAPIKeySettings();` <br> • `APIKeyTools apiKeyTools = new(apiKeySettings);` <br> • `if (!apiKeyTools.IsSecretConfigured) { ColoredConsole.WriteSecondaryLogLine("APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops."); }` |
-| **TODO 7** | Wrap the two methods as AI tools (Lab 03) | • `IList<AITool> tools = [AIFunctionFactory.Create(apiKeyTools.GenerateAPIKey, "generate_api_key"), AIFunctionFactory.Create(apiKeyTools.ValidateAPIKey, "validate_api_key")];` |
-| **TODO 8** | Create the two agents | • `AIAgent authAgent = agentChatClient.AsAIAgent(instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. When you generate a key, return the key exactly as produced by the tool.", name: "AuthAgent", tools: tools);` <br> • `AIAgent customerToneAgent = agentChatClient.AsAIAgent(instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.", name: "CustomerToneAgent");` |
-| **TODO 9** | Register an A2A server for each agent, then build the app | • `builder.AddA2AServer(authAgent);` <br> • `builder.AddA2AServer(customerToneAgent);` <br> • `var app = builder.Build();` <br> • `AddA2AServer` registers, for the agent **name**, the A2A request handler and a task store |
-| **TODO 10** | Map both protocol bindings of each agent | • `app.MapA2AJsonRpc(authAgent, AuthAgentPath);` <br> • `app.MapA2AHttpJson(authAgent, AuthAgentPath);` <br> • Same two lines for `customerToneAgent` and `CustomerToneAgentPath` |
-| **TODO 11** | Publish the agent cards | • `app.MapWellKnownAgentCard(AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}"), AuthAgentPath);` <br> • `app.MapWellKnownAgentCard(AgentCards.CreateCustomerToneAgentCard($"{serverSettings.BaseUrl}{CustomerToneAgentPath}"), CustomerToneAgentPath);` <br> • With a path, the card is served at `<path>/.well-known/agent-card.json` |
-| **TODO 12** | Run the server | • `await app.RunAsync(serverSettings.BaseUrl);` — it runs until `Ctrl+C` |
+| **TODO 4** | Create the ASP.NET Core application builder | • `var builder = WebApplication.CreateBuilder(args);` |
+| **TODO 5** | Create the tools of the AuthAgent | • `APIKeySettings apiKeySettings = ConfigurationHelper.GetAPIKeySettings();` <br> • `APIKeyTools apiKeyTools = new(apiKeySettings);` <br> • `if (!apiKeyTools.IsSecretConfigured) { ColoredConsole.WriteSecondaryLogLine("APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops."); }` |
+| **TODO 6** | Wrap the two methods as AI tools (Lab 03) | • `IList<AITool> tools = [AIFunctionFactory.Create(apiKeyTools.GenerateAPIKey, "generate_api_key"), AIFunctionFactory.Create(apiKeyTools.ValidateAPIKey, "validate_api_key")];` |
+| **TODO 7** | Create the two agents | • `AIAgent authAgent = chatClient.AsAIAgent(instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. When you generate a key, return the key exactly as produced by the tool.", name: "AuthAgent", tools: tools);` <br> • `AIAgent customerToneAgent = chatClient.AsAIAgent(instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.", name: "CustomerToneAgent");` |
+| **TODO 8** | Register an A2A server for each agent, then build the app | • `builder.AddA2AServer(authAgent);` <br> • `builder.AddA2AServer(customerToneAgent);` <br> • `var app = builder.Build();` <br> • `AddA2AServer` registers, for the agent **name**, the A2A request handler and a task store |
+| **TODO 9** | Map both protocol bindings of each agent | • `app.MapA2AJsonRpc(authAgent, AuthAgentPath);` <br> • `app.MapA2AHttpJson(authAgent, AuthAgentPath);` <br> • Same two lines for `customerToneAgent` and `CustomerToneAgentPath` |
+| **TODO 10** | Publish the agent cards | • `app.MapWellKnownAgentCard(AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}"), AuthAgentPath);` <br> • `app.MapWellKnownAgentCard(AgentCards.CreateCustomerToneAgentCard($"{serverSettings.BaseUrl}{CustomerToneAgentPath}"), CustomerToneAgentPath);` <br> • With a path, the card is served at `<path>/.well-known/agent-card.json` |
+| **TODO 11** | Run the server | • `await app.RunAsync(serverSettings.BaseUrl);` — it runs until `Ctrl+C` |
 
 ---
 
@@ -217,7 +214,7 @@ POST /a2a/authAgent/message:send                              └─▶ AIAgent 
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
 | `Microsoft.Agents.AI` | `AIAgent`, `AsAIAgent()` |
-| `Microsoft.Extensions.AI` | `IChatClient`, `AITool`, `AIFunctionFactory`, `AsIChatClient()` |
+| `Microsoft.Extensions.AI` | `AITool`, `AIFunctionFactory` |
 | `Microsoft.Extensions.DependencyInjection` | `AddA2AServer()` |
 | `Microsoft.AspNetCore.Builder` | `WebApplication`, `MapA2AJsonRpc()`, `MapA2AHttpJson()` |
 | `A2A` | `AgentCard`, `AgentSkill`, `AgentInterface`, `ProtocolBindingNames` |
@@ -243,7 +240,7 @@ info: Microsoft.Hosting.Lifetime[0]
       Application started. Press Ctrl+C to shut down.
 ```
 
-The delivered Start project prints the header and the endpoints (without the `APIKeySettings` notice of TODO 6), then exits: the server only listens once TODO 12 is done.
+The delivered Start project prints the header and the endpoints (without the `APIKeySettings` notice of TODO 5), then exits: the server only listens once TODO 11 is done.
 
 ## Troubleshooting
 
@@ -254,7 +251,7 @@ The delivered Start project prints the header and the endpoints (without the `AP
 | `'APIKeySettings:SecretKey' still contains a placeholder` | Remove the value (random secret) or set a real one in user secrets |
 | `Failed to bind to address http://127.0.0.1:5000: address already in use` | Another program uses the port (`lsof -i :5000`). Stop it, or run on another port with `A2AServer__BaseUrl=http://localhost:5050 dotnet run` and change the URLs of the client accordingly (`RemoteAgents__AuthAgent__Url`, `RemoteAgents__CustomerToneAgent__Url`) |
 | The client gets `403 Forbidden` on port 5000 | On **macOS**, the *AirPlay Receiver* also listens on port 5000 (System Settings → General → AirDrop & Handoff): when the lab server is not running, AirPlay answers instead. Start the server (or turn AirPlay Receiver off) |
-| The client gets *"Agent handler did not produce any response events"* | The agent failed on the server: look at the server console. With Azure OpenAI streaming, check that TODO 4 (workaround) is done and that the agents are created from `agentChatClient` |
+| The client gets *"Agent handler did not produce any response events"* | The agent failed on the server: look at the server console. The A2A hosting always runs the agents in streaming mode: an `InvalidOperationException` (*"requires an element of type 'Object', but the target element has type 'Null'"*) means that `Microsoft.Extensions.AI.OpenAI` is older than 10.11.0 (keep the reference of the `.csproj`) |
 | `401 Unauthorized` / `403` from Azure OpenAI | API key: check the user secret `AzureOpenAI:APIKey`. Entra ID: run `az login` and check the **Cognitive Services OpenAI User** role |
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
 | A key generated before a restart is "not valid" | Expected with the random secret: set `APIKeySettings:SecretKey` (Step 1) |
@@ -276,7 +273,6 @@ The following files are provided and should not be modified:
 - `AzureOpenAISettings.cs`, `A2AServerSettings.cs`, `APIKeySettings.cs` - Settings classes
 - `AgentCards.cs` - Agent cards of the two agents
 - `Tools/APIKeyTools.cs` - Tools of the AuthAgent
-- `StreamingWorkaround.cs` - Temporary workaround (Step 2)
 
 The following files should be modified:
 
@@ -288,6 +284,7 @@ The following files should be modified:
 | Package | Why |
 |---------|-----|
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` (brings `OpenAI` and `Microsoft.Extensions.AI`) |
+| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.22.0 brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The A2A hosting always streams, so the server needs it |
 | `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (preview) | `AddA2AServer`, `MapA2AJsonRpc`, `MapA2AHttpJson`; brings the A2A SDK v1 (`A2A`, `A2A.AspNetCore`) and `Microsoft.Extensions.Configuration.*` |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 
@@ -308,7 +305,8 @@ The following files should be modified:
 | Cards at `/a2a/authAgent/v1/card` (and a broken `.well-known` route) | Cards at `/a2a/<agent>/.well-known/agent-card.json` |
 | `Microsoft.Agents.Hosting.AspNetCore` 1.4.9-beta, `Microsoft.Extensions.Hosting` | Removed (not needed) |
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
-| `ChatClientAgent agent = chatClient.CreateAIAgent(...)` | `AIAgent agent = agentChatClient.AsAIAgent(...)` |
+| `ChatClientAgent agent = chatClient.CreateAIAgent(...)` | `AIAgent agent = chatClient.AsAIAgent(...)` |
+| `StreamingWorkaround.cs` (`WithNonStreamingResponses()`), a temporary middleware of the first 1.22.0 version | Removed: `Microsoft.Extensions.AI.OpenAI` 10.11.0 fixes the streaming of Azure content-filter annotations; the agents are created with `chatClient.AsAIAgent(...)` |
 | Agent named `APIKeyAgent` behind the `AuthAgent` card | Agent named `AuthAgent`, like its card |
 | Signing secret and API key in `appsettings.json` | Optional signing secret and API key in user secrets or environment variables |
 | URL `http://localhost:5000` hard-coded in the cards | `A2AServer:BaseUrl` in the configuration |

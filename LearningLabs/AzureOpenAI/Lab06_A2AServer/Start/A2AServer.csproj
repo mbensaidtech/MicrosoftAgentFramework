@@ -12,6 +12,10 @@
   <ItemGroup>
     <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <!-- Streaming fix: Agent Framework 1.22.0 brings Microsoft.Extensions.AI.OpenAI 10.10.x, whose streaming fails on the
+         annotation chunks without "delta" that Azure sends when the deployment uses the asynchronous content filter
+         (dotnet/extensions#7790). 10.11.0 fixes it (and brings OpenAI 2.14.0). -->
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
     <!-- A2A hosting for ASP.NET Core: AddA2AServer, MapA2AJsonRpc, MapA2AHttpJson (brings the A2A SDK v1, A2A.AspNetCore
          and Microsoft.Extensions.Configuration.* 10.0.12 transitively). No stable version exists yet: the preview aligned on 1.22.0 is used. -->
     <PackageReference Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.22.0-preview.260918.1" />

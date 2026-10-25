@@ -46,12 +46,6 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 // TODO 3: Get a ChatClient (Chat Completions API) for the deployment
 // ChatClient chatClient = ...
 
-// TODO 4: TEMPORARY WORKAROUND (see StreamingWorkaround.cs and the README): the A2A hosting runs the agents in streaming mode,
-// which currently fails with Azure OpenAI content-filter chunks (dotnet/extensions#7790).
-// Create the IChatClient of the agents, which answers streaming requests with a non-streaming call.
-// Hint: chatClient.AsIChatClient().WithNonStreamingResponses()
-// IChatClient agentChatClient = ...
-
 #endregion
 
 // Paths of the two agents on the server, and address the server listens on (A2AServer:BaseUrl)
@@ -66,40 +60,40 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: A2A server with two agents ===");
 
-    // TODO 5: Create the ASP.NET Core application builder
+    // TODO 4: Create the ASP.NET Core application builder
     // var builder = ...
 
-    // TODO 6: Create the API key tools of the AuthAgent from ConfigurationHelper.GetAPIKeySettings(),
+    // TODO 5: Create the API key tools of the AuthAgent from ConfigurationHelper.GetAPIKeySettings(),
     // and display a notice when the signing secret is not configured (apiKeyTools.IsSecretConfigured)
     // APIKeyTools apiKeyTools = ...
 
-    // TODO 7: Wrap GenerateAPIKey and ValidateAPIKey as AI tools named "generate_api_key" and "validate_api_key"
+    // TODO 6: Wrap GenerateAPIKey and ValidateAPIKey as AI tools named "generate_api_key" and "validate_api_key"
     // IList<AITool> tools = ...
 
-    // TODO 8: Create the two agents from agentChatClient: "AuthAgent" (with the tools) and "CustomerToneAgent" (no tools)
-    // Hint: agentChatClient.AsAIAgent(instructions: ..., name: ..., tools: ...), instructions in the README.
+    // TODO 7: Create the two agents from chatClient: "AuthAgent" (with the tools) and "CustomerToneAgent" (no tools)
+    // Hint: chatClient.AsAIAgent(instructions: ..., name: ..., tools: ...), instructions in the README.
     //       The names are the keys used by the A2A hosting to find the agents.
     // AIAgent authAgent = ...
     // AIAgent customerToneAgent = ...
 
-    // TODO 9: Register an A2A server for each agent (builder.AddA2AServer), then build the application
+    // TODO 8: Register an A2A server for each agent (builder.AddA2AServer), then build the application
     // var app = ...
 
-    // TODO 10: Expose each agent with both A2A v1 protocol bindings at its path (AuthAgentPath, CustomerToneAgentPath)
+    // TODO 9: Expose each agent with both A2A v1 protocol bindings at its path (AuthAgentPath, CustomerToneAgentPath)
     // Hint: app.MapA2AJsonRpc(agent, path) and app.MapA2AHttpJson(agent, path)
 
-    // TODO 11: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
+    // TODO 10: Publish the agent card of each agent at <agent path>/.well-known/agent-card.json
     // Hint: app.MapWellKnownAgentCard(card, path) with AgentCards.CreateAuthAgentCard($"{serverSettings.BaseUrl}{AuthAgentPath}")
     //       and AgentCards.CreateCustomerToneAgentCard(...)
 
-    // Provided: display the endpoints (the server only listens once TODO 12 runs it)
+    // Provided: display the endpoints (the server only listens once TODO 11 runs it)
     ColoredConsole.WritePrimaryLogLine($"AuthAgent:         {serverSettings.BaseUrl}{AuthAgentPath}");
     ColoredConsole.WritePrimaryLogLine($"  Agent card:      {serverSettings.BaseUrl}{AuthAgentPath}/.well-known/agent-card.json");
     ColoredConsole.WritePrimaryLogLine($"CustomerToneAgent: {serverSettings.BaseUrl}{CustomerToneAgentPath}");
     ColoredConsole.WritePrimaryLogLine($"  Agent card:      {serverSettings.BaseUrl}{CustomerToneAgentPath}/.well-known/agent-card.json");
     ColoredConsole.WriteSecondaryLogLine("Press Ctrl+C to stop the server.");
 
-    // TODO 12: Run the server until Ctrl+C, on the address of the configuration
+    // TODO 11: Run the server until Ctrl+C, on the address of the configuration
     // Hint: await app.RunAsync(serverSettings.BaseUrl);
 }
 

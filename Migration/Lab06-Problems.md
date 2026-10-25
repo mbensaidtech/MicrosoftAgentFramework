@@ -10,12 +10,12 @@
 - **Impacts** :
   - **Lab06_A2AServer** : l'hébergement A2A exécute toujours les agents en streaming, donc chaque requête renvoie *« Agent handler did not produce any response events »*.
   - **Lab01** (scénario 5) et **Lab02** (scénario 4) échouent maintenant (exit 134), alors qu'ils étaient validés le 2026-09-26/27. Leurs runs Solution échouent aussi dans le dashboard.
-- **État** : contournement temporaire dans Lab06_A2AServer (`StreamingWorkaround.cs`, TODO 4). Lab01 et Lab02 ne sont pas corrigés (hors périmètre).
+- **État** : ✅ **résolu le 2026-10-25.** #7790 a été fermé le 2026-10-12 par dotnet/extensions#7815 (publié dans `Microsoft.Extensions.AI.OpenAI` 10.11.0, qui apporte `OpenAI` 2.14.0). Lab01, Lab02 et Lab06_A2AServer référencent explicitement 10.11.0 (Start et Solution). `StreamingWorkaround.cs` et le TODO 4 sont supprimés. Une capture SSE du 2026-10-25 ne montre plus de chunks sans `delta` sur le déploiement de test (0 sur 106) ; la référence protège les déploiements qui utilisent le filtre asynchrone.
 - **À faire** :
-  - [ ] Surveiller le ticket #7790 et la sortie d'une version corrigée de `Microsoft.Extensions.AI.OpenAI`.
-  - [ ] Ensuite : supprimer `StreamingWorkaround.cs` et le TODO 4 (Start, Solution, README), puis créer les agents avec `chatClient.AsAIAgent(...)`.
-  - [ ] Retester Lab01, Lab02 et Lab06 (CLI et dashboard).
-  - [ ] Ou décider maintenant d'appliquer le même contournement à Lab01 et Lab02.
+  - [x] Surveiller le ticket #7790 et la sortie d'une version corrigée de `Microsoft.Extensions.AI.OpenAI` → 10.11.0 (2026-10-15).
+  - [x] Ensuite : supprimer `StreamingWorkaround.cs` et le TODO 4 (Start, Solution, README), puis créer les agents avec `chatClient.AsAIAgent(...)`.
+  - [x] Retester Lab01, Lab02 et Lab06 : CLI avec clé API et Entra ID, sorties vérifiées avec les attentes du dashboard (Lab01 7/7, Lab02 9/9, serveur 10/10, client 9/9) et `dotnet test` du dashboard. Reste à faire : un run depuis l'interface du dashboard.
+  - [x] ~~Ou décider maintenant d'appliquer le même contournement à Lab01 et Lab02.~~ Sans objet.
 
 ## 2. Client A2A v1 incompatible avec un serveur v0.3
 

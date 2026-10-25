@@ -48,11 +48,6 @@ OpenAIClient client = !string.IsNullOrWhiteSpace(settings.APIKey)
 // Step 3: Get a ChatClient (Chat Completions API) for the deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
-// Step 4: TEMPORARY WORKAROUND (see StreamingWorkaround.cs and the README): the A2A hosting runs the agents in streaming mode,
-// which currently fails with Azure OpenAI content-filter chunks (dotnet/extensions#7790). The agents are created from this
-// IChatClient, which answers streaming requests with a non-streaming call. When the bug is fixed, use chatClient.AsAIAgent(...).
-IChatClient agentChatClient = chatClient.AsIChatClient().WithNonStreamingResponses();
-
 #endregion
 
 // Paths of the two agents on the server, and address the server listens on (A2AServer:BaseUrl)
@@ -85,13 +80,13 @@ if (ShouldRunScenario(1))
     ];
 
     // Step 3: Create the two agents. Their names are the keys used by the A2A hosting to find them.
-    AIAgent authAgent = agentChatClient.AsAIAgent(
+    AIAgent authAgent = chatClient.AsAIAgent(
         instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. " +
                       "When you generate a key, return the key exactly as produced by the tool.",
         name: "AuthAgent",
         tools: tools);
 
-    AIAgent customerToneAgent = agentChatClient.AsAIAgent(
+    AIAgent customerToneAgent = chatClient.AsAIAgent(
         instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. " +
                       "Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.",
         name: "CustomerToneAgent");
