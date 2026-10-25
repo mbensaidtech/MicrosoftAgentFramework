@@ -41,12 +41,12 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | **Azure OpenAI resource** with a chat deployment | Every lab | You need the endpoint URL and the **deployment name** (not the model name). |
 | **Authentication** | Every lab | Either the resource **API key**, or **Microsoft Entra ID**: `az login` + the *Cognitive Services OpenAI User* role on the resource (used automatically when no key is set). |
 | Embedding deployment | Lab07+ | e.g. `text-embedding-3-small`. Lab07 reads it from `AzureOpenAI:EmbeddingDeploymentName` (`appsettings.json`, user secret or `AzureOpenAI__EmbeddingDeploymentName`). |
-| MongoDB | Lab05, Lab12 | e.g. `mongodb://localhost:27017`. Lab05 provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). |
+| MongoDB | Lab05, Lab12 | Each lab provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). Lab05 uses `mongodb://localhost:27017`, Lab12 `mongodb://localhost:27018` (set in their `appsettings.json`), so both can run at the same time. |
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09**, **AzureOpenAI/Lab10** and **AzureOpenAI/Lab11**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09**, **AzureOpenAI/Lab10**, **AzureOpenAI/Lab11** and **AzureOpenAI/Lab12**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10, Lab11, Lab12) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -218,8 +218,9 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab11): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab12): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
+- Lab12: needs its MongoDB container (`docker compose up -d` in its `MongoDB/` folder). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Lab10: each scenario starts its own MCP server (HTTP on `McpServer:BaseUrl`, `http://localhost:5100` by default, or stdio as a child process) and stops it: the port must be free during the run.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
@@ -392,13 +393,14 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 12 - AI Agent with AI Context Provider
+### Lab 12 - AI Agent with an AI Context Provider
 
-**Learn how to inject dynamic context into agent conversations**
+**Learn how to give an agent a long-term memory of its user with a custom `AIContextProvider` (`ProvideAIContextAsync` / `StoreAIContextAsync`, `ChatClientAgentOptions.AIContextProviders`, state in the session), memories extracted with structured output and stored in MongoDB**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | User memory management with AIContextProvider and MongoDB |
+| Scenario 1 | Remember the user from one session to another: the user introduces herself, the provider extracts the facts (another agent, `RunAsync<T>`) and stores them in MongoDB; in a new session (empty chat history), the provider adds them to the instructions and the agent knows her name and preferences; token usage displayed |
+| Scenario 2 | Chat with the agent at the console: it speaks first (`RunAsync(session)`) and greets you with what it remembers, then stores what you tell it — still known at the next run |
 
 ---
 
@@ -486,7 +488,7 @@ Instead of editing each `appsettings.json` file in every lab, you can set enviro
 | `AzureOpenAI__ChatDeploymentName` | Your chat model deployment name | `gpt-4o` |
 | `AzureOpenAI__APIKey` | Optional API key (if unset, `DefaultAzureCredential` is used) | `<your-api-key>` |
 | `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-3-small` |
-| `MongoDB__ConnectionString` | MongoDB connection string (Lab05, Lab12) | `mongodb://localhost:27017` |
+| `MongoDB__ConnectionString` | Optional MongoDB connection string (Lab05, Lab12): their `appsettings.json` already target their own containers (27017 / 27018), a variable overrides both | `mongodb://localhost:27017` |
 
 ### Linux / macOS
 
@@ -498,7 +500,7 @@ export AzureOpenAI__Endpoint="https://YOUR-RESOURCE.openai.azure.com/"
 export AzureOpenAI__ChatDeploymentName="YOUR-DEPLOYMENT-NAME"
 export AzureOpenAI__EmbeddingDeploymentName="YOUR-EMBEDDING-DEPLOYMENT-NAME"
 
-# MongoDB Configuration (for Lab05, Lab12)
+# MongoDB Configuration (optional, overrides the appsettings.json of Lab05 and Lab12)
 export MongoDB__ConnectionString="mongodb://localhost:27017"
 ```
 
@@ -518,7 +520,7 @@ $env:AzureOpenAI__Endpoint = "https://YOUR-RESOURCE.openai.azure.com/"
 $env:AzureOpenAI__ChatDeploymentName = "YOUR-DEPLOYMENT-NAME"
 $env:AzureOpenAI__EmbeddingDeploymentName = "YOUR-EMBEDDING-DEPLOYMENT-NAME"
 
-# MongoDB Configuration (for Lab05, Lab12)
+# MongoDB Configuration (optional, overrides the appsettings.json of Lab05 and Lab12)
 $env:MongoDB__ConnectionString = "mongodb://localhost:27017"
 ```
 

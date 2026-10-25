@@ -4,7 +4,8 @@ A shared utility library providing common functionality for all Learning Labs in
 
 ## Overview
 
-This project contains reusable utility classes (console output, spinner, Azure OpenAI endpoint helper, MongoDB health check) shared by all labs. It is referenced as a project dependency by each lab.
+This project contains reusable utility classes (console output, spinner, Azure OpenAI endpoint helper) shared by all labs. It is referenced as a project dependency by each lab.
+It has no package dependency: a lab that needs a database driver (for example `MongoDB.Driver` in Lab05 and Lab12) references it itself.
 
 ## Features
 

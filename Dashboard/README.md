@@ -3,13 +3,14 @@
 An optional, local web UI to follow the labs and run them without typing `dotnet` commands.
 It is a convenience layer: **every lab keeps working exactly the same with the CLI**, and no lab depends on the dashboard.
 
-> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison`, `Lab09-AIAgentWithFunctionToolsHumanApproval`, `Lab10_ExposeAIAgentAsMCPTool` and `Lab11-AIAgentWithCustomHttpTransport` (the migrated labs).
+> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison`, `Lab09-AIAgentWithFunctionToolsHumanApproval`, `Lab10_ExposeAIAgentAsMCPTool`, `Lab11-AIAgentWithCustomHttpTransport` and `Lab12-AIAgentWithAIContextProvider` (the migrated labs).
 > The two Lab06 labs are run in pairs: each run of one starts the reference solution of the other as its **companion** (see [Labs run in pairs](#labs-run-in-pairs-companion)), on port 5071.
 > Scenario 3 of Lab05 needs its MongoDB container (`docker compose up -d` in the lab's `MongoDB/` folder): without it, the Solution run fails with *"MongoDB is not reachable"*.
 > Lab07 needs an **embedding** deployment (`AzureOpenAI:EmbeddingDeploymentName`, not part of the settings form): without it, the run stops with *"'AzureOpenAI:EmbeddingDeploymentName' is not configured"*.
 > Lab09 is the first **interactive** lab of the catalog: scenario 1 waits for your decision in the input box (`Y` approves; the checks expect the approval), scenario 2 needs no input.
 > Lab10 starts its own MCP servers during the run and stops them (no companion): an HTTP server on `McpServer:BaseUrl` (`http://localhost:5100` by default, the port must be free) and a stdio server, a child process of the lab whose stderr the lab prints as `[server]` lines.
 > Lab11 prints the whole HTTP traffic of its agents (about 600 lines per run, every header and JSON body); the lab masks the `Authorization` header itself, and a check fails if a credential header is printed in clear.
+> Lab12 needs its MongoDB container (`docker compose up -d` in the lab's `MongoDB/` folder, port 27018): without it, the Solution run fails with *"MongoDB is not reachable"*. It is **interactive**: scenario 2 is a chat that waits for your messages in the input box (any message, or none); end it with an empty line, `exit` or **End input**. Its checks read scenario 1 and the greeting of scenario 2, not your messages.
 
 ## Start it
 
@@ -228,10 +229,10 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
 
 ```jsonc
 {
-  "id": "azureopenai-lab12",
-  "number": "12", "track": "Azure OpenAI", "level": "Beginner",
+  "id": "multiagentsystem-lab01",
+  "number": "01", "track": "Multi-Agent System", "level": "Intermediate",
   "title": "...", "summary": "...", "objectives": ["..."],
-  "path": "LearningLabs/AzureOpenAI/Lab12-AIAgentWithAIContextProvider",
+  "path": "LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool",
   "startProject": "Start/<Project>.csproj",
   "solutionProject": "Solution/<Project>.csproj",
   "timeoutSeconds": 180,
@@ -255,6 +256,7 @@ For labs with RAG, check the ranking of the search (the expected entry first), t
 For labs that compare formats or costs, check the measured result itself: the expected record first in the answer, the answer in the requested format (header line), and the sign of the difference in the comparison table (see `azureopenai-lab08`). A comparison row such as `Input tokens  3180  1421  -55%` has no colon, so the token usage parser ignores it.
 For labs with tool approvals, check the request itself (function and arguments), the decision, the tool result that only an executed tool can print, and that a rejected call was **not** executed (a negative lookahead on the scenario block, see `azureopenai-lab09`); use lookaheads when the model may order the requests differently from one run to another.
 For labs that expose an agent as an MCP tool, check what the MCP client sees (the tool name and its `query` parameter), data that only the tools of the exposed agent know in the tool result (an employee name for an id), the log line a stdio server writes on stderr (relayed by the lab as `[server]`), and the tool call of an agent that uses the MCP tool (see `azureopenai-lab10`).
+For labs with an `AIContextProvider`, make the provider write what it does while the agent runs (memories added before the model call, memories extracted after it) and check those lines in order, the data stored for the scope (the user) and what only the provider can give in a **new** session: the name and a preference of the user, with lookaheads over a multi-line answer, bounded by the next block (see `azureopenai-lab12`). Accept any of several memory-only details (`vegetarian`, `tofu`, `Alps`...): the model words its answer differently from one run to another.
 For labs that log HTTP traffic, check the logged request itself (the URL, a header added by the handler, the status and duration of the response), that no credential header is printed in clear (a lookahead anchored at `\A` on the whole output, so the pattern is tried once), and what only the second request of a function call contains (`"role": "tool"` with the tool result), not only the agent answer (see `azureopenai-lab11`).
 
 ## Tests
@@ -265,7 +267,7 @@ dotnet test
 ```
 
 Unit tests cover the console decoder (spinner, streaming, CRLF split across reads), the token usage parser,
-the checks (including the real Lab02, Lab03, Lab04, Lab05, Lab06, Lab07, Lab08, Lab09, Lab10 and Lab11 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, a Lab05 conversation that lost its history, Lab06 answers that do not come from the remote tools, Lab07 answers that do not come from the FAQ, Lab08 answers in the wrong format or without token savings, Lab09 approvals that were not honored, Lab10 answers that do not come from the exposed agent, and a Lab11 handler that only forwards the requests, prints a credential, or a model that answers without calling the tool), the build diagnostics,
+the checks (including the real Lab02, Lab03, Lab04, Lab05, Lab06, Lab07, Lab08, Lab09, Lab10, Lab11 and Lab12 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, a Lab05 conversation that lost its history, Lab06 answers that do not come from the remote tools, Lab07 answers that do not come from the FAQ, Lab08 answers in the wrong format or without token savings, Lab09 approvals that were not honored, Lab10 answers that do not come from the exposed agent, a Lab11 handler that only forwards the requests, prints a credential, or a model that answers without calling the tool, and a Lab12 context provider that is not written or never gives the stored memories to the model, and recall answers with the name only), the build diagnostics,
 the catalog path and companion validation, the French check descriptions, the localized README lookup, the Azure OpenAI settings store
 (format, preserved entries, precedence, validation, permissions — always in a temporary folder, never the real user-secrets file)
 and the masking of the API key, including an end-to-end run of a throwaway project that prints it;

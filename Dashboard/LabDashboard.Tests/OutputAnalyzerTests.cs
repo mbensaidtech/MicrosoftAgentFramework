@@ -1776,4 +1776,225 @@ public class OutputAnalyzerTests
         Assert.Equal(201L, usage.Input!.Value); // 16 + 185
         Assert.Equal(239L, usage.Total!.Value); // 23 + 216
     }
+
+    // Standard output of the Lab12 solution (real run), with "I work remotely on Fridays." then an empty line typed in the chat
+    // of scenario 2. The typed lines are not on stdout: the "You: " prompt is followed by the next output of the program.
+    private static readonly string[] Lab12SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Agent with a long-term memory - the memories of the user are stored in MongoDB",
+        "User id: ada",
+        "MemoryAssistant instructions: You are a friendly personal assistant. Use what you remember about the user to personalize your answers. When a conversation starts without a message from the user, introduce yourself and welcome the user, by name if you know it.",
+        "Memory extractor instructions: You extract facts about the user from the user message: name, job, city, interests, preferences, constraints. Write each fact as a short sentence in the third person, for example: \"The user works as a nurse.\". Do not extract a fact that is already known, nor questions or requests. Return an empty list when there is no new fact.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Remember the user from one session to another ===",
+        "Memories of user 'ada' cleared (6 deleted)",
+        "First session",
+        "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
+        "[Memory] No memory of user 'ada' yet: nothing added to the instructions",
+        "[Memory] 5 memories extracted and stored for user 'ada' (extraction run: 265 tokens):",
+        "  + The user's name is Ada.",
+        "  + The user works as a software developer.",
+        "  + The user is from Lyon.",
+        "  + The user loves hiking in the Alps.",
+        "  + The user is vegetarian.",
+        "Agent: Hi Ada! It's great to meet you. Welcome! As a software developer and a vegetarian who enjoys hiking in the Alps, you must have some interesting stories to tell. How can I assist you today?",
+        "Memories stored in MongoDB for user 'ada': 5",
+        "  - The user's name is Ada.",
+        "  - The user works as a software developer.",
+        "  - The user is from Lyon.",
+        "  - The user loves hiking in the Alps.",
+        "  - The user is vegetarian.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "New session (empty chat history)",
+        "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
+        "[Memory] 5 memories of user 'ada' added to the instructions",
+        "[Memory] No new memory for user 'ada' (extraction run: 256 tokens)",
+        "Agent: Hello, Ada! It's great to hear from you. For dinner, how about a delicious vegetarian stir-fry with tofu, colorful veggies, and rice? You can toss in some teriyaki sauce for extra flavor!",
+        "",
+        "As for a weekend activity, since you love hiking in the Alps, how about planning a day hike on one of the beautiful trails near Lyon? You could explore a new route and enjoy the stunning scenery. What do you think?",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (new session, with memories):",
+        "  Input tokens: 119",
+        "  Output tokens: 90",
+        "  Total tokens: 209",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
+        "[Memory] 5 memories of user 'ada' added to the instructions",
+        "[Memory] No user message in this run: nothing to extract",
+        "Agent: Hello, Ada! I'm your friendly personal assistant, and I'm here to help you with anything you need. How can I assist you today?",
+        "Type a message, or an empty line / 'exit' to end the chat.",
+        "You: [Memory] 5 memories of user 'ada' added to the instructions",
+        "[Memory] 1 memory extracted and stored for user 'ada' (extraction run: 254 tokens):",
+        "  + The user works remotely on Fridays.",
+        "Agent: That's great to hear, Ada! Working remotely on Fridays can be a nice way to wrap up the week. Do you have any special plans for your remote workday, or do you like to keep it flexible?",
+        "You: ",
+        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are in MongoDB).",
+    ];
+
+    // Standard output of the Lab12 exercise as delivered (TODOs not done yet): no MongoDB, no agent, no provider.
+    private static readonly string[] Lab12StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Agent with a long-term memory - the memories of the user are stored in MongoDB",
+        "User id: ada",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Remember the user from one session to another ===",
+        "First session",
+        "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "New session (empty chat history)",
+        "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
+        "Type a message, or an empty line / 'exit' to end the chat.",
+        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are in MongoDB).",
+    ];
+
+    [Fact]
+    public void Every_lab12_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab12 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab12")!;
+
+        Assert.True(lab12.Interactive);
+        Assert.Null(lab12.Companion);
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab12.Expectations, Lab12SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, Lab12StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab12_checks_fail_when_the_context_provider_is_not_written()
+    {
+        LabDefinition lab12 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab12")!;
+        // Agent and scenarios done, provider skeleton only: no [Memory] line, nothing stored, the new session knows nothing.
+        string[] output =
+        [
+            "Endpoint: https://example.openai.azure.com/",
+            "=== Scenario 1: Remember the user from one session to another ===",
+            "Memories of user 'ada' cleared (0 deleted)",
+            "First session",
+            "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
+            "Agent: Hi Ada! It's great to meet you! How can I assist you today?",
+            "Memories stored in MongoDB for user 'ada': 0",
+            "New session (empty chat history)",
+            "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
+            "Agent: I don't know your name yet! For dinner, how about a homemade stir-fry? As for a weekend activity, consider a hike.",
+            "Token Usage (new session, with memories):",
+            "  Input tokens: 71",
+            "  Output tokens: 85",
+            "  Total tokens: 156",
+            "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
+            "Agent: Hello! I'm your friendly personal assistant. What can I assist you with today?",
+            "Type a message, or an empty line / 'exit' to end the chat.",
+        ];
+
+        Assert.Equal(
+            ["config", "scenario1-usage"],
+            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab12_checks_fail_when_the_memories_are_stored_but_never_given_to_the_model()
+    {
+        LabDefinition lab12 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab12")!;
+        // StoreAIContextAsync done, ProvideAIContextAsync not done: the memories reach MongoDB, but neither the new session
+        // nor the greeting can use them (and the answer of the new session is guessed from the question only).
+        string[] output =
+        [
+            "Endpoint: https://example.openai.azure.com/",
+            "=== Scenario 1: Remember the user from one session to another ===",
+            "Memories of user 'ada' cleared (5 deleted)",
+            "First session",
+            "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
+            "[Memory] 5 memories extracted and stored for user 'ada' (extraction run: 265 tokens):",
+            "  + The user's name is Ada.",
+            "  + The user works as a software developer.",
+            "  + The user is from Lyon.",
+            "  + The user loves hiking in the Alps.",
+            "  + The user is vegetarian.",
+            "Agent: Hi Ada! It's great to meet you!",
+            "Memories stored in MongoDB for user 'ada': 5",
+            "  - The user's name is Ada.",
+            "  - The user works as a software developer.",
+            "  - The user is from Lyon.",
+            "  - The user loves hiking in the Alps.",
+            "  - The user is vegetarian.",
+            "New session (empty chat history)",
+            "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
+            "[Memory] No new memory for user 'ada' (extraction run: 222 tokens)",
+            "Agent: I don't know your name yet! For dinner, how about a vegetarian stir-fry?",
+            "Token Usage (new session, with memories):",
+            "  Input tokens: 71",
+            "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
+            "[Memory] No user message in this run: nothing to extract",
+            "Agent: Hello! I'm your friendly personal assistant. How can I help you today?",
+            "Type a message, or an empty line / 'exit' to end the chat.",
+        ];
+
+        Assert.Equal(
+            ["config", "scenario1-extracted", "scenario1-stored", "scenario1-usage"],
+            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Theory]
+    // Real answer of a dashboard run: "vegetable stir-fry with tofu" and "hiking in the Alps", without the word "vegetarian"
+    [InlineData("Agent: Hello, Ada! For dinner, how about trying a delicious vegetable stir-fry with tofu?|As for the weekend activity, since you love hiking in the Alps, how about planning a hike?", true)]
+    [InlineData("Agent: Hello, Ada! How about a vegetarian lasagna, and a walk in Lyon?", true)]
+    // The name alone, with ideas that do not come from the memories: not enough
+    [InlineData("Agent: Hello, Ada! How about a stir-fry with your favorite vegetables, and a visit to a museum?", false)]
+    // The preferences without the name
+    [InlineData("Agent: Hello! How about a vegetarian stir-fry, and a hike in the Alps?", false)]
+    public void Lab12_recall_check_needs_the_name_and_a_preference_that_only_the_memories_give(string answer, bool expected)
+    {
+        LabDefinition lab12 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab12")!;
+        string[] output =
+        [
+            "=== Scenario 1: Remember the user from one session to another ===",
+            "New session (empty chat history)",
+            "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
+            "[Memory] 5 memories of user 'ada' added to the instructions",
+            "[Memory] No new memory for user 'ada' (extraction run: 256 tokens)",
+            .. answer.Split('|'),
+            "",
+            "Token Usage (new session, with memories):",
+            "  Input tokens: 119",
+        ];
+
+        Assert.Equal(expected, OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Single(r => r.Id == "scenario1-recall").Passed);
+    }
+
+    [Fact]
+    public void Labels_the_lab12_token_usage_with_its_scenario_and_ignores_the_extraction_cost_of_the_provider()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab12SolutionOutput));
+
+        // The "(extraction run: 265 tokens)" of the [Memory] lines is not a usage report
+        Assert.Equal(["Scenario 1 · Token Usage (new session, with memories)"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(119L, usage.Input!.Value);
+        Assert.Equal(209L, usage.Total!.Value);
+    }
 }

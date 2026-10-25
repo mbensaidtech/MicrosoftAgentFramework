@@ -18,7 +18,7 @@
 | `ModelContextProtocol` / `.AspNetCore` | **2.2.0** (stable) | Pour Lab04 (`ModelContextProtocol`) / Lab10 (`ModelContextProtocol.AspNetCore`, qui apporte `ModelContextProtocol` et le framework partagé ASP.NET Core). Version du `Directory.Packages.props` 1.22.0 ; une 2.3.0 est publiée depuis (constaté le 2026-10-25), non retenue : version figée. |
 | `Microsoft.Extensions.VectorData.Abstractions` | **10.10.0** (stable) | Pour Lab05 / Lab07 (transitif via MAF). |
 | `CommunityToolkit.VectorData.InMemory` | **1.0.1** (stable) | `InMemoryVectorStore` des samples officiels (`Agent_Step04_3rdPartyChatHistoryStorage`) ; Lab05. |
-| `MongoDB.Driver` | **3.12.0** (stable) | Driver officiel ; Lab05 le référence directement (voir §8, CommonUtilities). |
+| `MongoDB.Driver` | **3.12.0** (stable) | Driver officiel ; Lab05 et Lab12 le référencent directement. `CommonUtilities` n'en dépend plus depuis la phase 0 (Lab12, voir §8). |
 
 ### Packages sans version stable (exception documentée)
 
@@ -62,16 +62,16 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | preview.260108.1 | Refonte des méthodes de `ChatMessageStore` | #2604 | Lab05 |
 | preview.260121.1 | **`AgentRunResponse` → `AgentResponse`**, **`AgentRunResponseUpdate` → `AgentResponseUpdate`** | #3197 | tous |
 | preview.260121.1 | **`CreateAIAgent` / `GetAIAgent` → `AsAIAgent`** | #3222 | tous |
-| preview.260121.1 | `GetNewThread` / `DeserializeThread` deviennent asynchrones | #3152 | Lab05, Lab09, Lab12 |
+| preview.260121.1 | `GetNewThread` / `DeserializeThread` deviennent asynchrones | #3152 | Lab05, Lab09, Lab12 ✅ |
 | preview.260127.1 | **`ChatMessageStore` → `ChatHistoryProvider`** | #3375 | Lab05 |
-| preview.260127.1 | **`AgentThread` → `AgentSession`** | #3430 | Lab05, Lab09, Lab12 |
-| preview.260205.1 | `GetNewSession` → **`CreateSessionAsync`** ; `AgentSession.Serialize` déplacé sur `AIAgent` | #3501, #3650 | Lab05, Lab09, Lab12 |
+| preview.260127.1 | **`AgentThread` → `AgentSession`** | #3430 | Lab05, Lab09, Lab12 ✅ |
+| preview.260205.1 | `GetNewSession` → **`CreateSessionAsync`** ; `AgentSession.Serialize` déplacé sur `AIAgent` | #3501, #3650 | Lab05, Lab09, Lab12 ✅ |
 | preview.260205.1 | Suppression de `UserInputRequests` | #3682 | Lab09 ✅ |
 | 1.14.0 | **Liaison des réponses d'approbation** aux demandes surfacées (`[BREAKING]`) ; `ToolApprovalAgent` sorti d'expérimental | #7111, #7107 | Lab09 ✅ (session obligatoire) |
 | **1.22.0** | **Liaison des approbations renforcée** (`[BREAKING]`, replay) : seules les demandes enregistrées par le framework dans la session font foi ; liaison aussi pour les réponses « always approve » | #8375, #8432 | Lab09 ✅ |
 | preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 | MAS-Lab02/03 (à vérifier) |
-| preview.260205.1 | Agent et session fournis à `AIContextProvider` / `ChatHistoryProvider` | #3695 | Lab05, Lab12 |
-| rc1 | Session `StateBag`, plusieurs providers par agent, composition au lieu d'héritage typé | #3806, #3988 | Lab05, Lab12 |
+| preview.260205.1 | Agent et session fournis à `AIContextProvider` / `ChatHistoryProvider` | #3695 | Lab05, Lab12 ✅ |
+| rc1 | Session `StateBag`, plusieurs providers par agent, composition au lieu d'héritage typé ; `AIContextProviderFactory` → `AIContextProviders` ; `InvokingAsync` / `InvokedAsync` deviennent non virtuels (on surcharge `ProvideAIContextAsync` / `StoreAIContextAsync`) | #3806, #3988 | Lab05, Lab12 ✅ (§4.18) |
 | rc1 | Événements `AgentResponse[Update]` unifiés en `WorkflowOutputEvent` ; renommages API Workflows | #3441, #4090 | MAS-Lab02/03 |
 | rc1 | Améliorations Structured Output | #3761 | Lab02 |
 | 1.0.0 | Suppression de `OpenAIAssistantClientExtensions` ; `Microsoft.Agents.AI.AzureAI` → `Microsoft.Agents.AI.Foundry` | #5058, #5042 | aucun |
@@ -167,7 +167,7 @@ await agent.RunAsync("...", session);
 
 **Nouvelle approche** : `ChatHistoryProvider` (option `ChatClientAgentOptions.ChatHistoryProvider`), `AIContextProviders` (collection), état dans `AgentSession.StateBag`.
 
-**Explication** — Refonte complète entre preview.260108 et rc3 (#2604, #3375, #3695, #3806, #3988, #4327, #4395). **Refonte conceptuelle** pour Lab05 et Lab12 ; référence officielle : `02-agents/Agents/Agent_Step04_3rdPartyChatHistoryStorage`, `Agent_Step17_AdditionalAIContext`, `02-agents/AgentWithMemory/*`.
+**Explication** — Refonte complète entre preview.260108 et rc3 (#2604, #3375, #3695, #3806, #3988, #4327, #4395). **Refonte conceptuelle** pour Lab05 et Lab12 ; référence officielle : `02-agents/Agents/Agent_Step04_3rdPartyChatHistoryStorage`, `Agent_Step17_AdditionalAIContext`, `02-agents/AgentWithMemory/*`. Validé sur Lab05 (§4.11) et Lab12 (§4.18).
 
 ### 4.7 Configuration
 
@@ -591,6 +591,67 @@ Points découverts :
 - **Écho de `x-ms-client-request-id`** : Azure OpenAI renvoie en réponse la valeur envoyée (observé), mais ce comportement n'est pas documenté pour Azure OpenAI : non enseigné.
 - **Spinner** : pas de `WithSpinner()` dans un lab dont le handler écrit sur la console (les deux s'entremêleraient).
 
+### 4.18 `AIContextProvider` : mémoire à long terme de l'utilisateur (validé sur Lab12)
+
+**Ancienne approche**
+```csharp
+// Un provider par thread (fabrique), état dans des champs, méthodes publiques surchargées
+ChatClientAgent agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = chatOptions,
+    AIContextProviderFactory = _ => new UserMemoryAIContextProvider(extractorAgent, userId, repository)
+});
+public override async ValueTask<AIContext> InvokingAsync(InvokingContext context, CancellationToken ct)
+{
+    _userMemories = await _repository.GetUserMemoriesAsync(_userId);          // champ relu dans InvokedAsync
+    return new AIContext { Instructions = string.Join("\n", _userMemories.Select(x => x.Memory)) };
+}
+public override async ValueTask InvokedAsync(InvokedContext context, CancellationToken ct) { /* extraction, userId écrit par le modèle */ }
+```
+
+**Nouvelle approche**
+```csharp
+AIAgent memoryAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    Name = "...",
+    ChatOptions = new() { Instructions = "..." },
+    AIContextProviders = [new UserMemoryAIContextProvider(extractor, repository, stateInitializer: _ => new UserMemoryAIContextProvider.State(userId))]
+});
+AgentResponse greeting = await memoryAgent.RunAsync(await memoryAgent.CreateSessionAsync());   // l'agent parle en premier : le provider est appelé
+
+internal sealed class UserMemoryAIContextProvider : AIContextProvider
+{
+    private readonly ProviderSessionState<State> _sessionState;        // new(stateInitializer, stateKey: nameof(UserMemoryAIContextProvider))
+    public override IReadOnlyList<string> StateKeys => [_sessionState.StateKey];
+    protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken ct = default)
+    {
+        string userId = _sessionState.GetOrInitializeState(context.Session).UserId;
+        List<string> memories = await _repository.GetMemoriesAsync(userId, ct);
+        return memories.Count == 0 ? new AIContext() : new AIContext { Instructions = "What you remember about the user:\n" + ... };
+    }
+    protected override async ValueTask StoreAIContextAsync(InvokedContext context, CancellationToken ct = default)
+    {
+        List<ChatMessage> userMessages = context.RequestMessages.Where(m => m.Role == ChatRole.User).ToList();   // messages passés à RunAsync seulement
+        AgentResponse<ExtractedMemories> extraction = await _extractor.RunAsync<ExtractedMemories>(
+            [new(ChatRole.System, $"Facts already known ...:\n{string.Join("\n", known.DefaultIfEmpty("(none)"))}"), .. userMessages], cancellationToken: ct);
+        // stockage avec le userId de la session, jamais celui du modèle
+    }
+    public sealed class State(string userId) { public string UserId { get; } = userId; }
+}
+```
+
+**Explication** — Les méthodes publiques `InvokingAsync` / `InvokedAsync` d'`AIContextProvider` ne sont plus virtuelles (l'ancien code ne compile plus : **`CS0506`**, vérifié) : elles appellent `InvokingCoreAsync` / `InvokedCoreAsync`, dont l'implémentation de base filtre les messages (par défaut seulement `AgentRequestMessageSourceType.External`, c'est-à-dire ceux passés à `RunAsync`), appelle **`ProvideAIContextAsync`** / **`StoreAIContextAsync`** (les deux méthodes à surcharger dans le cas courant), marque les messages fournis comme venant du provider et fusionne l'`AIContext` (instructions concaténées avec `\n`, messages et outils ajoutés) ; `StoreAIContextAsync` n'est **pas appelé si le run a échoué** (`InvokeException`). `ChatClientAgentOptions.AIContextProviderFactory` n'existe plus (**`CS0117`**, vérifié) : `AIContextProviders` reçoit des **instances** (une par agent, partagées par toutes ses sessions, appelées dans l'ordre). **Changement conceptuel** : le provider ne garde aucune donnée de session dans ses champs (doc Learn « Context Providers » : *« shouldn't have an id for the specific set of memories in a field »*) ; la portée (ici l'id de l'utilisateur) vit dans `AgentSession.StateBag` via `ProviderSessionState<T>`, initialisée par un **`stateInitializer`** fourni par l'application — pattern de `Mem0Provider` et `ChatHistoryMemoryProvider` (portées de stockage / de recherche par utilisateur). Les mémoires appartiennent à l'utilisateur (MongoDB) et non à la session : une nouvelle session (historique vide) les retrouve. Toutes ces API sont dans `PublicAPI.Shipped.txt` 1.22.0 et non expérimentales (seuls les constructeurs de `InvokingContext` / `InvokedContext` le sont, `MAAI001`, inutiles ici). Références : samples `01-get-started/04_memory` (`UserInfoMemory` : `ProvideAIContextAsync` + `StoreAIContextAsync` avec extraction en sortie structurée), `02-agents/Agents/Agent_Step17_AdditionalAIContext` (deux providers, `MessageAIContextProvider`, outils fournis par un provider, filtre de l'historique), `02-agents/AgentWithMemory/AgentWithMemory_Step02_MemoryUsingMem0` et `_Step08_MemoryUsingCosmosNoSql` (`stateInitializer` + portée utilisateur) ; sources `AIContextProvider.cs`, `ProviderSessionState{TState}.cs`, `ChatClientAgent.cs` au tag ; pages Learn [Context Providers](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/context-providers?pivots=programming-language-csharp) (2026-09-09) et [Context provider integrations](https://learn.microsoft.com/agent-framework/integrations/by-component/context-providers/?pivots=programming-language-csharp).
+
+Points découverts :
+- **Vérifié hors ligne** (`IChatClient` factice) : `ProvideAIContextAsync` ne reçoit dans `context.AIContext.Messages` que le message du run, même quand l'historique en contient d'autres ; `StoreAIContextAsync` ne reçoit que la nouvelle requête ; l'état `{"userId":"ada"}` est sérialisé dans `stateBag.UserMemoryAIContextProvider` par `SerializeSessionAsync` et relu après `DeserializeSessionAsync` ; deux providers avec la même clé d'état → `InvalidOperationException: Multiple providers use the same state key '…'` à la création de l'agent.
+- **Le provider s'exécute dans `RunAsync`** (`StoreAIContextAsync` attendu avant le retour, source `ChatClientAgent.RunCoreAsync`) : une extraction par message ajoute un appel modèle (~250 tokens) et de la latence ; une exception du provider remonte à l'appelant (les providers intégrés, eux, journalisent et continuent).
+- **`RunAsync(session)` sans message** fonctionne avec Chat Completions (requête avec le seul message `system`) : le provider fournit le contexte, `StoreAIContextAsync` ne voit aucun message utilisateur.
+- **Coût mesuré** (`gpt-4o-mini`) : la question de la nouvelle session coûte 119 tokens d'entrée avec 5 souvenirs dans les instructions, 71 sans.
+- **Prompt d'extraction** : avec un message système *« Facts already known about the user …: »* suivi d'une liste **vide**, `gpt-4o-mini` n'a rien extrait de la présentation (4 runs sur 4) ; avec `(none)` (`DefaultIfEmpty("(none)")`), les 5 faits sont extraits (3/3) et rien n'est ré-extrait quand ils sont connus (3/3). Un exemple d'instruction qui reprend la donnée de test (*« The user's name is Ada. »*) est aussi à éviter.
+- **Coquille Learn** (2026-09) : la page « Context Providers » écrit `public override string StateKey => …` ; l'API 1.22.0 est `public override IReadOnlyList<string> StateKeys` (comme les samples).
+- Un provider qui écrit sur la console pendant le run : pas de `WithSpinner()` (cf. §4.17).
+- **Sécurité** : ce que renvoie un provider est fusionné tel quel (instructions = confiance maximale) — injection indirecte possible depuis le stockage ; la portée doit venir de l'application (l'ancien lab demandait au modèle de recopier le `userId` dans sa sortie structurée).
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -600,9 +661,11 @@ Points découverts :
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | Retiré des samples et des dépendances MAF (1.21.0) ; package encore publié mais sa dernière version stable (2.1.0) est antérieure à la v1 API | Construction du client dans tous les labs | `OpenAI.OpenAIClient` + `OpenAIClientOptions.Endpoint = …/openai/v1/` + `ApiKeyCredential` ou `BearerTokenPolicy` | **tous** |
 | `CreateAIAgent` / `GetAIAgent` | Renommés (preview.260121) | Compilation | `AsAIAgent` | tous |
 | `AgentRunResponse` / `AgentRunResponseUpdate` | Renommés | Compilation | `AgentResponse` / `AgentResponseUpdate` | tous |
-| `AgentThread`, `GetNewThread`, `DeserializeThread`, `thread.Serialize()` | Renommés / déplacés / async | Compilation + concept | `AgentSession`, `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync` sur `AIAgent` (§4.11) | Lab05 ✅, Lab09 ✅, Lab12 |
+| `AgentThread`, `GetNewThread`, `DeserializeThread`, `thread.Serialize()` | Renommés / déplacés / async | Compilation + concept | `AgentSession`, `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync` sur `AIAgent` (§4.11) | Lab05 ✅, Lab09 ✅, Lab12 ✅ |
 | `ChatMessageStore`, `ChatMessageStoreFactory` | Renommés + refondus | Refonte | `ChatHistoryProvider` (instance unique, `ChatClientAgentOptions.ChatHistoryProvider`) + `ProviderSessionState<T>` ; `ChatClientAgentOptions.Instructions` → `ChatOptions.Instructions` (§4.11) | Lab05 ✅ |
-| `AIContextProvider` (API preview) | Refondu (signature, StateBag, composition) | Refonte | `AIContextProvider` 1.x / `MessageAIContextProvider` | Lab12 |
+| `AIContextProvider` (API preview) : `public override InvokingAsync` / `InvokedAsync`, état dans des champs | Refondu (méthodes non virtuelles, StateBag, composition) | Compilation (`CS0506`) + concept | `protected override ProvideAIContextAsync` / `StoreAIContextAsync` ; provider sans état, état par session via `ProviderSessionState<T>` + `stateInitializer` ; `MessageAIContextProvider` pour un provider qui n'ajoute que des messages (§4.18) | Lab12 ✅ |
+| `ChatClientAgentOptions.AIContextProviderFactory` (un provider par thread) | Supprimé | Compilation | `ChatClientAgentOptions.AIContextProviders = [...]` (une instance par agent, partagée par ses sessions ; plusieurs providers appelés dans l'ordre) (§4.18) | Lab12 ✅ |
+| `CommonUtilities.MongoDbHealthCheck` (+ `Environment.Exit(1)`) | Supprimé (phase 0) : plus aucun lab ne l'utilisait après Lab12 | Compilation (labs non migrés : aucun usage constaté) | `ConfigurationHelper.ConnectToMongoDbAsync()` du lab (ping, `ServerSelectionTimeout` 5 s, message actionnable) | Lab05 ✅, Lab12 ✅ |
 | `AgentResponse.Deserialize<T>()`, `RunAsync<T>` limité à `ChatClientAgent`, `AIJsonUtilities.CreateJsonSchema` + `ForJsonSchema(schema, …)` | Supprimé / généralisé / simplifié | Compilation (Deserialize) + pédagogie | `JsonSerializer.Deserialize<T>(response.Text, …)`, `AIAgent.RunAsync<T>`, `ChatResponseFormat.ForJsonSchema<T>()` | Lab02 |
 | `ModelContextProtocol 0.5.0-preview.1` | Préversion ; 2.2.0 stable | Aucune rupture pour le client HTTP (`McpClient.CreateAsync`, `HttpClientTransport(Options)`, `ListToolsAsync`, `McpClientTool` inchangés) ; côté serveur, API inchangées mais valeurs par défaut changées (§3, §4.16) | `ModelContextProtocol` 2.2.0 / `ModelContextProtocol.AspNetCore` 2.2.0 | Lab04 ✅, Lab10 ✅ |
 | SSE legacy de `MapMcp` (`…/sse`, `…/message`) | Désactivé par défaut (`EnableLegacySse = false`), impossible en mode sans état | Clients SSE : `405` / `404` | Streamable HTTP (`HttpTransportMode.StreamableHttp` côté client) | Lab10 ✅ |
@@ -627,7 +690,7 @@ Points découverts :
 | `Microsoft.Extensions.Hosting` (usage « config seulement ») | Surdimensionné | Dépendance inutile | `Microsoft.Extensions.Configuration.Json/UserSecrets/EnvironmentVariables/Binder` | tous les labs console |
 | `Azure.Identity 1.18.0-beta.2` | Préversion | Règle « stable » | `Azure.Identity 1.21.0` | tous |
 | `ToonNet` 1.0.4 / `ToonNetSerializer` 1.0.0 (packages tiers « TOON », Lab08) | Non officiels ; `ToonNetSerializer` n'existe plus sur NuGet (`NU1101`, le Start ne restaurait plus) | Restauration du Start impossible ; règle 12 | Aucun package : outil renvoyant des objets (JSON par le framework) ou du CSV encodé par `HotelCsv.cs` fourni (§4.14) | Lab08 ✅ |
-| `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | `MongoDB.Driver 3.12.0` — Lab05 le référence directement (son graphe n'a plus de package vulnérable) ; Lab07 ne référence plus MongoDB ; la montée de CommonUtilities reste à faire avec Lab12 (dernier lab à référencer 2.30.0 en direct, cf. §8) | tous (warnings), Lab12 (code) |
+| `MongoDB.Driver 2.30.0` (CommonUtilities) | Vulnérabilités transitives (`Snappier` 1.0.0 *high*, `SharpCompress` 0.30.1 *moderate*) | Warnings NU1902/NU1903 dans **tous** les labs | **Retiré de CommonUtilities (phase 0, Lab12)** : `CommonUtilities` n'a plus aucune dépendance ; Lab05 et Lab12 référencent `MongoDB.Driver 3.12.0` directement ; Lab07 ne référence plus MongoDB. Plus aucun NU1902/NU1903 dans les labs AzureOpenAI (non-régression : 34 projets recompilés, cf. rapport Lab12) | ✅ tous |
 
 ---
 
@@ -681,9 +744,10 @@ Points découverts :
 - **Lab05 / Lab07** : connecteurs Semantic Kernel en préversion et API mémoire/historique profondément refondues → refonte conceptuelle, pas une adaptation syntaxique (Lab05 ✅ §4.11, Lab07 ✅ §4.13).
 - **Vérification des identifiants (2026-10-02)** : `GET …/openai/v1/models` avec `api-key` renvoie **401 même quand Chat Completions fonctionne** avec la même clé (constaté sur Lab09 : `curl` 401 / Entra 400, puis les deux voies ont réussi en exécution réelle). Ne pas conclure d'un `curl` sur `/models` : tester avec un appel chat (p. ex. Lab01 scénario 1) avant de déclarer les identifiants invalides. Les tests d'exécution de Lab07 et Lab08 restent à rejouer.
 - **Identifiants Azure OpenAI de l'environnement de migration (constaté le 2026-09-29)** : la clé API des variables `AzureOpenAI__*` renvoie `401 Access denied due to invalid subscription key` sur tous les chemins (v1 et `api-version`), et Entra ID (`az login`, même tenant, ressource présente et `Succeeded`, RP `Microsoft.CognitiveServices` enregistré, `disableLocalAuth = false`) renvoie `400 SubscriptionNotRegistered` — alors que les deux voies fonctionnaient le 2026-09-28 (Lab06). Cause hors dépôt (clé régénérée ? incident côté Azure ?) : à corriger avant tout test d'exécution (Lab07 §5 du rapport).
-- **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab12.
-- **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
+- **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. **Résolu avec Lab12 (phase 0)** : Lab12 vérifie lui aussi la connexion dans son `ConfigurationHelper` ; `MongoDbHealthCheck` et `MongoDB.Driver 2.30.0` sont retirés de `CommonUtilities`, qui n'a plus de dépendance de paquet. Les warnings NU1902/NU1903 hérités disparaissent de tous les labs (les NU1902 restants de MAS-Lab02/03 viennent de leur propre `OpenTelemetry.Api` 1.13.1, hors périmètre).
+- **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`, Lab12 : `lab12-aiagent-memory`) et des `container_name` uniques (`lab05-mongodb`, `lab12-mongodb`). Lab12 publie MongoDB sur `127.0.0.1:27018` pour pouvoir tourner à côté de celui de Lab05 (27017).
 - **Culture du poste** : les nombres interpolés dans les chaînes (`decimal`, `double`) suivent la culture courante (fr-FR sur le poste de migration : `55,5`). Tout affichage attendu par les README et les checks du dashboard passe par `CultureInfo.InvariantCulture` (Lab08 `FormatConsole`) ; à vérifier dans les labs suivants qui affichent des montants ou des scores.
+- **Labs à context provider (Lab12)** : un provider qui appelle un modèle dans `StoreAIContextAsync` double les appels par message ; les checks du dashboard doivent accepter plusieurs formulations du modèle (un détail parmi plusieurs que seule la mémoire donne : `vegetarian|tofu|Alps|Lyon`), l'agent n'employant pas toujours le même mot (*vegetable stir-fry with tofu* au lieu de *vegetarian*, constaté au 5ᵉ run).
 - **Serveurs MCP stdio (Lab10)** : stdout est réservé au protocole ; tout `Console.WriteLine`, et la sortie de build d'un `dotnet run` sans `--no-build`, casse la connexion (§4.16). Les labs qui lancent un serveur stdio doivent pointer sur la `.dll` construite.
 - **Journaux HTTP et secrets (Lab11)** : un handler ou une politique placé dans le pipeline voit la requête **après** l'authentification : `Authorization` contient la clé API (SDK `OpenAI`) ou le jeton Entra ID. Ne jamais en afficher une partie ; le dashboard masque la clé qu'il connaît (`••••`), mais pas un terminal ni un jeton Entra ID.
 - **Streaming (observation du 2026-10-25)** : un `RunStreamingAsync` court (gpt-4o-mini, France Central) a réussi via la sonde Lab11, alors que la régression ci-dessus le faisait échouer depuis le 2026-09-28. À confirmer en re-testant Lab01 scénario 5, Lab02 et Lab06 (hors périmètre de Lab11) avant de retirer le contournement de Lab06_A2AServer.

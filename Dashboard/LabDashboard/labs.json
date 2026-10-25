@@ -1206,6 +1206,89 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab12",
+      "number": "12",
+      "track": "Azure OpenAI",
+      "title": "AI Agent with an AI Context Provider",
+      "summary": "Give an agent a long-term memory of its user: a custom AIContextProvider adds the memories stored in MongoDB to the instructions before each run, and extracts the new facts from the user message after it, with another agent and structured output. The memories follow the user from one session to another. Needs the lab's MongoDB container (docker compose up -d); scenario 2 is a chat that waits for your messages.",
+      "level": "Intermediate",
+      "objectives": [
+        "Write a custom AIContextProvider: ProvideAIContextAsync before the model call, StoreAIContextAsync after a successful run",
+        "Return additional instructions for a run with AIContext",
+        "Attach the provider to the agent with ChatClientAgentOptions.AIContextProviders (one instance shared by all the sessions)",
+        "Keep the per-session state of the provider (the user id) in the session with ProviderSessionState<T> and a state initializer",
+        "Extract facts from the user message with another agent and structured output (RunAsync<T>)",
+        "Store the memories per user in MongoDB and find them again in a new session, and when the agent speaks first (RunAsync(session))"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab12-AIAgentWithAIContextProvider",
+      "startProject": "Start/AIAgentWithAIContextProvider.csproj",
+      "solutionProject": "Solution/AIAgentWithAIContextProvider.csproj",
+      "timeoutSeconds": 240,
+      "interactive": true,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-provide-empty",
+          "description": "Scenario 1 - after the memories of 'ada' were cleared, the provider ran before the first model call and found no memory",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories of user 'ada' cleared \\(\\d+ deleted\\)\\s*$(?:(?!^=== Scenario).)*?^First session\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] No memory of user 'ada' yet: nothing added to the instructions\\s*$"
+        },
+        {
+          "id": "scenario1-extracted",
+          "description": "Scenario 1 - after the first run, the provider extracted new memories from the introduction, the name Ada included",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) extracted and stored for user 'ada' \\(extraction run: \\d+ tokens\\):\\s*$(?:(?!^=== Scenario|^Agent:).)*?^  \\+ [^\\n]*\\bAda\\b"
+        },
+        {
+          "id": "scenario1-stored",
+          "description": "Scenario 1 - MongoDB holds the memories of 'ada': her name and her vegetarian diet",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories stored in MongoDB for user 'ada': [1-9]\\d*\\s*$(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bAda\\b)(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bvegetarian\\b)"
+        },
+        {
+          "id": "scenario1-recall",
+          "description": "Scenario 1 - in a new session (empty chat history), the provider added the memories and the answer uses them: the name Ada and one of her preferences (vegetarian, the Alps, Lyon)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^New session \\(empty chat history\\)\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the instructions\\s*$(?:(?!^=== Scenario).)*?^Agent: (?=(?:(?!^Token Usage).)*?\\bAda\\b)(?=(?:(?!^Token Usage).)*?\\b(?:vegetarian|tofu|Alps|Lyon)\\b)"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-greeting",
+          "description": "Scenario 2 - the agent spoke first (RunAsync without a message): the provider added the memories, had nothing to extract, and the greeting uses the name Ada",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the instructions\\s*$\\s*^\\[Memory\\] No user message in this run: nothing to extract\\s*$\\s*^Agent: (?=(?:(?!^Type a message).)*?\\bAda\\b)"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Agent IA avec un AI Context Provider",
+          "level": "Intermédiaire",
+          "summary": "Donnez à un agent une mémoire à long terme de son utilisateur : un AIContextProvider personnalisé ajoute aux instructions, avant chaque run, les souvenirs stockés dans MongoDB, et extrait après le run les nouveaux faits du message de l'utilisateur, avec un autre agent et une sortie structurée. Les souvenirs suivent l'utilisateur d'une session à l'autre. Nécessite le conteneur MongoDB du lab (docker compose up -d) ; le scénario 2 est une conversation qui attend vos messages.",
+          "objectives": [
+            "Écrire un AIContextProvider personnalisé : ProvideAIContextAsync avant l'appel du modèle, StoreAIContextAsync après un run réussi",
+            "Renvoyer des instructions supplémentaires pour un run avec AIContext",
+            "Brancher le provider sur l'agent avec ChatClientAgentOptions.AIContextProviders (une instance partagée par toutes les sessions)",
+            "Conserver l'état par session du provider (l'id de l'utilisateur) dans la session avec ProviderSessionState<T> et un initialiseur d'état",
+            "Extraire des faits du message de l'utilisateur avec un autre agent et une sortie structurée (RunAsync<T>)",
+            "Stocker les souvenirs par utilisateur dans MongoDB et les retrouver dans une nouvelle session, et quand l'agent parle en premier (RunAsync(session))"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-provide-empty": "Scénario 1 - après l'effacement des souvenirs de 'ada', le provider s'est exécuté avant le premier appel du modèle et n'a trouvé aucun souvenir",
+            "scenario1-extracted": "Scénario 1 - après le premier run, le provider a extrait de la présentation de nouveaux souvenirs, dont le prénom Ada",
+            "scenario1-stored": "Scénario 1 - MongoDB contient les souvenirs de 'ada' : son prénom et son régime végétarien",
+            "scenario1-recall": "Scénario 1 - dans une nouvelle session (historique vide), le provider a ajouté les souvenirs et la réponse les utilise : le prénom Ada et l'une de ses préférences (végétarienne, les Alpes, Lyon)",
+            "scenario1-usage": "Scénario 1 - consommation de tokens affichée",
+            "scenario2-greeting": "Scénario 2 - l'agent a parlé en premier (RunAsync sans message) : le provider a ajouté les souvenirs, n'avait rien à extraire, et l'accueil utilise le prénom Ada"
+          }
+        }
+      }
     }
   ]
 }
