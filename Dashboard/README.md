@@ -52,6 +52,8 @@ To configure them without a terminal, use the **Azure OpenAI settings** (see bel
 | Interactive labs (`Console.ReadLine`) | labs with `"interactive": true` keep stdin open: an input box under the output shows *Waiting for input #n* exactly when the program reads, sends the line, echoes it, and **End input** closes stdin (`ReadLine` returns `null`). Waiting does not count against the lab timeout — see [Interactive labs](#interactive-labs) |
 | Labs run in pairs (companion) | a lab can declare a `companion` project (the reference solution of another lab): a server started before the lab and stopped after it, or a client run against the lab once it is ready. Its output is shown as `companion` lines — see [Labs run in pairs](#labs-run-in-pairs-companion) |
 | Azure OpenAI settings | top-bar button (status: *API key* / *Microsoft Entra ID* / *Not configured*) opening a form for the endpoint, the chat deployment and the API key shared by every migrated lab — see [Azure OpenAI settings](#azure-openai-settings) |
+| Reset exercises | **Reset exercises…** under the lab list, **Reset this exercise…** in the History tab (shown once the exercise was started): one exercise, several or all back to *Not started* (their runs and their `_StartCompleted/` folder), after confirmations proportional to the risk — see [Reset exercises](#reset-exercises) |
+| Journey | a column left of the lab list: overall progress, the state of every exercise, XP, rank, milestones, distinctions and the next mission, recomputed from the local history and refreshed by itself — see [Journey](#journey) |
 
 ## Architecture
 
@@ -65,7 +67,9 @@ LabDashboard (ASP.NET Core minimal API, 127.0.0.1 only)
    │   └─ ProcessRunner + ConsoleStreamDecoder   (no shell, terminal semantics)
    │   └─ RunInput + InputSignalParser          (stdin of interactive labs)
    ├─ OutputAnalyzer  checks, token usage, build diagnostics
-   └─ RunHistoryStore JSON file, atomic writes
+   ├─ RunHistoryStore JSON file, atomic writes
+   ├─ LabResetService reset of exercises (runs + _StartCompleted), single-use confirmations
+   └─ LearningJourney states, XP, rank, milestones, distinctions (computed from the history, read-only)
    ▼
 dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
                               └─ LabInputHook (startup hook, interactive labs only)
@@ -76,11 +80,14 @@ dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
 | `GET /api/labs` | catalog with progress and last runs |
 | `GET /api/labs/{id}?lang=fr` | details: README (HTML, `README.fr.md` when present), objectives, packages, commands, checks, history |
 | `GET /api/labs/{id}/solution` | solution files that differ from the exercise |
+| `GET /api/journey` | the journey: per lab `state` (`notStarted` / `inProgress` / `completed` / `toResume`), `running`, attempts, best checks, XP and XP still within reach; totals, `rank` (and next rank), `milestones`, `badges`, `next` mission. Read-only, recomputed on every call |
 | `POST /api/labs/{id}/runs` `{ "target": "start" \| "solution" }` | start a run (409 if one is in progress) |
 | `GET /api/runs/{runId}/events` | Server-Sent Events: `phase`, `output` (streams `stdout`, `stderr`, `system`, `stdin`), `progress`, `input-request`, `input-sent`, `input-closed`, `result` (replayed from the start on reconnection) |
 | `POST /api/runs/{runId}/input` `{ "text": "…" }` | send one line to an interactive run (400 `newline` / `tooLong`; 409 `notInteractive`, `notAccepting` (build or exited), `closed`, `tooManyPending`) |
 | `POST /api/runs/{runId}/input/close` | close the standard input of an interactive run |
 | `POST /api/runs/{runId}/cancel` | cancel a run |
+| `POST /api/labs/reset/preview` `{ "labIds": [...] }` | what a reset would delete (runs per target, `_StartCompleted/` files, size and source files, `blocked` reason) and, unless a lab is blocked, a single-use `confirmationId` valid 10 minutes, plus a 5-character `code` for several labs. **Deletes nothing** (400 `labIds`: `required` / `unknown`) |
+| `POST /api/labs/reset` `{ "confirmationId", "names"?, "code"? }` | reset the labs of that confirmation (`names`: the folder name of the lab when there is one; `code`: when there are several, names not needed): per-lab result `reset` / `nothingToReset` / `failed` (runs and files removed, `verified`, error). 400 `names` / `code` (`mismatch`), 409 `running` / `busy`, 410 `expired` (unknown, expired or already used) / `tooManyAttempts` (3rd wrong code) — a refused request deletes nothing |
 | `GET /api/settings/azure-openai` | Azure OpenAI settings: values, effective source of each one, authentication mode — **never the API key** |
 | `PUT /api/settings/azure-openai` `{ "endpoint", "chatDeploymentName", "apiKey" }` | save (400 with field errors; empty endpoint/deployment removes the value, empty key keeps the stored key) |
 | `DELETE /api/settings/azure-openai/api-key` | remove the stored API key |
@@ -100,7 +107,8 @@ It runs processes, so it is locked down to a local, single-user tool:
 - `POST` requests need the `X-Lab-Dashboard: 1` header and a same-origin `Origin` (CSRF: a web page cannot trigger a run);
 - no CORS, no authentication secrets, no cloud dependency. The README is rendered with raw HTML disabled;
 - the Azure OpenAI API key is **write-only**: the API never returns it (only "stored: yes/no"), the form clears it after saving,
-  it is never logged, and any occurrence of it in a run output (live stream, result, history, copied output) is replaced by `••••`.
+  it is never logged, and any occurrence of it in a run output (live stream, result, history, copied output) is replaced by `••••`;
+- a reset of exercises only deletes the history of the selected labs and their `<lab folder>/_StartCompleted` (fixed name, never a path from the request), after a confirmation the server checks itself (see [Reset exercises](#reset-exercises)).
 
 ## Azure OpenAI settings
 
@@ -151,6 +159,39 @@ The labs are not modified, and **`dotnet run` in a terminal is unchanged**.
 | Ports | `environment` sets variables on **both** processes of the run (`A2AServer__BaseUrl`, `RemoteAgents__*__Url` = `http://localhost:5071`): no conflict with a server you started yourself on port 5000 (or with the macOS AirPlay Receiver, which also listens on 5000). They are shown in the log. |
 | Verdict | *Failed* at the run step when the companion server is not ready (*"The companion failed"*), when the lab (a server) exits or times out before it is ready (*"The lab (a server) never became ready"*, e.g. the delivered `Start`), or when the companion client exits with an error. |
 | Not supported | A companion for an interactive lab. |
+
+## Reset exercises
+
+To undo a mistake (an exercise run by accident, a `_StartCompleted/` folder left in a lab folder) or to start the course over.
+**Reset exercises…** (under the lab list) or **Reset this exercise…** (History tab of a lab) opens a dialog: choose **One exercise** or **Several or all**.
+Only the exercises with something to reset are listed: **in progress** or **completed** (a run of *My exercise*), or holding a `_StartCompleted/` folder. A never-started exercise is not listed (a lab with only *Reference solution* runs is *Not started*), and its History tab has no reset button.
+Each exercise is shown with its name (its lab folder, e.g. `Lab01-FirstBasicAIAgent`) and a **copy** button.
+
+| Question | Answer |
+|---|---|
+| What is deleted? | For each selected lab: **all its runs** (Start and Solution) in `Dashboard/.data/history.json`, and its `<lab folder>/_StartCompleted/` folder (git-ignored completed copy of `Start/`, often only MSBuild `obj/` leftovers). The lab then shows *Not started*, *No run yet* and an empty history. |
+| What is never touched? | `Start/` (your code, `bin/`, `obj/`), `Solution/`, the README files, `labs.json`, the settings (user secrets, `appsettings*.json`), `identity.json` / `outbox.json` / `standalone`, the other labs, any other file of the lab folder (`.tmp-*`…), the Docker containers of Lab05 / Lab12. |
+| How is it confirmed? | Before anything, the dialog shows what will be deleted per lab: runs per target, files, size and **source files** of `_StartCompleted/` (files outside `bin/` and `obj/`, with a warning: that completed copy of your code is deleted too). **One exercise**: type (or paste) its folder name (e.g. `Lab01-FirstBasicAIAgent`, case-sensitive), then confirm a second screen. **Several or all**: retype the random 5-character code shown on screen (no name to type), then confirm a recap of the consequences. The red button names the action and is never focused by default. |
+| Checked by the server too? | Yes: the preview issues a confirmation for exactly those labs, valid **10 minutes** and usable **once**; the reset needs the typed name for one lab, the code for several. Three wrong codes cancel it; a double click or a replayed request resets nothing twice; a lab whose run is in progress cannot be reset; one reset at a time. |
+| Which `_StartCompleted` is deleted? | Only a real folder named exactly `_StartCompleted` directly inside the lab folder of the catalog. A symbolic link or a junction is never followed nor deleted (the lab is *blocked*, remove the link by hand), nor a folder that contains a project of the catalog; links inside the folder are removed, never followed. |
+| Order and errors | The folder is deleted first, the runs only once it is gone (a lab never looks reset while its folder remains); the history is rewritten in one atomic write. A permission error is shown for that lab with the path, its runs are kept, and the other labs are reset. |
+| Verified? | After the reset, each lab is checked again (no run left, no folder, `Start` and `Solution` projects present): the summary says *Reset and verified*, *Already at zero* or *Not reset* with the reason. |
+| Trainer's dashboard | When you joined a workshop, a new `progress.snapshot` (authoritative) is sent, so the trainer sees *Not started* too. Nothing is sent when working alone. |
+
+## Journey
+
+The column left of the lab list (a band above it below 1280 px wide) turns the progress into a route through the course.
+Everything is computed by the server from `Dashboard/.data/history.json` (`Journey/LearningJourney.cs`): nothing else is stored, a reset of exercises lowers it, and nothing is sent to the trainer.
+
+| Part | What it shows |
+|---|---|
+| Core | One arc per exercise in catalog order (wider gaps between levels): green *completed*, amber *in progress* (the share of checks of its best run), red dashed *to resume*, blue pulse *running*; a blue dot marks the lab open on the right. Inside: the percentage completed and, in blue, the XP toward the next rank. |
+| Rank and XP | *Foundations* → *Tooling* (15 % of the course base XP) → *Integration* (35 %) → *Orchestration* (60 %) → *Mastery* (85 %). XP: 100 per Beginner exercise, 150 per Intermediate one, 200 per Advanced one; +50 when it passes on the first attempt, +25 when its solution was not run before; an exercise in progress earns `base × 0.5 × best checks / checks`. Running a solution never earns XP. |
+| Trajectory | The exercises as waypoints, one group per level (the gate lights up when every exercise of the level is completed), joined by a trail; selecting one opens the lab. *To resume* = passed before, but the latest attempt (a Start run not cancelled) failed or timed out: it still counts as completed, like in the lab list and on the trainer's dashboard. |
+| Next mission | The exercise in progress run most recently, else the first one to resume, else the next one to start, with **Continue** and the XP still within reach. |
+| Distinctions | *First steps*, *First try*, *No safety net* (completed without running its solution before), *Persistence* (3 unsuccessful attempts or more before passing), *Milestone cleared*, *Summit*; each insignia shows how to earn it. |
+
+It refreshes when a run starts or ends, after a reset, when the page comes back to the front and every 20 seconds while it is visible (a run from another tab). A completed exercise, a new rank, a cleared milestone or a distinction is celebrated once, when it happens on the open page (short card, also announced to screen readers); never on load, on a language switch or after a reset. `prefers-reduced-motion` turns every animation off.
 
 ## Reporting to the admin dashboard
 
@@ -274,6 +315,8 @@ and the masking of the API key, including an end-to-end run of a throwaway proje
 the interactive input: signal parsing (split signals, mixed stderr), numbering, type-ahead, validation, end of input, the paused lab timeout,
 the reporting: identity file (creation, permissions, validation), outbox (order, cap, persistence), progress snapshot, and the client against an in-process fake of the admin API (registration with the workshop key, `X-API-Key` on every `/api/v1` route but health (header only, from the configuration or `LABS_ADMIN_API_KEY`), missing or refused API key stopping without retry, refused workshop key, the API key never in logs, status or local files, batches of 100 in order, wrong key, `Retry-After`, lost answer, re-registration on a rejected token, server down then back, help request sent / acknowledged / resolved / cancelled / adopted, settings changes, and a real run against a server that never answers — same verdict, no delay),
 the companions: end-to-end runs of throwaway server and client projects (a server ready before the lab and stopped after it, a lab that is a server checked with its client, a lab or a companion server that exits before it is ready);
+the reset of exercises, in a temporary repository (preview counts and source files, the name for one lab and the code only for several, single use, expiry, three wrong codes, a running lab, a symbolic link never followed, a catalog project inside `_StartCompleted`, a folder that cannot be deleted keeping its runs, `Start/`, `Solution/` and the other labs byte-for-byte unchanged, the snapshot sent only when joined, and a reset lab that builds and runs again);
+the journey (states with Solution-only and cancelled runs, *to resume*, partial XP, both bonuses, persistence, rank thresholds, milestones and distinctions, next mission order, an empty catalog);
 and end-to-end runs of a throwaway project answering three `ReadLine` calls (non-ASCII text, masked secret), closing the input, timing out without an answer, and running unchanged when the lab is not interactive.
 
 ## Limitations

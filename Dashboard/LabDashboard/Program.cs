@@ -7,7 +7,9 @@ using LabDashboard;
 using LabDashboard.Catalog;
 using LabDashboard.Execution;
 using LabDashboard.History;
+using LabDashboard.Journey;
 using LabDashboard.Reporting;
+using LabDashboard.Reset;
 using LabDashboard.Settings;
 using Markdig;
 using Microsoft.Extensions.Configuration.Json;
@@ -42,6 +44,7 @@ builder.Services.AddSingleton(LabCatalog.Load(
 builder.Services.AddSingleton<RunHistoryStore>();
 builder.Services.AddSingleton(services => AzureOpenAISettingsStore.ForCatalog(services.GetRequiredService<LabCatalog>()));
 builder.Services.AddSingleton<LabRunner>();
+builder.Services.AddSingleton<LabResetService>();
 
 // Reporting to the trainer's admin dashboard: off until the developer joins a workshop from the welcome dialog or the settings (no network call before that).
 builder.Services.AddSingleton(services => IdentityStore.ForOptions(options, services.GetRequiredService<IHostEnvironment>(), services.GetRequiredService<ILogger<IdentityStore>>()));
@@ -94,10 +97,10 @@ app.UseStaticFiles(new StaticFileOptions
 MarkdownPipeline markdown = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
 RouteGroupBuilder api = app.MapGroup("/api");
 
-api.MapGet("/labs", (LabCatalog catalog, RunHistoryStore history, LabRunner runner) =>
-    catalog.Labs.Select(lab => LabSummary.From(lab, history.ForLab(lab.Id), runner.ActiveRun)));
+api.MapGet("/labs", (LabCatalog catalog, RunHistoryStore history, LabRunner runner, LabResetService reset) =>
+    catalog.Labs.Select(lab => LabSummary.From(lab, history.ForLab(lab.Id), runner.ActiveRun, reset.HasCompletedCopy(lab))));
 
-api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistoryStore history, LabRunner runner) =>
+api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistoryStore history, LabRunner runner, LabResetService reset) =>
 {
     if (catalog.Find(id) is not { } lab)
     {
@@ -112,7 +115,7 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
     reporting.ReportLabOpened(lab.Id);
 
     return Results.Ok(new LabDetails(
-        LabSummary.From(lab, runs, runner.ActiveRun),
+        LabSummary.From(lab, runs, runner.ActiveRun, reset.HasCompletedCopy(lab)),
         lab.Objectives,
         Path.GetRelativePath(catalog.RepositoryRoot, catalog.LabDirectory(lab)),
         readmeHtml,
@@ -127,6 +130,10 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
         runs.FirstOrDefault(),
         runs.Select(r => r with { Log = [] }).ToList()));
 });
+
+// The learner's journey (states, XP, rank, milestones, distinctions, next mission), recomputed from the history: read-only.
+api.MapGet("/journey", (LabCatalog catalog, RunHistoryStore history, LabRunner runner) =>
+    LearningJourney.Build(catalog.Labs, history.ForLab, runner.ActiveRun?.Lab.Id));
 
 api.MapGet("/labs/{id}/solution", (string id, LabCatalog catalog) =>
 {
@@ -149,6 +156,28 @@ api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalo
     return runner.TryStart(lab, request.Target, out LabRun run)
         ? Results.Accepted($"/api/runs/{run.Id}/events", new { runId = run.Id })
         : Results.Conflict(new { error = $"A run is already in progress ({run.Lab.Title}, {run.Target}).", runId = run.Id });
+});
+
+// Reset of exercises (runs + _StartCompleted): the preview issues a single-use confirmation and deletes nothing;
+// the reset needs the typed folder names and, for several labs, the code of that preview.
+api.MapPost("/labs/reset/preview", (ResetPreviewRequest request, LabResetService reset) =>
+    reset.Preview(request.LabIds, out string? error) is { } preview
+        ? Results.Ok(preview)
+        : Results.BadRequest(new { errors = new Dictionary<string, string> { ["labIds"] = error! } }));
+
+api.MapPost("/labs/reset", async (ResetRequest request, LabResetService reset) =>
+{
+    ResetOutcome outcome = await reset.ExecuteAsync(request);
+    return outcome.Refusal switch
+    {
+        null => Results.Ok(new { labs = outcome.Labs }),
+        ResetRefusal.Names => Results.BadRequest(new { errors = new Dictionary<string, string> { ["names"] = "mismatch" } }),
+        ResetRefusal.Code => Results.BadRequest(new { errors = new Dictionary<string, string> { ["code"] = "mismatch" } }),
+        ResetRefusal.Running => Results.Conflict(new { error = "running", labIds = outcome.RunningLabIds }),
+        ResetRefusal.Busy => Results.Conflict(new { error = "busy" }),
+        ResetRefusal.TooManyAttempts => Results.Json(new { error = "tooManyAttempts" }, statusCode: StatusCodes.Status410Gone),
+        _ => Results.Json(new { error = "expired" }, statusCode: StatusCodes.Status410Gone),
+    };
 });
 
 api.MapGet("/runs/{runId}/events", (string runId, LabRunner runner, CancellationToken cancellationToken) =>
@@ -387,11 +416,13 @@ internal sealed record LabSummary(
     LabCompanion? Companion,
     IReadOnlyDictionary<string, LabTranslation> Translations,
     string Progress,
+    bool HasCompletedCopy,
+    string FolderName,
     RunRecord? LastStartRun,
     RunRecord? LastSolutionRun,
     string? ActiveRunId)
 {
-    public static LabSummary From(LabDefinition lab, IReadOnlyList<RunRecord> runs, LabRun? activeRun)
+    public static LabSummary From(LabDefinition lab, IReadOnlyList<RunRecord> runs, LabRun? activeRun, bool hasCompletedCopy)
     {
         RunRecord? lastStart = runs.FirstOrDefault(r => r.Target == RunTarget.Start);
         RunRecord? lastSolution = runs.FirstOrDefault(r => r.Target == RunTarget.Solution);
@@ -403,7 +434,8 @@ internal sealed record LabSummary(
 
         return new LabSummary(
             lab.Id, lab.Number, lab.Track, lab.Title, lab.Summary, lab.Level, lab.TimeoutSeconds,
-            lab.Interactive, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress,
+            lab.Interactive, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress, hasCompletedCopy,
+            LabResetService.FolderName(lab),
             lastStart is null ? null : lastStart with { Log = [] },
             lastSolution is null ? null : lastSolution with { Log = [] },
             activeRun?.Lab.Id == lab.Id ? activeRun.Id : null);

@@ -15,6 +15,7 @@
     } catch (e) { /* storage unavailable: English */ }
   </script>
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/journey.css">
   <script type="module" src="js/dashboard.js"></script>
 </head>
 <body>
@@ -37,6 +38,8 @@
     <symbol id="i-ticket" viewBox="0 0 16 16"><path d="M2 4.8c0-.4.3-.8.8-.8h10.4c.5 0 .8.4.8.8v1.6a1.6 1.6 0 0 0 0 3.2v1.6c0 .4-.3.8-.8.8H2.8c-.5 0-.8-.4-.8-.8V9.6a1.6 1.6 0 0 0 0-3.2z"/><path d="M10.2 5.6v1.1M10.2 9.3v1.1"/></symbol>
     <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1.8l5 1.9v3.9c0 3.2-2.1 5.6-5 6.6-2.9-1-5-3.4-5-6.6V3.7z"/><path d="M5.8 8l1.6 1.6 2.9-3"/></symbol>
     <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.8 4.3h10.4M6.3 4.3V2.9h3.4v1.4M4.2 4.3l.6 8.6c.1.7.6 1.2 1.3 1.2h3.8c.7 0 1.2-.5 1.3-1.2l.6-8.6"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 16 16"><path d="M2.9 8.6A5.2 5.2 0 1 0 4.4 4.3"/><path d="M2.6 1.9v3h3"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.3l6 10.9H2z"/><path d="M8 6.6v3M8 11.4v.1"/></symbol>
   </svg>
 
   <header class="top">
@@ -96,6 +99,16 @@
   </div>
 
   <div class="wrap shell">
+    <!-- JOURNEY: progress core, trajectory, next mission and distinctions, rendered by js/journey.js from GET /api/journey. -->
+    <aside class="journey" id="journey" aria-labelledby="journey-title">
+      <div class="journey-head">
+        <h2 id="journey-title" class="caps" data-i18n="journey.title">Journey</h2>
+        <span class="count mono" id="journey-count"></span>
+      </div>
+      <div class="journey-body" id="journey-body"></div>
+      <p class="sr-only" id="journey-live" aria-live="polite"></p>
+    </aside>
+
     <aside class="rail" aria-labelledby="rail-title">
       <div class="rail-head">
         <h2 id="rail-title" class="caps" data-i18n="rail.title">Labs</h2>
@@ -103,6 +116,7 @@
       </div>
       <nav id="lab-list" class="lab-list"></nav>
       <p class="rail-note" data-i18n="rail.note"></p>
+      <button class="rail-action" type="button" id="reset-open" aria-haspopup="dialog" aria-controls="reset-dialog"><svg class="ico"><use href="#i-reset"/></svg><span data-i18n="reset.open"></span></button>
     </aside>
 
     <main id="lab-view" class="lab-view" aria-live="polite">
@@ -284,6 +298,94 @@
     </form>
   </dialog>
 
+  <!-- RESET: puts exercises back to "Not started" (run history + _StartCompleted folder; Start/, Solution/ and the settings are never touched).
+       Only the exercises started or completed (or with a _StartCompleted folder) are listed. One exercise: its folder name typed,
+       then an explicit confirmation. Several or all: the code shown typed again, then a recap.
+       The server checks the same confirmation again (single use, short-lived): the page is not the only guard. -->
+  <dialog id="reset-dialog" class="dialog" aria-labelledby="reset-title">
+    <form id="reset-form" novalidate>
+      <header class="dialog-head">
+        <span class="dialog-head-ico dialog-head-ico-danger" aria-hidden="true"><svg class="ico"><use href="#i-reset"/></svg></span>
+        <div class="dialog-head-text">
+          <h2 id="reset-title" data-i18n="reset.title"></h2>
+          <span class="dialog-head-sub" id="reset-step-label"></span>
+        </div>
+        <button class="term-btn dialog-close" type="button" data-action="close-reset" data-i18n-aria="settings.close" data-i18n-title="settings.close"><svg class="ico"><use href="#i-x"/></svg></button>
+      </header>
+
+      <div class="dialog-body">
+        <p class="notice notice-bad" id="reset-error" role="alert" hidden></p>
+        <p class="sr-only" id="reset-live" aria-live="polite"></p>
+
+        <!-- 1. One exercise, or several / all (started or completed only) -->
+        <section class="reset-step" data-reset-step="choose">
+          <p class="hint" data-i18n="reset.intro"></p>
+          <p class="notice" id="reset-empty" data-i18n="reset.empty" hidden></p>
+          <div class="seg reset-mode" role="group" data-i18n-aria="reset.modeAria">
+            <button type="button" data-reset-mode="one" aria-pressed="true"><span data-i18n="reset.modeOne"></span></button>
+            <button type="button" data-reset-mode="many" aria-pressed="false"><span data-i18n="reset.modeMany"></span></button>
+          </div>
+          <div class="field" id="reset-one">
+            <label for="reset-lab" data-i18n="reset.pickOne"></label>
+            <select id="reset-lab"></select>
+            <p class="field-hint reset-one-name" id="reset-one-name" hidden></p>
+          </div>
+          <fieldset class="reset-pick" id="reset-many" hidden>
+            <legend data-i18n="reset.pickMany"></legend>
+            <div class="reset-pick-bar">
+              <span class="hint" id="reset-selected-count" aria-live="polite"></span>
+              <div class="btns push">
+                <button class="btn btn-sm" type="button" data-action="reset-select-all" data-i18n="reset.selectAll"></button>
+                <button class="btn btn-sm" type="button" data-action="reset-select-none" data-i18n="reset.selectNone"></button>
+              </div>
+            </div>
+            <div class="reset-checklist" id="reset-checklist"></div>
+          </fieldset>
+        </section>
+
+        <!-- 2. What will be deleted, then the name typed (one exercise) or the code typed again (several / all) -->
+        <section class="reset-step" data-reset-step="review" hidden>
+          <p class="notice notice-bad reset-warning"><b data-i18n="reset.irreversible"></b> <span id="reset-review-intro"></span></p>
+          <ul class="reset-labs" id="reset-preview"></ul>
+          <div class="reset-code-block" id="reset-code-block" hidden>
+            <p class="hint" data-i18n="reset.codeIntro"></p>
+            <p class="reset-code mono" id="reset-code"></p>
+            <div class="field">
+              <label for="reset-code-input" data-i18n="reset.codeLabel"></label>
+              <input id="reset-code-input" type="text" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="hint-reset-code err-reset-code">
+              <p class="field-hint" id="hint-reset-code" data-i18n="reset.codeHint"></p>
+              <p class="field-error" id="err-reset-code" hidden></p>
+            </div>
+          </div>
+          <p class="hint reset-kept" data-i18n="reset.kept"></p>
+        </section>
+
+        <!-- 3. Final confirmation: consequences and exercises -->
+        <section class="reset-step" data-reset-step="confirm" hidden>
+          <p class="notice notice-bad reset-warning"><b data-i18n="reset.irreversible"></b> <span data-i18n="reset.confirmIntro"></span></p>
+          <h3 class="reset-confirm-title" id="reset-confirm-title"></h3>
+          <ul class="reset-effects reset-consequences" id="reset-consequences"></ul>
+          <h4 class="caps reset-subtitle" data-i18n="reset.exercises"></h4>
+          <ul class="list reset-confirm-labs" id="reset-confirm-labs"></ul>
+          <p class="hint reset-kept" data-i18n="reset.kept"></p>
+          <p class="hint" id="reset-expires"></p>
+        </section>
+
+        <!-- 4. Summary -->
+        <section class="reset-step" data-reset-step="result" hidden>
+          <p class="hint" id="reset-result-intro"></p>
+          <ul class="reset-labs" id="reset-results"></ul>
+        </section>
+      </div>
+
+      <footer class="dialog-foot">
+        <button class="btn dialog-foot-start" type="button" data-action="reset-back" data-i18n="reset.back" hidden></button>
+        <button class="btn" type="button" data-action="close-reset" id="reset-cancel" data-i18n="settings.cancel"></button>
+        <button class="btn btn-primary" type="submit" id="reset-next"></button>
+      </footer>
+    </form>
+  </dialog>
+
   <template id="lab-template">
     <header class="hero">
       <div class="hero-kicker">
@@ -412,7 +514,10 @@
             <tbody data-bind="history"></tbody>
           </table>
         </div>
-        <p class="fig-cap"><span data-i18n="history.storage"></span></p>
+        <p class="fig-cap">
+          <span data-i18n="history.storage"></span>
+          <button class="btn btn-sm btn-quiet-danger" type="button" data-action="reset-lab" aria-haspopup="dialog" aria-controls="reset-dialog"><svg class="ico"><use href="#i-reset"/></svg><span data-i18n="reset.openLab"></span></button>
+        </p>
       </div>
     </section>
 

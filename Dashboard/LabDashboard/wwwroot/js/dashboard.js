@@ -1,5 +1,6 @@
 // Agent Framework Lab Bench — client. Plain ES modules, no dependencies.
 import { t, setLanguage, language, locale, translateTree } from "./i18n.js";
+import { initJourney, refreshJourney, renderJourney } from "./journey.js";
 
 const api = {
   async get(path) {
@@ -140,6 +141,7 @@ async function applyLanguage(lang) {
   renderReporting();
   if (document.getElementById("settings").open) renderSettings();
   renderRail();
+  if (state.reset) renderReset();
   if (!state.view || !state.details) return;
 
   // Refresh the README for the new language, keep the terminal (it is program output).
@@ -174,6 +176,8 @@ function renderRail() {
     item.addEventListener("click", () => selectLab(lab.id));
     return item;
   }));
+  // The journey column shows the same labs: same titles, language and open lab.
+  renderJourney({ labs: state.labs, currentId: state.currentId });
 }
 
 function latestRun(summary) {
@@ -184,6 +188,7 @@ function latestRun(summary) {
 async function refreshLabs() {
   state.labs = await api.get("/labs");
   renderRail();
+  refreshJourney(); // handles its own errors: the lab list never waits for it
 }
 
 // ---------- lab view ----------
@@ -212,6 +217,7 @@ async function selectLab(id) {
   wireSolution(main);
   main.querySelector('[data-action="open-settings"]').addEventListener("click", () => openSettings("azure"));
   main.querySelector('[data-action="help"]').addEventListener("click", openHelp);
+  main.querySelector('[data-action="reset-lab"]').addEventListener("click", () => openReset(state.currentId));
   renderHelpButtons();
 
   const lab = state.details.lab;
@@ -271,6 +277,8 @@ function renderAbout() {
 function renderHistory() {
   const main = state.view;
   const runs = state.details.history;
+  // Nothing to reset in an exercise never started (see isResettable).
+  main.querySelector('[data-action="reset-lab"]').hidden = !isResettable(state.details.lab);
   $(main, "historyCount").textContent = String(runs.length);
   const body = $(main, "history");
   if (!runs.length) {
@@ -358,6 +366,7 @@ function wireRunControls(main) {
     }
     toast(t("toast.started", { target: targetLabel(target) }));
     attachToRun(payload.runId, target);
+    refreshLabs().catch(() => {}); // the lab list and the journey show the run at once
   });
 
   main.querySelector('[data-action="cancel"]').addEventListener("click", async (event) => {
@@ -989,6 +998,9 @@ function wireSettings() {
   wireChrome();
   wireSettings();
   wireReporting();
+  wireReset();
+  // A change seen by the journey (a run started or ended in another tab) refreshes the lab list too.
+  initJourney({ onOpen: (id) => selectLab(id), onChange: () => refreshLabs().catch(() => {}) });
   setServer("connecting");
 
   try {
@@ -1318,5 +1330,559 @@ function wireReporting() {
     } finally {
       submit.disabled = false;
     }
+  });
+}
+
+// ---------- Reset exercises: run history + _StartCompleted folder, with confirmations proportional to the risk ----------
+// Only the exercises started or completed (or holding a _StartCompleted folder) are listed. One exercise: its folder name
+// typed, then an explicit confirmation. Several or all: the code shown typed again, then a recap.
+// The server checks the same confirmation again (single use, short-lived): the page is not the only guard.
+// Function declarations: boot() wires the dialog before this part of the module is evaluated.
+function resetDialog() { return document.getElementById("reset-dialog"); }
+function labName(lab) { return `${t("lab.kicker", { number: lab.number })} · ${labText(lab, "title")}`; }
+
+/** Something to reset: a run of My exercise (in progress or completed) or a _StartCompleted folder. A never-started exercise is not listed. */
+function isResettable(lab) { return lab.progress !== "notStarted" || lab.hasCompletedCopy; }
+function resettableLabs() { return state.labs.filter(isResettable); }
+function resetStepList() { return ["choose", "review", "confirm"]; }
+
+function fmtBytes(bytes) {
+  const units = language() === "fr" ? ["o", "Ko", "Mo", "Go"] : ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+  return `${value.toLocaleString(locale(), { maximumFractionDigits: unit ? 1 : 0 })} ${units[unit]}`;
+}
+
+/** A translated sentence with {name} shown as code (never parsed as HTML). */
+function textWithCode(template, code) {
+  const [before, after = ""] = template.split("{name}");
+  const fragment = document.createDocumentFragment();
+  fragment.append(before, el("code", null, code), after);
+  return fragment;
+}
+
+/** The name of an exercise (its lab folder) and a button that copies it, e.g. to paste it in the confirmation field. */
+function nameWithCopy(name) {
+  const button = el("button", "copy-name");
+  button.type = "button";
+  const label = t("reset.copyName", { name });
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.append(icon("copy", "ico-sm"));
+  let timer;
+  button.addEventListener("click", async (event) => {
+    // Also inside the label of a checkbox: copying never checks or unchecks it.
+    event.preventDefault();
+    event.stopPropagation();
+    let copied = true;
+    try { await navigator.clipboard.writeText(name); } catch { copied = false; }
+    button.classList.toggle("copied", copied);
+    button.classList.toggle("failed", !copied);
+    button.title = copied ? t("reset.copied", { name }) : t("reset.copyFailed");
+    button.replaceChildren(icon(copied ? "check" : "x", "ico-sm"));
+    document.getElementById("reset-live").textContent = button.title;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      button.classList.remove("copied", "failed");
+      button.title = label;
+      button.replaceChildren(icon("copy", "ico-sm"));
+    }, 1800);
+  });
+
+  const wrapper = el("span", "reset-name");
+  wrapper.append(el("code", null, name), button);
+  return wrapper;
+}
+
+async function openReset(labId = null) {
+  // Fresh progress, running state and _StartCompleted badges; the list already shown is used if the server is unreachable.
+  try { await refreshLabs(); } catch { /* keep the current list */ }
+  const preselected = resettableLabs().some((lab) => lab.id === labId) ? labId : "";
+  state.reset = { step: "choose", mode: "one", one: preselected, many: new Set(), preview: null, name: "", code: "", busy: false, results: null, error: null, restart: false };
+  renderReset();
+  resetDialog().showModal();
+  focusResetStep();
+}
+
+function closeReset() {
+  if (state.reset?.busy) return;
+  resetDialog().close();
+}
+
+function resetSelection() {
+  const r = state.reset;
+  const ids = r.mode === "one" ? [r.one].filter(Boolean) : [...r.many];
+  return resettableLabs().filter((lab) => ids.includes(lab.id)).map((lab) => lab.id);
+}
+
+function renderReset() {
+  const r = state.reset;
+  if (!r) return;
+  resetDialog().querySelectorAll("[data-reset-step]").forEach((section) => { section.hidden = section.dataset.resetStep !== r.step; });
+  const error = document.getElementById("reset-error");
+  error.hidden = !r.error;
+  error.textContent = r.error ?? "";
+
+  if (r.step === "choose") renderResetChoose();
+  else if (r.step === "review") renderResetReview();
+  else if (r.step === "confirm") renderResetConfirm();
+  else renderResetResult();
+  renderResetProgress();
+}
+
+/** Step counter and buttons only: a change of selection keeps the focus where it is. */
+function renderResetProgress() {
+  const r = state.reset;
+  const steps = resetStepList();
+  document.getElementById("reset-step-label").textContent = r.step === "result"
+    ? t("reset.stepDone")
+    : t("reset.stepOf", { step: steps.indexOf(r.step) + 1, count: steps.length });
+  renderResetFooter();
+}
+
+function resetCanContinue() {
+  const r = state.reset;
+  switch (r.step) {
+    case "choose": return resetSelection().length > 0;
+    case "review": {
+      const { confirmationId, code, labs } = r.preview ?? {};
+      if (!confirmationId) return false;
+      return code ? r.code.trim().length === code.length : r.name.trim() === labs[0].folderName;
+    }
+    default: return true;
+  }
+}
+
+function renderResetFooter() {
+  const r = state.reset;
+  const dialog = resetDialog();
+  const back = dialog.querySelector('[data-action="reset-back"]');
+  back.hidden = r.step === "choose" || r.step === "result" || r.restart;
+  back.disabled = r.busy;
+  const cancel = document.getElementById("reset-cancel");
+  cancel.hidden = r.step === "result";
+  cancel.disabled = r.busy;
+  dialog.querySelector(".dialog-close").disabled = r.busy;
+
+  const destructive = r.step === "confirm" && !r.restart;
+  const labs = r.preview?.labs ?? [];
+  const label = r.restart ? t("reset.restart")
+    : r.busy ? t(destructive ? "reset.inProgress" : "reset.loading")
+    : r.step === "result" ? t("reset.close")
+    : !destructive ? t("reset.continue")
+    : labs.length === 1 ? t("reset.doOne", { name: labs[0].folderName })
+    : t("reset.doMany", { count: labs.length });
+  const next = document.getElementById("reset-next");
+  next.className = `btn ${destructive ? "btn-danger" : "btn-primary"}`;
+  next.replaceChildren(...(destructive ? [icon("reset")] : []), el("span", null, label));
+  next.disabled = r.busy || (!r.restart && !resetCanContinue());
+}
+
+function resetLabState(lab) {
+  const parts = [lab.activeRunId ? t("status.running") : t(`progress.${lab.progress}`)];
+  if (lab.hasCompletedCopy) parts.push("_StartCompleted");
+  return parts.join(" · ");
+}
+
+function renderResetChoose() {
+  const r = state.reset;
+  const dialog = resetDialog();
+  const labs = resettableLabs();
+  const empty = labs.length === 0;
+  document.getElementById("reset-empty").hidden = !empty;
+  dialog.querySelector(".reset-mode").hidden = empty;
+  dialog.querySelectorAll("[data-reset-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.resetMode === r.mode)));
+  document.getElementById("reset-one").hidden = empty || r.mode !== "one";
+  document.getElementById("reset-many").hidden = empty || r.mode !== "many";
+
+  const select = document.getElementById("reset-lab");
+  const placeholder = el("option", null, t("reset.pickPlaceholder"));
+  placeholder.value = "";
+  select.replaceChildren(placeholder, ...labs.map((lab) => {
+    const option = el("option", null, `${labName(lab)} — ${resetLabState(lab)}`);
+    option.value = lab.id;
+    option.disabled = !!lab.activeRunId;
+    return option;
+  }));
+  select.value = r.one;
+  renderResetOneName();
+
+  document.getElementById("reset-checklist").replaceChildren(...labs.map((lab) => {
+    const running = !!lab.activeRunId;
+    const row = el("label", `reset-check${running ? " disabled" : ""}`);
+    const box = el("input");
+    box.type = "checkbox";
+    box.value = lab.id;
+    box.checked = r.many.has(lab.id);
+    box.disabled = running;
+    const meta = el("span", "reset-check-meta");
+    meta.append(running ? pill("running", t("status.running")) : pill(lab.progress, t(`progress.${lab.progress}`)));
+    if (lab.hasCompletedCopy) meta.append(el("span", "tag tag-copy", "_StartCompleted"));
+    meta.append(nameWithCopy(lab.folderName));
+    row.append(box, el("span", "reset-check-num", lab.number), el("span", "reset-check-title", labText(lab, "title")), meta);
+    return row;
+  }));
+  renderResetCount();
+}
+
+/** Under the list of "One exercise": the name of the chosen exercise, ready to copy. */
+function renderResetOneName() {
+  const lab = resettableLabs().find((l) => l.id === state.reset.one);
+  const line = document.getElementById("reset-one-name");
+  line.hidden = !lab;
+  line.replaceChildren(...(lab ? [`${t("reset.nameLabel")} `, nameWithCopy(lab.folderName)] : []));
+}
+
+function renderResetCount() {
+  document.getElementById("reset-selected-count").textContent = t("reset.selectedCount", { count: state.reset.many.size, total: resettableLabs().length });
+}
+
+function resetEffects(preview) {
+  const list = el("ul", "reset-effects");
+  const line = (iconName, text, kind) => {
+    const item = el("li", kind);
+    item.append(icon(iconName, "ico-sm"), el("span", null, text));
+    list.append(item);
+  };
+
+  if (preview.blocked) line("x", t(`reset.blocked.${preview.blocked}`, { path: preview.completedCopy?.path ?? "" }), "bad");
+  if (preview.nothingToReset) {
+    line("check", t("reset.nothing"));
+    return list;
+  }
+
+  const runs = preview.startRuns + preview.solutionRuns;
+  line(runs ? "trash" : "check", runs ? t("reset.runs", { count: runs, start: preview.startRuns, solution: preview.solutionRuns }) : t("reset.noRuns"));
+  const copy = preview.completedCopy;
+  if (!copy) {
+    line("check", t("reset.noCopy"));
+  } else if (!["link", "notDirectory", "unreadable"].includes(preview.blocked)) {
+    line("trash", t(copy.sourceFiles ? "reset.copy" : "reset.copyBuildOnly", { path: copy.path, files: copy.files, size: fmtBytes(copy.bytes) }));
+    if (copy.sourceFiles) line("alert", t("reset.copySources", { count: copy.sourceFiles }), "warn");
+  }
+  return list;
+}
+
+/** One exercise only: its exact folder name typed (or pasted after copying it). */
+function resetNameField(preview) {
+  const r = state.reset;
+  const id = "reset-name";
+  const field = el("div", "field");
+  const label = el("label");
+  label.htmlFor = id;
+  label.append(textWithCode(t("reset.typeName"), preview.folderName));
+
+  const input = el("input");
+  Object.assign(input, { id, type: "text", autocomplete: "off", spellcheck: false, value: r.name });
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("aria-describedby", `${id}-error`);
+  const ok = icon("check", "field-ok");
+  const error = el("p", "field-error", t("reset.nameMismatch"));
+  error.id = `${id}-error`;
+
+  // The mismatch is shown once the value is as long as the name (or on leaving the field), not on every key.
+  const update = (strict) => {
+    const value = input.value.trim();
+    const match = value === preview.folderName;
+    const wrong = !match && value.length > 0 && (strict || value.length >= preview.folderName.length);
+    ok.classList.toggle("on", match);
+    error.hidden = !wrong;
+    input.setAttribute("aria-invalid", String(wrong));
+  };
+  input.addEventListener("input", () => { r.name = input.value; update(false); renderResetFooter(); });
+  input.addEventListener("blur", () => update(true));
+  update(false);
+
+  const row = el("div", "field-check");
+  row.append(input, ok);
+  field.append(label, row, error);
+  return field;
+}
+
+function renderResetReview() {
+  const r = state.reset;
+  const { labs, confirmationId, code } = r.preview;
+  const many = labs.length > 1;
+  // Blocked: nothing will be deleted, so no "cannot be undone" warning.
+  document.querySelector('[data-reset-step="review"] .reset-warning b').hidden = !confirmationId;
+  document.getElementById("reset-review-intro").textContent = !confirmationId ? t("reset.blockedIntro")
+    : t(many ? "reset.reviewIntroMany" : "reset.reviewIntroOne");
+  document.getElementById("reset-preview").replaceChildren(...labs.map((preview) => {
+    const lab = state.labs.find((l) => l.id === preview.id);
+    const item = el("li", `reset-lab${preview.blocked ? " ko" : ""}`);
+    const head = el("div", "reset-lab-head");
+    head.append(el("b", null, lab ? labName(lab) : preview.id), pill(preview.progress, t(`progress.${preview.progress}`)), nameWithCopy(preview.folderName));
+    item.append(head, resetEffects(preview));
+    if (confirmationId && !many) item.append(resetNameField(preview));
+    return item;
+  }));
+
+  // Several or all: the code is the only thing typed.
+  const block = document.getElementById("reset-code-block");
+  block.hidden = !(confirmationId && code);
+  if (!block.hidden) {
+    const shown = document.getElementById("reset-code");
+    shown.textContent = code;
+    // Read character by character by screen readers.
+    shown.setAttribute("aria-label", t("reset.codeAria", { code: code.split("").join(" ") }));
+    document.getElementById("reset-code-input").value = r.code;
+    setResetCodeError(null);
+  }
+}
+
+function setResetCodeError(message) {
+  const error = document.getElementById("err-reset-code");
+  error.hidden = !message;
+  error.textContent = message ?? "";
+  document.getElementById("reset-code-input").setAttribute("aria-invalid", String(!!message));
+}
+
+function renderResetConfirm() {
+  const { preview } = state.reset;
+  const labs = preview.labs;
+  document.getElementById("reset-confirm-title").textContent = labs.length === 1
+    ? t("reset.confirmOne", { name: labs[0].folderName })
+    : t("reset.confirmMany", { count: labs.length });
+
+  const runs = labs.reduce((sum, lab) => sum + lab.startRuns + lab.solutionRuns, 0);
+  const copies = labs.filter((lab) => lab.completedCopy);
+  const files = copies.reduce((sum, lab) => sum + lab.completedCopy.files, 0);
+  const sources = copies.reduce((sum, lab) => sum + lab.completedCopy.sourceFiles, 0);
+  const effects = [
+    ["reset", t("reset.effectProgress")],
+    ["trash", runs ? t("reset.effectRuns", { count: runs }) : t("reset.effectNoRuns")],
+    ...(copies.length ? [["trash", t("reset.effectCopies", { count: copies.length, files })]] : []),
+    ...(sources ? [["alert", t("reset.effectSources", { count: sources }), "warn"]] : []),
+    ...(state.reporting?.enabled ? [["cloud", t("reset.effectReporting")]] : []),
+  ];
+  document.getElementById("reset-consequences").replaceChildren(...effects.map(([name, text, kind]) => {
+    const item = el("li", kind);
+    item.append(icon(name, "ico-sm"), el("span", null, text));
+    return item;
+  }));
+
+  document.getElementById("reset-confirm-labs").replaceChildren(...labs.map((preview) => {
+    const lab = state.labs.find((l) => l.id === preview.id);
+    const item = el("li", null, `${lab ? labName(lab) : preview.id} `);
+    item.append(nameWithCopy(preview.folderName));
+    return item;
+  }));
+  const time = new Date(preview.expiresAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("reset-expires").textContent = t("reset.expires", { time });
+}
+
+function renderResetResult() {
+  const { results } = state.reset;
+  const failed = results.filter((result) => result.status === "failed").length;
+  document.getElementById("reset-result-intro").textContent = failed
+    ? t("reset.resultIntroFailed", { ok: results.length - failed, failed })
+    : t("reset.resultIntro", { ok: results.length });
+  document.getElementById("reset-results").replaceChildren(...results.map((result) => {
+    const lab = state.labs.find((l) => l.id === result.id);
+    const good = result.status !== "failed";
+    const item = el("li", `reset-lab ${good ? "ok" : "ko"}`);
+    const head = el("div", "reset-lab-head");
+    head.append(icon(good ? "check" : "x", good ? "ico-ok" : "ico-ko"), el("b", null, lab ? labName(lab) : result.id));
+    const params = { runs: result.runsRemoved, files: result.filesRemoved };
+    const text = result.status === "reset" ? t("reset.resultReset", params)
+      : result.status === "nothingToReset" ? t("reset.resultNothing")
+      : t("reset.resultFailed", params);
+    item.append(head, el("p", "reset-result-text", text));
+    if (result.error) item.append(el("p", "reset-error-text", result.error));
+    return item;
+  }));
+}
+
+function focusResetStep() {
+  const r = state.reset;
+  if (!r) return;
+  const dialog = resetDialog();
+  const section = dialog.querySelector(`[data-reset-step="${r.step}"]`);
+  const next = document.getElementById("reset-next");
+  const cancel = document.getElementById("reset-cancel");
+  let target;
+  if (r.restart || r.step === "result") target = next;
+  // Never the destructive button: Enter must not confirm by habit.
+  else if (r.step === "confirm") target = cancel;
+  else if (r.step === "choose") {
+    target = !resettableLabs().length ? cancel
+      : r.mode === "one" ? document.getElementById("reset-lab")
+      : section.querySelector("input:not(:disabled)");
+  } else {
+    const { confirmationId, code, labs } = r.preview;
+    const input = confirmationId ? document.getElementById(code ? "reset-code-input" : "reset-name") : null;
+    target = input && (code || input.value.trim() !== labs[0].folderName) ? input : null;
+  }
+  (target ?? (next.disabled ? dialog.querySelector('[data-action="reset-back"]') : next)).focus();
+}
+
+function goReset(step) {
+  const r = state.reset;
+  r.step = step;
+  r.error = null;
+  renderReset();
+  focusResetStep();
+}
+
+async function previewReset() {
+  const r = state.reset;
+  r.busy = true;
+  renderResetFooter();
+  try {
+    const response = await api.post("/labs/reset/preview", { labIds: resetSelection() });
+    if (response.ok) {
+      Object.assign(r, { preview: response.payload, name: "", code: "", step: "review", error: null });
+    } else {
+      const code = response.payload?.errors?.labIds;
+      r.error = code ? t(`reset.error.labIds.${code}`) : t("reset.error.other", { status: response.status });
+    }
+  } catch {
+    r.error = t("reset.error.network");
+  } finally {
+    r.busy = false;
+  }
+  renderReset();
+  focusResetStep();
+}
+
+function applyResetRefusal({ status, payload }) {
+  const r = state.reset;
+  const error = payload?.error;
+  if (status === 400 && payload?.errors?.names) {
+    Object.assign(r, { step: "review", error: t("reset.error.names") });
+  } else if (status === 400 && payload?.errors?.code) {
+    Object.assign(r, { step: "review", code: "", error: t("reset.error.code") });
+  } else if (error === "busy") {
+    r.error = t("reset.error.busy");
+  } else if (error === "running") {
+    const labs = (payload.labIds ?? []).map((id) => state.labs.find((l) => l.id === id)).map((lab, i) => (lab ? labName(lab) : payload.labIds[i]));
+    Object.assign(r, { error: t("reset.error.running", { labs: labs.join(", ") }), restart: true });
+  } else if (error === "expired" || error === "tooManyAttempts") {
+    Object.assign(r, { error: t(`reset.error.${error}`), restart: true });
+  } else {
+    r.error = t("reset.error.other", { status });
+  }
+}
+
+async function executeReset() {
+  const r = state.reset;
+  r.busy = true;
+  r.error = null;
+  renderReset();
+  try {
+    // One exercise: its typed name. Several or all: the code only.
+    const many = !!r.preview.code;
+    const response = await api.post("/labs/reset", {
+      confirmationId: r.preview.confirmationId,
+      names: many ? null : [r.name.trim()],
+      code: many ? r.code.trim() : null,
+    });
+    r.busy = false;
+    if (response.ok) {
+      Object.assign(r, { results: response.payload.labs, step: "result" });
+      await refreshAfterReset(r.results);
+      const reset = r.results.filter((result) => result.status !== "failed").length;
+      if (reset) toast(t("reset.toast", { count: reset }));
+    } else {
+      applyResetRefusal(response);
+    }
+  } catch {
+    // The request may or may not have reached the server: the lab list shows the actual state.
+    Object.assign(r, { busy: false, error: t("reset.error.network"), restart: true });
+    await refreshAfterReset([]);
+  }
+  renderReset();
+  focusResetStep();
+}
+
+/** The lab list, and the open lab when it was reset, show the new state at once (behind the summary). */
+async function refreshAfterReset(results) {
+  try {
+    await refreshLabs();
+    if (state.currentId && results.some((result) => result.id === state.currentId)) await selectLab(state.currentId);
+    if (state.reporting?.enabled) await loadReportingStatus();
+  } catch { /* the next refresh shows it */ }
+}
+
+async function onResetNext() {
+  const r = state.reset;
+  if (!r || r.busy) return;
+  if (r.restart) {
+    Object.assign(r, { step: "choose", preview: null, name: "", code: "", error: null, restart: false });
+    renderReset();
+    focusResetStep();
+    return;
+  }
+
+  switch (r.step) {
+    case "choose": return previewReset();
+    case "review":
+      if (!resetCanContinue()) return;
+      if (r.preview.code && r.code.trim().toUpperCase() !== r.preview.code) {
+        setResetCodeError(t("reset.codeMismatch"));
+        document.getElementById("reset-code-input").focus();
+        return;
+      }
+      return goReset("confirm");
+    case "confirm": return executeReset();
+    default: return closeReset();
+  }
+}
+
+function wireReset() {
+  const dialog = resetDialog();
+  document.getElementById("reset-open").addEventListener("click", () => openReset());
+  dialog.querySelectorAll('[data-action="close-reset"]').forEach((b) => b.addEventListener("click", closeReset));
+  // Escape closes like Cancel, except while a request is in flight.
+  dialog.addEventListener("cancel", (event) => { if (state.reset?.busy) event.preventDefault(); });
+  dialog.addEventListener("close", () => {
+    state.reset = null;
+    document.getElementById("reset-code-input").value = "";
+    document.getElementById("reset-live").textContent = "";
+  });
+
+  dialog.querySelector('[data-action="reset-back"]').addEventListener("click", () => {
+    const r = state.reset;
+    if (!r || r.busy) return;
+    const steps = resetStepList();
+    goReset(steps[Math.max(0, steps.indexOf(r.step) - 1)]);
+  });
+  dialog.querySelectorAll("[data-reset-mode]").forEach((button) => button.addEventListener("click", () => {
+    state.reset.mode = button.dataset.resetMode;
+    state.reset.error = null;
+    renderReset();
+  }));
+  document.getElementById("reset-lab").addEventListener("change", (event) => {
+    state.reset.one = event.target.value;
+    renderResetOneName();
+    renderResetProgress();
+  });
+  document.getElementById("reset-checklist").addEventListener("change", (event) => {
+    if (event.target.type !== "checkbox") return;
+    const { many } = state.reset;
+    if (event.target.checked) many.add(event.target.value);
+    else many.delete(event.target.value);
+    renderResetCount();
+    renderResetProgress();
+  });
+  dialog.querySelector('[data-action="reset-select-all"]').addEventListener("click", () => {
+    for (const lab of resettableLabs()) if (!lab.activeRunId) state.reset.many.add(lab.id);
+    renderReset();
+  });
+  dialog.querySelector('[data-action="reset-select-none"]').addEventListener("click", () => {
+    state.reset.many.clear();
+    renderReset();
+  });
+
+  const codeInput = document.getElementById("reset-code-input");
+  codeInput.addEventListener("input", () => {
+    state.reset.code = codeInput.value = codeInput.value.toUpperCase();
+    setResetCodeError(null);
+    renderResetFooter();
+  });
+  document.getElementById("reset-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    onResetNext();
   });
 }

@@ -64,14 +64,64 @@ public sealed class RunHistoryStore
                 json = JsonSerializer.Serialize(_runs, JsonOptions);
             }
 
-            string temp = _file + ".tmp";
-            await File.WriteAllTextAsync(temp, json);
-            File.Move(temp, _file, overwrite: true);
+            await WriteAsync(json);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    /// Removes every run of the given labs in one atomic write and returns the number of runs removed per lab.
+    /// When the file cannot be written, the runs stay in memory too (the history shown never differs from the file).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, int>> RemoveLabsAsync(IReadOnlyCollection<string> labIds)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            Dictionary<string, int> removed = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, List<RunRecord>> remaining;
+            string json;
+            lock (_runs)
+            {
+                remaining = new(_runs, StringComparer.OrdinalIgnoreCase);
+                foreach (string labId in labIds)
+                {
+                    removed[labId] = remaining.Remove(labId, out List<RunRecord>? runs) ? runs.Count : 0;
+                }
+
+                if (removed.Values.All(count => count == 0))
+                {
+                    return removed;
+                }
+
+                json = JsonSerializer.Serialize(remaining, JsonOptions);
+            }
+
+            await WriteAsync(json);
+            lock (_runs)
+            {
+                foreach (string labId in labIds)
+                {
+                    _runs.Remove(labId);
+                }
+            }
+
+            return removed;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task WriteAsync(string json)
+    {
+        string temp = _file + ".tmp";
+        await File.WriteAllTextAsync(temp, json);
+        File.Move(temp, _file, overwrite: true);
     }
 
     private Dictionary<string, List<RunRecord>> Load()

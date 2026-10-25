@@ -256,6 +256,9 @@ public sealed class ReportingClient : BackgroundService
         Report("progress.snapshot", null, ProgressSnapshot.Progress(_catalog, _history));
     }
 
+    /// <summary>The history changed outside a run (exercises reset): a full snapshot, authoritative on the server, replaces the previous progress.</summary>
+    public void ProgressChanged() => Report("progress.snapshot", null, ProgressSnapshot.Progress(_catalog, _history));
+
     public void ReportSettingsChanged(AzureOpenAISettingsStatus status) =>
         Report("settings.changed", null, new { authMode = status.Configured ? status.Authentication : "notConfigured" });
 
