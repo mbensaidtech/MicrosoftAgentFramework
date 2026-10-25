@@ -1,105 +1,190 @@
-using Azure.Identity;
-using Azure.AI.OpenAI;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
-using ModelContextProtocol.Server;
-using OpenAI.Chat;
-using OpenAI;
+using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Reflection;
-
+using Azure.Identity;
+using Microsoft.Agents.AI;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+using OpenAI;
+using OpenAI.Chat;
 using CommonUtilities;
+
 using ExposeAIAgentAsMCPTool;
 using ExposeAIAgentAsMCPTool.Tools;
+using static ExposeAIAgentAsMCPTool.McpConsole;
 
 // ============================================
-// SCENARIO SELECTION - Choose which scenario to run
+// SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Available scenarios: RemoteWithHttpTransport, LocalWithStdioServerTransport
-// (only ONE scenario can run at a time since each starts a server)
-Scenario scenarioToRun = Scenario.LocalWithStdioServerTransport;
+// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios
+HashSet<int> scenariosToRun = [1, 2, 3];
 // ============================================
 
-ColoredConsole.WriteInfoLine($"=== Running Scenario: {scenarioToRun} ===");
+bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+
+// The program can also run as an MCP server only (see "Use the server from MCP Inspector or VS Code" in the README):
+//   --stdio : the stdio MCP server. Scenarios 2 and 3 start this program with it, and so do MCP Inspector or VS Code.
+//   --http  : scenario 1, then its HTTP MCP server keeps running until Ctrl+C.
+bool stdioServerMode = args.Contains("--stdio");
+bool httpServerMode = args.Contains("--http");
+
+if (stdioServerMode)
+{
+    // With the stdio transport, stdout carries the MCP messages and nothing else.
+    // Everything the lab prints goes to stderr instead, which MCP hosts show as the log of the server.
+    Console.SetOut(Console.Error);
+}
 
 #region Setup: Configuration and Client Initialization
 
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
-ColoredConsole.WritePrimaryLogLine("Azure OpenAI Settings: ");
-ColoredConsole.WriteSecondaryLogLine($"Azure OpenAI Endpoint: {settings.Endpoint}");
-ColoredConsole.WriteSecondaryLogLine($"Azure OpenAI Chat Deployment Name: {settings.ChatDeploymentName}");
+Console.WriteLine($"Endpoint: {settings.Endpoint}");
+Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
-// Step 2: Create AzureOpenAIClient with managed identity authentication
-AzureOpenAIClient client = new AzureOpenAIClient(new Uri(settings.Endpoint), new DefaultAzureCredential());
+// TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
+// Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
+// OpenAIClientOptions clientOptions = ...
 
-// Step 3: Get a ChatClient for the specific deployment
-ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
+// TODO 2: Create the OpenAIClient
+// - If settings.APIKey is set: authenticate with an ApiKeyCredential
+// - Otherwise: authenticate with Microsoft Entra ID using a BearerTokenPolicy built from
+//   DefaultAzureCredential and the scope "https://ai.azure.com/.default"
+// Note: the AuthenticationPolicy constructor is flagged experimental (OPENAI001), keep the pragma around it.
+#pragma warning disable OPENAI001
+// OpenAIClient client = ...
+#pragma warning restore OPENAI001
 
-#endregion
-
-#region Create and configure the AI Agent
-
-// Step 1: Create an instance of CompanyTools
-var companyTools = new CompanyTools();
-
-// Step 2: Get all public instance methods from CompanyTools using reflection
-MethodInfo[] methods = typeof(CompanyTools).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-
-// Step 3: Create a list of AITool from the methods using AIFunctionFactory.Create
-List<AITool> tools = methods.Select(method => AIFunctionFactory.Create(method, companyTools)).Cast<AITool>().ToList();
-
-// Step 4: Create agent with tools
-var agentOptions = new ChatClientAgentOptions
-{ 
-    Name = "CompanyAssistant",
-    Description = "A helpful assistant that can help with company tasks.",
-    ChatOptions = new() { Instructions = "You are a helpful assistant that can help with company tasks.", Tools = tools },
-};
-
-ChatClientAgent agent = chatClient.CreateAIAgent(agentOptions);
+// TODO 3: Get a ChatClient (Chat Completions API) for the deployment
+// ChatClient chatClient = ...
 
 #endregion
 
-#region Scenario 1: Expose the AI agent as a remote MCP tool, accessible via both SSE and StreamableHTTP transport types.
+#region The CompanyAssistant agent and its MCP tool (used by every scenario and by the stdio server)
 
-if (scenarioToRun == Scenario.RemoteWithHttpTransport)
+// TODO 4: Create the CompanyAssistant agent with the company tools (same as Lab 03)
+// Hint: var companyTools = new CompanyTools(); then chatClient.AsAIAgent(instructions: ..., name: "CompanyAssistant",
+//       description: ..., tools: [AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"), ...])
+//       with the three public methods of CompanyTools. The name and the description become those of the MCP tool.
+// AIAgent companyAssistant = ...
+
+// TODO 5: Turn the agent into a function (one string parameter "query", the agent's answer as result)
+// Hint: companyAssistant.AsAIFunction() - without a session, every call runs the agent in a new session
+// AIFunction companyAssistantFunction = ...
+
+// TODO 6: Wrap the function in an MCP server tool
+// Hint: McpServerTool.Create(companyAssistantFunction)
+// McpServerTool companyAssistantTool = ...
+
+#endregion
+
+#region Stdio server mode: started with --stdio by an MCP host (scenarios 2 and 3, MCP Inspector, VS Code)
+
+if (stdioServerMode)
 {
-    ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario: Expose the AI agent as a remote MCP tool, accessible via both SSE and StreamableHTTP transport types. ===");
+    // TODO 7: Create an empty host and register the MCP server with the stdio transport and the CompanyAssistant tool
+    // Hint: Host.CreateEmptyApplicationBuilder(settings: null) (no configuration, no logging: nothing may reach stdout),
+    //       then builder.Services.AddMcpServer().WithStdioServerTransport().WithTools([companyAssistantTool])
+    // HostApplicationBuilder stdioBuilder = ...
 
-    // Step 1: Convert agent to an AIFunction
-    // Hint: AsAIFunction()
+    // TODO 8: Run the server until the host closes stdin
+    // Hint: ColoredConsole.WriteSecondaryLogLine("CompanyAssistant MCP server ready on stdio."), then await stdioBuilder.Build().RunAsync()
 
-    // Step 2: Create an MCP server tool from the AIFunction
-    // Hint: McpServerTool.Create()
-
-    // Step 3: Build and configure the web application with MCP server
-    // Hint: WebApplication.CreateBuilder(), AddMcpServer(), WithHttpTransport(), WithTools()
-
-    // Step 4: Map the MCP endpoint with custom path and run the server
-    // Hint: MapMcp(), UseHttpsRedirection(), Run()
+    return;
 }
 
 #endregion
 
-#region Scenario 2: Expose the AI Agent as an MCP Tool using Stdio Server Transport
+// Path of the MCP endpoint on the HTTP server, and address the server listens on (McpServer:BaseUrl)
+const string McpPath = "/mcp/companyassistant";
+McpServerSettings serverSettings = ConfigurationHelper.GetMcpServerSettings();
+string mcpUrl = $"{serverSettings.BaseUrl}{McpPath}";
 
-if (scenarioToRun == Scenario.LocalWithStdioServerTransport)
+#region Scenario 1: Expose the agent as a remote MCP tool (Streamable HTTP)
+
+if (ShouldRunScenario(1) || httpServerMode)
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario: LocalWithStdioServerTransport - Expose the AI Agent as an MCP Tool using Stdio Server Transport ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 1: Expose the agent as a remote MCP tool (Streamable HTTP) ===");
 
-    // Step 1: Convert agent to an AIFunction
-    // Hint: AsAIFunction()
+    // TODO 9: Create an ASP.NET Core application and register the MCP server with the HTTP transport and the CompanyAssistant tool
+    // Hint: WebApplication.CreateBuilder(args), then builder.Services.AddMcpServer().WithHttpTransport().WithTools([companyAssistantTool])
+    // WebApplicationBuilder builder = ...
 
-    // Step 2: Create an MCP server tool from the AIFunction
-    // Hint: McpServerTool.Create()
+    // TODO 10: Build the application, map the MCP endpoint on McpPath and start the server without blocking
+    // Hint: builder.Build(), app.MapMcp(McpPath), app.Urls.Add(serverSettings.BaseUrl), await app.StartAsync(),
+    //       then ColoredConsole.WritePrimaryLogLine($"MCP server listening on {mcpUrl}")
+    // WebApplication app = ...
 
-    // Step 3: Build and configure the application with MCP server using Stdio transport
-    // Hint: Host.CreateEmptyApplicationBuilder(), AddMcpServer(), WithStdioServerTransport(), WithTools()
+    const string query = "Get the information of the employee with the ID EMP003.";
+    ColoredConsole.WritePrimaryLogLine($"Query: {query}");
 
-    // Step 4: Build and run the application
-    // Hint: Build(), RunAsync()
+    // TODO 11: Be an MCP client of the server: connect with the Streamable HTTP transport, list the tools, call the tool
+    // Hint: await using (McpClient mcpClient = await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
+    //       { Name = "CompanyAssistant over HTTP", Endpoint = new Uri(mcpUrl), TransportMode = HttpTransportMode.StreamableHttp }))) { ... }
+    //       and in the block: WriteTools(await mcpClient.ListToolsAsync()), then
+    //       await mcpClient.CallToolAsync("CompanyAssistant", new Dictionary<string, object?> { ["query"] = query })
+    //       (.AsTask().WithSpinner("Waiting for the MCP tool")) and WriteToolResult(result)
+
+    // TODO 12: With --http, keep the server running for other MCP clients; otherwise stop it
+    // Hint: if (httpServerMode) { ColoredConsole.WriteSecondaryLogLine("..."); await app.WaitForShutdownAsync(); return; }
+    //       then await app.StopAsync()
+}
+
+#endregion
+
+#region Scenario 2: Expose the agent as a local MCP tool (stdio)
+
+if (ShouldRunScenario(2))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===");
+
+    const string query = "Which meeting rooms can host at least 10 people?";
+    ColoredConsole.WritePrimaryLogLine($"Query: {query}");
+
+    // TODO 13: Describe how to start the server: this same program, started with --stdio as a child process
+    // Hint: new StdioClientTransport(new StdioClientTransportOptions { Name = "CompanyAssistant over stdio", Command = "dotnet",
+    //       Arguments = [Assembly.GetEntryAssembly()!.Location, "--stdio"],
+    //       StandardErrorLines = line => ColoredConsole.WriteSecondaryLogLine($"[server] {line}") })
+    // StdioClientTransport transport = ...
+
+    // TODO 14: Connect: the client starts the server process, then opens the MCP session
+    // Hint: await using McpClient mcpClient = await McpClient.CreateAsync(transport);
+
+    // TODO 15: List the tools of the server and call the tool (same as in TODO 11, another transport)
+    // Hint: WriteTools(await mcpClient.ListToolsAsync()), then CallToolAsync("CompanyAssistant", ...) and WriteToolResult(result)
+}
+
+#endregion
+
+#region Scenario 3: Another agent uses the CompanyAssistant through MCP
+
+if (ShouldRunScenario(3))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===");
+
+    string prompt = $"Book the meeting room ROOM-B for the employee EMP002 on {DateTime.Today.AddDays(1):yyyy-MM-dd} " +
+                    "from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.";
+    ColoredConsole.WritePrimaryLogLine($"User: {prompt}");
+
+    // TODO 16: Start the stdio server and connect to it (same as TODO 13 and TODO 14)
+    // await using McpClient mcpClient = ...
+
+    // TODO 17: Get the MCP tools and create the OfficeAssistant agent, whose only tool is the CompanyAssistant
+    // Hint: IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync(); then chatClient.AsAIAgent(instructions: ...,
+    //       name: "OfficeAssistant", tools: [.. mcpTools.Cast<AITool>()]) - an McpClientTool is an AIFunction (Lab 04)
+    // AIAgent officeAssistant = ...
+
+    // TODO 18: Run the OfficeAssistant, then display the MCP tool calls, the answer and the token usage
+    // Hint: await officeAssistant.RunAsync(prompt).WithSpinner("Running the OfficeAssistant"), then WriteToolCalls(response),
+    //       "Agent answer:" with response.Text, and WriteTokenUsage(response)
 }
 
 #endregion

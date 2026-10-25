@@ -3,11 +3,12 @@
 An optional, local web UI to follow the labs and run them without typing `dotnet` commands.
 It is a convenience layer: **every lab keeps working exactly the same with the CLI**, and no lab depends on the dashboard.
 
-> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison` and `Lab09-AIAgentWithFunctionToolsHumanApproval` (the migrated labs).
+> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison`, `Lab09-AIAgentWithFunctionToolsHumanApproval` and `Lab10_ExposeAIAgentAsMCPTool` (the migrated labs).
 > The two Lab06 labs are run in pairs: each run of one starts the reference solution of the other as its **companion** (see [Labs run in pairs](#labs-run-in-pairs-companion)), on port 5071.
 > Scenario 3 of Lab05 needs its MongoDB container (`docker compose up -d` in the lab's `MongoDB/` folder): without it, the Solution run fails with *"MongoDB is not reachable"*.
 > Lab07 needs an **embedding** deployment (`AzureOpenAI:EmbeddingDeploymentName`, not part of the settings form): without it, the run stops with *"'AzureOpenAI:EmbeddingDeploymentName' is not configured"*.
 > Lab09 is the first **interactive** lab of the catalog: scenario 1 waits for your decision in the input box (`Y` approves; the checks expect the approval), scenario 2 needs no input.
+> Lab10 starts its own MCP servers during the run and stops them (no companion): an HTTP server on `McpServer:BaseUrl` (`http://localhost:5100` by default, the port must be free) and a stdio server, a child process of the lab whose stderr the lab prints as `[server]` lines.
 
 ## Start it
 
@@ -226,10 +227,10 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
 
 ```jsonc
 {
-  "id": "azureopenai-lab10",
-  "number": "10", "track": "Azure OpenAI", "level": "Beginner",
+  "id": "azureopenai-lab11",
+  "number": "11", "track": "Azure OpenAI", "level": "Beginner",
   "title": "...", "summary": "...", "objectives": ["..."],
-  "path": "LearningLabs/AzureOpenAI/Lab10_ExposeAIAgentAsMCPTool",
+  "path": "LearningLabs/AzureOpenAI/Lab11-AIAgentWithCustomHttpTransport",
   "startProject": "Start/<Project>.csproj",
   "solutionProject": "Solution/<Project>.csproj",
   "timeoutSeconds": 180,
@@ -252,6 +253,7 @@ For labs with memory or sessions, check what only the history can give (a name g
 For labs with RAG, check the ranking of the search (the expected entry first), the lines written by the search (tool call, provider search input and results) and a fact that only the knowledge base contains (a deadline, a delay), not the presence of an answer (see `azureopenai-lab07`).
 For labs that compare formats or costs, check the measured result itself: the expected record first in the answer, the answer in the requested format (header line), and the sign of the difference in the comparison table (see `azureopenai-lab08`). A comparison row such as `Input tokens  3180  1421  -55%` has no colon, so the token usage parser ignores it.
 For labs with tool approvals, check the request itself (function and arguments), the decision, the tool result that only an executed tool can print, and that a rejected call was **not** executed (a negative lookahead on the scenario block, see `azureopenai-lab09`); use lookaheads when the model may order the requests differently from one run to another.
+For labs that expose an agent as an MCP tool, check what the MCP client sees (the tool name and its `query` parameter), data that only the tools of the exposed agent know in the tool result (an employee name for an id), the log line a stdio server writes on stderr (relayed by the lab as `[server]`), and the tool call of an agent that uses the MCP tool (see `azureopenai-lab10`).
 
 ## Tests
 
@@ -261,7 +263,7 @@ dotnet test
 ```
 
 Unit tests cover the console decoder (spinner, streaming, CRLF split across reads), the token usage parser,
-the checks (including the real Lab02, Lab03, Lab04, Lab05, Lab06, Lab07, Lab08 and Lab09 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, a Lab05 conversation that lost its history, Lab06 answers that do not come from the remote tools, Lab07 answers that do not come from the FAQ, Lab08 answers in the wrong format or without token savings, and Lab09 approvals that were not honored), the build diagnostics,
+the checks (including the real Lab02, Lab03, Lab04, Lab05, Lab06, Lab07, Lab08, Lab09 and Lab10 checks against a solution and a delivered-exercise output, Lab03 / Lab04 answers given without calling the tools, a Lab05 conversation that lost its history, Lab06 answers that do not come from the remote tools, Lab07 answers that do not come from the FAQ, Lab08 answers in the wrong format or without token savings, Lab09 approvals that were not honored, and Lab10 answers that do not come from the exposed agent), the build diagnostics,
 the catalog path and companion validation, the French check descriptions, the localized README lookup, the Azure OpenAI settings store
 (format, preserved entries, precedence, validation, permissions — always in a temporary folder, never the real user-secrets file)
 and the masking of the API key, including an end-to-end run of a throwaway project that prints it;

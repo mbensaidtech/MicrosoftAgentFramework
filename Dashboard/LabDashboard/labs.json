@@ -1000,6 +1000,100 @@
           }
         }
       }
+    },
+    {
+      "id": "azureopenai-lab10",
+      "number": "10",
+      "track": "Azure OpenAI",
+      "title": "Expose an AI Agent as an MCP Tool",
+      "summary": "Turn an agent into an MCP tool and serve it twice: over Streamable HTTP with ASP.NET Core, and over stdio as a child process of an MCP host. Call it as an MCP client, then let another agent delegate a booking to it through MCP.",
+      "level": "Intermediate",
+      "objectives": [
+        "Turn an agent into a function with AsAIFunction() (name, description, query parameter, a new session per call)",
+        "Wrap the function in an MCP tool with McpServerTool.Create() and register it with AddMcpServer().WithTools()",
+        "Serve the tool over Streamable HTTP with ASP.NET Core: WithHttpTransport() and MapMcp(path)",
+        "Serve the tool over stdio with Host.CreateEmptyApplicationBuilder() and WithStdioServerTransport(), with nothing else than MCP messages on stdout",
+        "Call the tool as an MCP client (ListToolsAsync, CallToolAsync) and start a stdio server as an MCP host (StdioClientTransport)",
+        "Give the MCP tool to another agent, which delegates a task to the exposed agent"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab10_ExposeAIAgentAsMCPTool",
+      "startProject": "Start/ExposeAIAgentAsMCPTool.csproj",
+      "solutionProject": "Solution/ExposeAIAgentAsMCPTool.csproj",
+      "timeoutSeconds": 180,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-server",
+          "description": "Scenario 1 - the HTTP MCP server listens on the MCP endpoint",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^MCP server listening on https?://\\S+/mcp/companyassistant\\s*$"
+        },
+        {
+          "id": "scenario1-tool",
+          "description": "Scenario 1 - the MCP client sees the agent as the CompanyAssistant tool, with a query parameter",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S[^\\n]*$\\s*^\\s*Input schema: \\{[^\\n]*\\\"query\\\""
+        },
+        {
+          "id": "scenario1-result",
+          "description": "Scenario 1 - the tool call over HTTP returned the agent's answer with data of the company tools (EMP003 is Charlie Brown)",
+          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Tool result:\\s*$(?:(?!^=== Scenario).)*?Charlie Brown"
+        },
+        {
+          "id": "scenario2-server",
+          "description": "Scenario 2 - the stdio MCP server was started as a child process (its log on stderr) and lists the CompanyAssistant tool",
+          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^\\[server\\] CompanyAssistant MCP server ready on stdio\\.)(?=(?:(?!^=== Scenario).)*?^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S)"
+        },
+        {
+          "id": "scenario2-result",
+          "description": "Scenario 2 - the tool call over stdio returned the rooms for 10 people or more (Innovation Lab, Executive Suite)",
+          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool result:\\s*$(?=(?:(?!^=== Scenario).)*?Innovation Lab)(?=(?:(?!^=== Scenario).)*?Executive Suite)"
+        },
+        {
+          "id": "scenario3-tool-call",
+          "description": "Scenario 3 - the OfficeAssistant called the CompanyAssistant MCP tool",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: CompanyAssistant\\(query: \\S"
+        },
+        {
+          "id": "scenario3-result",
+          "description": "Scenario 3 - the booking went through MCP: names only the company tools know (Brainstorm Corner, Bob Johnson)",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: CompanyAssistant\\((?=(?:(?!^=== Scenario).)*?Bob Johnson)(?=(?:(?!^=== Scenario).)*?Brainstorm Corner)"
+        },
+        {
+          "id": "scenario3-usage",
+          "description": "Scenario 3 - token usage displayed",
+          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Exposer un agent IA comme outil MCP",
+          "level": "Intermédiaire",
+          "summary": "Transformez un agent en outil MCP et servez-le de deux façons : en Streamable HTTP avec ASP.NET Core, et en stdio comme processus enfant d'un hôte MCP. Appelez-le en client MCP, puis laissez un autre agent lui déléguer une réservation via MCP.",
+          "objectives": [
+            "Transformer un agent en fonction avec AsAIFunction() (nom, description, paramètre query, une nouvelle session par appel)",
+            "Envelopper la fonction dans un outil MCP avec McpServerTool.Create() et l'enregistrer avec AddMcpServer().WithTools()",
+            "Servir l'outil en Streamable HTTP avec ASP.NET Core : WithHttpTransport() et MapMcp(path)",
+            "Servir l'outil en stdio avec Host.CreateEmptyApplicationBuilder() et WithStdioServerTransport(), sans rien d'autre que les messages MCP sur stdout",
+            "Appeler l'outil en client MCP (ListToolsAsync, CallToolAsync) et démarrer un serveur stdio en hôte MCP (StdioClientTransport)",
+            "Donner l'outil MCP à un autre agent, qui délègue une tâche à l'agent exposé"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-server": "Scénario 1 - le serveur MCP HTTP écoute sur l'endpoint MCP",
+            "scenario1-tool": "Scénario 1 - le client MCP voit l'agent comme l'outil CompanyAssistant, avec un paramètre query",
+            "scenario1-result": "Scénario 1 - l'appel de l'outil en HTTP a renvoyé la réponse de l'agent avec des données des outils de l'entreprise (EMP003 est Charlie Brown)",
+            "scenario2-server": "Scénario 2 - le serveur MCP stdio a été démarré comme processus enfant (son journal sur stderr) et liste l'outil CompanyAssistant",
+            "scenario2-result": "Scénario 2 - l'appel de l'outil en stdio a renvoyé les salles de 10 personnes ou plus (Innovation Lab, Executive Suite)",
+            "scenario3-tool-call": "Scénario 3 - l'OfficeAssistant a appelé l'outil MCP CompanyAssistant",
+            "scenario3-result": "Scénario 3 - la réservation est passée par MCP : des noms que seuls les outils de l'entreprise connaissent (Brainstorm Corner, Bob Johnson)",
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+          }
+        }
+      }
     }
   ]
 }

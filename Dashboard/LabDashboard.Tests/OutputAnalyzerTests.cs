@@ -1239,4 +1239,164 @@ public class OutputAnalyzerTests
         Assert.Equal(["Scenario 1 · Token Usage (2 runs)", "Scenario 2 · Token Usage (2 runs)"], usage.Reports.Select(r => r.Label));
         Assert.Equal(1409L, usage.Total!.Value); // 355 + 1054
     }
+
+    // Standard output of the Lab10 solution, as decoded by the dashboard (spinner lines removed). The [server] lines are the
+    // stderr of the stdio MCP server (a child process), relayed by the lab on its own stdout.
+    private static readonly string[] Lab10SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Expose the agent as a remote MCP tool (Streamable HTTP) ===",
+        "MCP server listening on http://localhost:5100/mcp/companyassistant",
+        "Query: Get the information of the employee with the ID EMP003.",
+        "MCP tools available (1):",
+        "- CompanyAssistant: Answers questions about the employees and the meeting rooms of the company, and books meeting rooms.",
+        "  Input schema: {\"type\":\"object\",\"properties\":{\"query\":{\"description\":\"Input query to invoke the agent.\",\"type\":\"string\"}},\"required\":[\"query\"]}",
+        "",
+        "Tool result:",
+        "Here is the information for the employee with ID EMP003:",
+        "",
+        "- **Name:** Charlie Brown",
+        "- **Department:** Engineering",
+        "- **Position:** Tech Lead",
+        "- **Email:** charlie.brown@company.com",
+        "- **Vacation Days Remaining:** 12",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===",
+        "Query: Which meeting rooms can host at least 10 people?",
+        "[server] Endpoint: https://example.openai.azure.com/",
+        "[server] Deployment: gpt-4o-mini",
+        "[server] CompanyAssistant MCP server ready on stdio.",
+        "MCP tools available (1):",
+        "- CompanyAssistant: Answers questions about the employees and the meeting rooms of the company, and books meeting rooms.",
+        "  Input schema: {\"type\":\"object\",\"properties\":{\"query\":{\"description\":\"Input query to invoke the agent.\",\"type\":\"string\"}},\"required\":[\"query\"]}",
+        "",
+        "Tool result:",
+        "The meeting rooms that can host at least 10 people are:",
+        "",
+        "1. **Innovation Lab (ROOM-A)**",
+        "   - Capacity: 10 people",
+        "   - Features: Projector, Whiteboard, Video Conference",
+        "",
+        "2. **Executive Suite (ROOM-C)**",
+        "   - Capacity: 20 people",
+        "   - Features: Projector, Video Conference, Catering Service",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===",
+        "User: Book the meeting room ROOM-B for the employee EMP002 on 2026-10-26 from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.",
+        "[server] Endpoint: https://example.openai.azure.com/",
+        "[server] Deployment: gpt-4o-mini",
+        "[server] CompanyAssistant MCP server ready on stdio.",
+        "",
+        "Tool called: CompanyAssistant(query: Book the meeting room ROOM-B for the employee EMP002 on 2026-10-26 from 10:00 to 11:00, subject: Campaign review.)",
+        "Tool result: The meeting room ROOM-B has been successfully booked for the employee EMP002. Here are the details:",
+        "",
+        "- **Room:** Brainstorm Corner (ROOM-B)",
+        "- **Date:** 2026-10-26",
+        "- **Time:** 10:00 - 11:00",
+        "- **Subject:** Campaign review",
+        "- **Booked by:** Bob Johnson",
+        "",
+        "If you need anything else, let me know!",
+        "Tool called: CompanyAssistant(query: Get the name of the employee with ID EMP002.)",
+        "Tool result: The name of the employee with ID EMP002 is Bob Johnson.",
+        "Tool called: CompanyAssistant(query: Get the name of the room with ID ROOM-B.)",
+        "Tool result: The name of the room with ID ROOM-B is \"Brainstorm Corner.\"",
+        "Agent answer:",
+        "The meeting room ROOM-B has been successfully booked for the employee Bob Johnson on 2026-10-26 from 10:00 to 11:00 for the subject \"Campaign review.\"",
+        "",
+        "- **Room Name:** Brainstorm Corner",
+        "- **Employee Name:** Bob Johnson",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 568",
+        "  Output tokens: 169",
+        "  Total tokens: 737",
+    ];
+
+    // Standard output of the Lab10 exercise as delivered (TODOs not done yet): no server, no MCP client, no agent run.
+    private static readonly string[] Lab10StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Expose the agent as a remote MCP tool (Streamable HTTP) ===",
+        "Query: Get the information of the employee with the ID EMP003.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===",
+        "Query: Which meeting rooms can host at least 10 people?",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===",
+        "User: Book the meeting room ROOM-B for the employee EMP002 on 2026-10-26 from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.",
+    ];
+
+    [Fact]
+    public void Every_lab10_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab10 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab10")!;
+
+        Assert.False(lab10.Interactive);
+        Assert.Null(lab10.Companion);
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab10.Expectations, Lab10SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            OutputAnalyzer.EvaluateExpectations(lab10.Expectations, Lab10StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab10_checks_fail_when_the_answers_do_not_come_from_the_exposed_agent()
+    {
+        LabDefinition lab10 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab10")!;
+        // Scenario 1: the HTTP server is up and lists the tool, but the agent failed inside the server.
+        // Scenario 2: the stdio server never started (no [server] line, no tool) and the answer does not come from the tools.
+        // Scenario 3: the OfficeAssistant answered by itself, with invented names.
+        string[] output =
+        [
+            "=== Scenario 1: Expose the agent as a remote MCP tool (Streamable HTTP) ===",
+            "MCP server listening on http://localhost:5100/mcp/companyassistant",
+            "Query: Get the information of the employee with the ID EMP003.",
+            "MCP tools available (1):",
+            "- CompanyAssistant: Answers questions about the employees and the meeting rooms of the company, and books meeting rooms.",
+            "  Input schema: {\"type\":\"object\",\"properties\":{\"query\":{\"description\":\"Input query to invoke the agent.\",\"type\":\"string\"}},\"required\":[\"query\"]}",
+            "The tool reported an error:",
+            "An error occurred invoking 'CompanyAssistant'.",
+            "=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===",
+            "Query: Which meeting rooms can host at least 10 people?",
+            "Tool result:",
+            "I do not have access to the list of meeting rooms.",
+            "=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===",
+            "User: Book the meeting room ROOM-B for the employee EMP002 on 2026-10-26 from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.",
+            "Tool calls: none",
+            "Agent answer:",
+            "ROOM-B (Room Alpha) is booked for John Doe.",
+        ];
+
+        Assert.Equal(
+            ["scenario1-server", "scenario1-tool"],
+            OutputAnalyzer.EvaluateExpectations(lab10.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Labels_the_lab10_token_usage_with_scenario_3()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab10SolutionOutput));
+
+        Assert.Equal(["Scenario 3 · Token Usage"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(737L, usage.Total!.Value);
+    }
 }

@@ -1,18 +1,22 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Shared by every lab: set your Azure OpenAI secrets once with `dotnet user-secrets`. -->
+    <UserSecretsId>microsoft-agent-framework-learninglabs</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.7.0-beta.2" />
-    <PackageReference Include="Azure.Identity" Version="1.18.0-beta.2" />
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251219.1" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.5.0-preview.1" />
-
+    <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
+    <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <!-- Official MCP C# SDK for ASP.NET Core: brings ModelContextProtocol (McpServerTool, stdio transport, McpClient) and the
+         ASP.NET Core shared framework (WebApplication, Host, and the configuration providers used by ConfigurationHelper). -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,4 +30,3 @@
   </ItemGroup>
 
 </Project>
-

@@ -46,7 +46,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
 > **Migration in progress:** the labs are being migrated to the stable release of Microsoft Agent Framework (1.22.0).
-> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08** and **AzureOpenAI/Lab09**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> Migrated so far: **AzureOpenAI/Lab01**, **AzureOpenAI/Lab02**, **AzureOpenAI/Lab03**, **AzureOpenAI/Lab04**, **AzureOpenAI/Lab05**, **AzureOpenAI/Lab06_A2AServer**, **AzureOpenAI/Lab06_A2AClient**, **AzureOpenAI/Lab07**, **AzureOpenAI/Lab08**, **AzureOpenAI/Lab09** and **AzureOpenAI/Lab10**. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -57,7 +57,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01, Lab02, Lab03, Lab04, Lab05, Lab06 server and client, Lab07, Lab08, Lab09, Lab10) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -218,9 +218,10 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab09): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab10): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
+- Lab10: each scenario starts its own MCP server (HTTP on `McpServer:BaseUrl`, `http://localhost:5100` by default, or stdio as a child process) and stops it: the port must be free during the run.
 - Interactive input works for the labs declared interactive in the dashboard catalog; key-by-key input (`Console.ReadKey`) is not supported.
 - Console colors are not rendered.
 
@@ -367,13 +368,16 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
-### Lab 10 - Expose AI Agent as MCP Tool
+### Lab 10 - Expose an AI Agent as an MCP Tool
 
-**Learn how to expose your AI Agent as an MCP server for other clients**
+**Learn how to expose your AI agent as a tool of an MCP server (`AsAIFunction`, `McpServerTool.Create`), over Streamable HTTP and stdio, for other applications and agents**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Create an MCP server that exposes agent capabilities |
+| Scenario 1 | Remote MCP server over Streamable HTTP (ASP.NET Core, `WithHttpTransport` + `MapMcp`): the program connects as an MCP client, lists the tool (name, description, `query` parameter) and calls the agent |
+| Scenario 2 | Local MCP server over stdio (`WithStdioServerTransport`): the program is the MCP host and starts itself with `--stdio` as a child process (stdout reserved for MCP messages, server log on stderr) |
+| Scenario 3 | Another agent uses the exposed agent: the MCP tool is given to an `OfficeAssistant`, which delegates a booking to the `CompanyAssistant` through MCP; tool calls and token usage displayed |
+| Optional | `--http` / `--stdio` keep a server running for MCP Inspector or VS Code |
 
 ---
 

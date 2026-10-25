@@ -15,7 +15,7 @@
 | `Microsoft.Extensions.AI` / `.Abstractions` / `.OpenAI` | **10.10.0** (transitif) | Dépendance directe de MAF 1.22.0. |
 | `Azure.Identity` | **1.21.0** | Stable ; même version que le dépôt officiel. |
 | `Microsoft.Extensions.Configuration.*` | **10.0.12** | Stable, alignée sur .NET 10 et sur le dépôt officiel. |
-| `ModelContextProtocol` / `.AspNetCore` | **2.2.0** (stable) | Pour Lab04 / Lab10. |
+| `ModelContextProtocol` / `.AspNetCore` | **2.2.0** (stable) | Pour Lab04 (`ModelContextProtocol`) / Lab10 (`ModelContextProtocol.AspNetCore`, qui apporte `ModelContextProtocol` et le framework partagé ASP.NET Core). Version du `Directory.Packages.props` 1.22.0 ; une 2.3.0 est publiée depuis (constaté le 2026-10-25), non retenue : version figée. |
 | `Microsoft.Extensions.VectorData.Abstractions` | **10.10.0** (stable) | Pour Lab05 / Lab07 (transitif via MAF). |
 | `CommunityToolkit.VectorData.InMemory` | **1.0.1** (stable) | `InMemoryVectorStore` des samples officiels (`Agent_Step04_3rdPartyChatHistoryStorage`) ; Lab05. |
 | `MongoDB.Driver` | **3.12.0** (stable) | Driver officiel ; Lab05 le référence directement (voir §8, CommonUtilities). |
@@ -80,6 +80,7 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | 1.21.0 | Clarification des modes d'exécution de l'agent A2A | #8032 | Lab06 (défaut `AgentRunMode.ReturnMessage` : réponse = un `Message` A2A) |
 | preview → 1.x (A2A SDK v1) | **Protocole A2A v0.3 → v1** : SDK `A2A` 1.0.0-preview2, hébergement `AddA2AServer` + `MapA2AJsonRpc`/`MapA2AHttpJson` + `MapWellKnownAgentCard`, `AgentCard.SupportedInterfaces`, `GetAIAgent` → `AsAIAgent`. **Client v1 et serveur v0.3 incompatibles** (vérifié : *"'method' field is not a valid A2A method"*) | guide Learn « A2A SDK v1 Migration Guide » | Lab06 (client **et** serveur, migrés ensemble) |
 | 1.22.0 | Sessions MCP adossées à un provider scoppées par invocation | #8425 | aucun — ne concerne que `Microsoft.Agents.AI.Workflows.Declarative.Mcp` (`DefaultMcpToolHandler`), vérifié sur la PR ; Lab04 utilise `McpClient` directement |
+| SDK MCP C# 0.5 → 2.2 (serveur) | **Streamable HTTP sans état par défaut** (`HttpServerTransportOptions.SessionMode = Stateless`, révision de protocole 2026-07-28, SEP-2567) et **SSE legacy désactivé par défaut** (`EnableLegacySse = false` ; incompatible avec le mode sans état) : `MapMcp` ne sert plus `/sse` ni `/message` | docs XML `ModelContextProtocol.AspNetCore` 2.2.0 | Lab10 ✅ (vérifié : client SSE → `405`, `GET …/sse` → `404`) |
 
 ---
 
@@ -488,6 +489,56 @@ Points découverts :
 - **Lab interactif** : `Console.ReadLine()` → `"interactive": true` dans le catalogue du dashboard (premier lab à l'utiliser) ; `null` (entrée fermée) = rejet.
 - Le `Start` doit **utiliser** ses constantes partagées (`AgentInstructions`) hors des TODO, sinon `CS0219` en `-warnaserror` (Lab09 les affiche dans le bloc Setup) ; le Start de **Lab05** présente aujourd'hui ce défaut (4 `CS0219`), à corriger lors d'un passage ultérieur.
 
+### 4.16 Agent exposé comme outil MCP (validé sur Lab10)
+
+**Ancienne approche**
+```csharp
+// ModelContextProtocol.AspNetCore 0.5.0-preview.1 (Solution seulement : le Start ne compilait pas, CS0246) ; Microsoft.NET.Sdk.Web
+ChatClientAgent agent = chatClient.CreateAIAgent(agentOptions);              // outils trouvés par réflexion (GetMethods)
+McpServerTool tool = McpServerTool.Create(agent.AsAIFunction());
+// Scénario « HTTP » (enum Scenario, un seul serveur bloquant par exécution)
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMcpServer().WithHttpTransport().WithTools([tool]);
+var app = builder.Build(); app.MapMcp("/mcp/companyassistant"); app.UseHttpsRedirection(); app.Run();   // SSE + Streamable HTTP
+// Scénario « stdio » : ColoredConsole écrivait sur stdout avant le serveur (8 lignes non JSON avant le premier message MCP)
+var host = Host.CreateEmptyApplicationBuilder(settings: null);
+host.Services.AddMcpServer().WithStdioServerTransport().WithTools([tool]); await host.Build().RunAsync();
+```
+
+**Nouvelle approche**
+```csharp
+// ModelContextProtocol.AspNetCore 2.2.0 (Start = Solution), Microsoft.NET.Sdk + usings explicites
+if (args.Contains("--stdio")) Console.SetOut(Console.Error);                  // stdout réservé aux messages MCP
+AIAgent companyAssistant = chatClient.AsAIAgent(instructions: "...", name: "CompanyAssistant", description: "...", tools: [...]);
+McpServerTool tool = McpServerTool.Create(companyAssistant.AsAIFunction());   // nom/description de l'agent, paramètre "query"
+// stdio (serveur lancé par un hôte MCP avec --stdio)
+HostApplicationBuilder stdio = Host.CreateEmptyApplicationBuilder(settings: null);
+stdio.Services.AddMcpServer().WithStdioServerTransport().WithTools([tool]); await stdio.Build().RunAsync();
+// Streamable HTTP (sans état par défaut, pas de SSE)
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMcpServer().WithHttpTransport().WithTools([tool]);
+WebApplication app = builder.Build(); app.MapMcp("/mcp/companyassistant"); app.Urls.Add(baseUrl); await app.StartAsync();
+// Le lab se teste lui-même : client HTTP, puis hôte stdio qui se relance avec --stdio, puis agent client
+await using McpClient http = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new Uri(url), TransportMode = HttpTransportMode.StreamableHttp }));
+CallToolResult result = await http.CallToolAsync("CompanyAssistant", new Dictionary<string, object?> { ["query"] = "..." });
+await using McpClient stdioClient = await McpClient.CreateAsync(new StdioClientTransport(new() { Command = "dotnet",
+    Arguments = [Assembly.GetEntryAssembly()!.Location, "--stdio"], StandardErrorLines = line => ... }));
+AIAgent office = chatClient.AsAIAgent(instructions: "...", name: "OfficeAssistant", tools: [.. (await stdioClient.ListToolsAsync()).Cast<AITool>()]);
+```
+
+**Explication** — Les API serveur du SDK MCP C# n'ont pas changé de forme entre 0.5.0-preview.1 et 2.2.0 (`McpServerTool.Create(AIFunction)`, `AddMcpServer`, `WithHttpTransport`, `WithStdioServerTransport`, `WithTools`, `MapMcp`), mais **leurs valeurs par défaut** ont changé : le transport HTTP est **sans état** (aucune session MCP, chaque requête est indépendante) et le **SSE legacy n'est plus mappé** (§3). Côté MAF, `AsAIFunction(options, session)` (`PublicAPI.Shipped.txt` 1.22.0, source `AgentExtensions.cs`) nomme la fonction d'après l'agent (caractères non alphanumériques → `_`), reprend sa description, expose un seul paramètre `query` et renvoie `response.Text` ; **sans session, chaque appel crée une nouvelle session** (outil sans état ; une session fournie serait partagée par tous les appelants, ce que la doc XML déconseille). Référence officielle : sample `02-agents/Agents/Agent_Step07_AsMcpTool` (stdio, `Host.CreateEmptyApplicationBuilder`, packages `Microsoft.Extensions.Hosting` + `ModelContextProtocol`) ; transport HTTP : quickstart Learn .NET « Build a minimal MCP server » (template `mcpserver`, options stdio/http, `WithHttpTransport` + `MapMcp`) et docs XML de `ModelContextProtocol.AspNetCore` 2.2.0 ; hôte stdio : quickstart Learn .NET « Build a minimal MCP client » et sample `Agent_MCP_Server` (`StdioClientTransport`). **Changement conceptuel** : le lab n'exige plus MCP Inspector (Node.js) — il se teste lui-même avec la CLI `dotnet` (client MCP HTTP, hôte stdio qui relance le programme avec `--stdio`, agent client) ; `--http` / `--stdio` gardent un serveur pour MCP Inspector ou VS Code.
+
+Points découverts :
+- **Page Learn obsolète** : l'URL `agent-framework/tutorials/agents/agent-as-mcp-tool` sert désormais la page « Hosted MCP Tools » (sans rapport : outils MCP hébergés par Foundry) ; la page « Self-host agents as MCP tools » indique pour .NET *« coming soon »* (le package Python `agent-framework-hosting-mcp` n'a pas d'équivalent .NET). Le sample au tag fait foi.
+- **stdout d'un serveur stdio** : toute ligne non JSON-RPC sur stdout est un message invalide. `Console.SetOut(Console.Error)` en mode `--stdio` **vérifié** (le transport écrit sur le flux stdout brut : stdout ne contient que les réponses JSON-RPC, le journal du lab part sur stderr) ; `Host.CreateEmptyApplicationBuilder(settings: null)` n'ajoute aucun fournisseur de log. Le client 2.2.0 tolérait les 8 lignes parasites de l'ancien serveur (ignorées), mais c'était contraire au protocole.
+- **`dotnet run` avec build écrit sur stdout** : les warnings de build (NU1902/NU1903 hérités de `CommonUtilities`) précèdent le premier message MCP → un hôte MCP doit lancer `dotnet run --no-build -- --stdio` ou `dotnet <dll> --stdio` (vérifié). Le lab, hôte de ses scénarios 2-3, lance `dotnet <Assembly.GetEntryAssembly().Location> --stdio`.
+- **Résultat de l'outil = chaîne JSON** : `AIFunctionFactory` sérialise la valeur de retour, donc le bloc texte MCP contient `"...\n..."` (déjà le cas avant la migration). `McpClientTool` le renvoie comme `TextContent`. Le helper d'affichage le décode ; `AIFunctionFactoryOptions.MarshalResult = (r, _, _) => new ValueTask<object?>(r)` passé à `AsAIFunction` donne du texte brut (**vérifié**, API stable) → « Going further ».
+- **Erreur dans l'agent exposé** : le serveur MCP renvoie `IsError = true` et un message générique (`An error occurred invoking 'CompanyAssistant'.`), sans détail ; le serveur HTTP journalise l'exception (niveau warning). Un serveur stdio qui s'arrête → `ClientTransportClosedException: MCP server process exited unexpectedly (exit code: N)` + fin du stderr du serveur.
+- **Package** : `ModelContextProtocol.AspNetCore` apporte un `FrameworkReference` `Microsoft.AspNetCore.App` : `WebApplication`, `Host`, l'injection de dépendances et les fournisseurs de configuration du `ConfigurationHelper` viennent du framework partagé → ni `Microsoft.Extensions.Configuration.*`, ni `Microsoft.Extensions.Hosting`, ni `Microsoft.Extensions.DependencyInjection` en référence explicite (pas de `NU1510` constaté avec eux, mais inutiles). `Microsoft.NET.Sdk` conservé (comme Lab06_A2AServer) : `using Microsoft.AspNetCore.Builder;`, `Microsoft.Extensions.Hosting`, `Microsoft.Extensions.DependencyInjection` explicites.
+- **Journalisation ASP.NET Core** : en `Information`, chaque requête MCP produit ~8 lignes (Kestrel, routage, `McpServer`). `appsettings.json` → `Logging:LogLevel:Default = Warning` ; lu depuis le *content root* (dossier courant), donc effectif avec `dotnet run` depuis le dossier du projet et dans le dashboard (répertoire de travail = dossier du projet).
+- **Port** : `McpServer:BaseUrl` = `http://localhost:5100` (5000 évité : AirPlay sur macOS, cf. Lab06) ; port occupé → `IOException: Failed to bind to address … address already in use`.
+- **Usage** : seules les consommations de l'agent client (scénario 3) sont visibles ; celles de l'agent exposé sont faites dans le processus serveur et ne remontent pas par MCP.
+
 ---
 
 ## 5. APIs / packages supprimés ou remplacés
@@ -501,10 +552,13 @@ Points découverts :
 | `ChatMessageStore`, `ChatMessageStoreFactory` | Renommés + refondus | Refonte | `ChatHistoryProvider` (instance unique, `ChatClientAgentOptions.ChatHistoryProvider`) + `ProviderSessionState<T>` ; `ChatClientAgentOptions.Instructions` → `ChatOptions.Instructions` (§4.11) | Lab05 ✅ |
 | `AIContextProvider` (API preview) | Refondu (signature, StateBag, composition) | Refonte | `AIContextProvider` 1.x / `MessageAIContextProvider` | Lab12 |
 | `AgentResponse.Deserialize<T>()`, `RunAsync<T>` limité à `ChatClientAgent`, `AIJsonUtilities.CreateJsonSchema` + `ForJsonSchema(schema, …)` | Supprimé / généralisé / simplifié | Compilation (Deserialize) + pédagogie | `JsonSerializer.Deserialize<T>(response.Text, …)`, `AIAgent.RunAsync<T>`, `ChatResponseFormat.ForJsonSchema<T>()` | Lab02 |
-| `ModelContextProtocol 0.5.0-preview.1` | Préversion ; 2.2.0 stable | Aucune rupture pour le client HTTP (`McpClient.CreateAsync`, `HttpClientTransport(Options)`, `ListToolsAsync`, `McpClientTool` inchangés) | `ModelContextProtocol` 2.2.0 | Lab04 (Lab10 : côté serveur, à vérifier) |
+| `ModelContextProtocol 0.5.0-preview.1` | Préversion ; 2.2.0 stable | Aucune rupture pour le client HTTP (`McpClient.CreateAsync`, `HttpClientTransport(Options)`, `ListToolsAsync`, `McpClientTool` inchangés) ; côté serveur, API inchangées mais valeurs par défaut changées (§3, §4.16) | `ModelContextProtocol` 2.2.0 / `ModelContextProtocol.AspNetCore` 2.2.0 | Lab04 ✅, Lab10 ✅ |
+| SSE legacy de `MapMcp` (`…/sse`, `…/message`) | Désactivé par défaut (`EnableLegacySse = false`), impossible en mode sans état | Clients SSE : `405` / `404` | Streamable HTTP (`HttpTransportMode.StreamableHttp` côté client) | Lab10 ✅ |
+| `app.UseHttpsRedirection()` (Lab10) | Sans effet : aucun endpoint HTTPS | Pédagogie | — (supprimé ; serveur sur `http://localhost` seulement) | Lab10 ✅ |
+| `Microsoft.NET.Sdk.Web` (Solution) / `Microsoft.Extensions.Hosting` (Start) pour un serveur MCP | Start ≠ Solution | Socle | `Microsoft.NET.Sdk` + `ModelContextProtocol.AspNetCore` (framework partagé ASP.NET Core) | Lab10 ✅ |
 | `McpClientFactory.CreateAsync` | Supprimé (API 0.x) — encore montré par la page Learn « Using MCP tools » en C# au 2026-09-23 | Compilation | `McpClient.CreateAsync` (sample `Agent_MCP_Server` au tag) | Lab04, Lab10 |
 | `clientFactory: c => new ConfigureOptionsChatClient(c, o => …)` pour fixer `MaxOutputTokens` / `Temperature` | Toujours disponible (MEAI) mais détourné : c'est un middleware `IChatClient` | Pédagogie | `AsAIAgent(new ChatClientAgentOptions { ChatOptions = new() { Instructions, Tools, MaxOutputTokens, Temperature } })` | Lab04 |
-| `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab qui construit un `ServiceCollection` : Lab10, MAS) |
+| `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab console qui construit un `ServiceCollection` : MAS) ; inutile pour Lab10 (framework partagé ASP.NET Core via `ModelContextProtocol.AspNetCore`) |
 | `UserInputRequests`, `UserInputRequestContent` | Supprimés | Compilation + concept | `response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>()` + boucle `while` ; session obligatoire (§4.15) | Lab09 ✅ |
 | `FunctionApprovalRequestContent` (`.FunctionCall`) | Renommé (MEAI 10.x) | Compilation | `ToolApprovalRequestContent` (`.ToolCall` à caster en `FunctionCallContent`), `CreateResponse(approved, reason)` (§4.15) | Lab09 ✅ |
 | `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02/03 (à vérifier) |
@@ -575,4 +629,5 @@ Points découverts :
 - **CommonUtilities** : monter `MongoDB.Driver` en 3.x provoquerait `NU1605` (downgrade) dans Lab12, qui référence 2.30.0 directement (Lab07 ne référence plus MongoDB depuis sa migration). Décision Lab05 : ne pas toucher CommonUtilities ; Lab05 référence `MongoDB.Driver` 3.12.0 (la version la plus haute gagne dans son graphe) et **n'utilise pas** `MongoDbHealthCheck` (compilé contre 2.x ; la 3.0 a fusionné `MongoDB.Driver.Core` dans `MongoDB.Driver`, compatibilité binaire non garantie) — il vérifie la connexion dans son `ConfigurationHelper`. La montée de CommonUtilities (ou le déplacement de `MongoDbHealthCheck`) se fera avec Lab12.
 - **Docker Compose** : un `docker-compose.yml` placé dans un dossier `MongoDB/` prend par défaut le nom de projet `mongodb`, partagé avec tout autre projet local du même nom : `docker compose up` **recrée alors les conteneurs de l'autre projet** et réutilise ses volumes. Toujours déclarer un `name:` de projet propre au lab (Lab05 : `lab05-aiagent-sessions`) et des `container_name` uniques (Lab07, Lab12).
 - **Culture du poste** : les nombres interpolés dans les chaînes (`decimal`, `double`) suivent la culture courante (fr-FR sur le poste de migration : `55,5`). Tout affichage attendu par les README et les checks du dashboard passe par `CultureInfo.InvariantCulture` (Lab08 `FormatConsole`) ; à vérifier dans les labs suivants qui affichent des montants ou des scores.
+- **Serveurs MCP stdio (Lab10)** : stdout est réservé au protocole ; tout `Console.WriteLine`, et la sortie de build d'un `dotnet run` sans `--no-build`, casse la connexion (§4.16). Les labs qui lancent un serveur stdio doivent pointer sur la `.dll` construite.
 - **Analyse graphify** : l'extracteur AST échoue sur 5 `Program.cs` à top-level statements (Lab01/02/03/04/07 Solution) ; sans impact sur la compilation, mais ces fichiers sont sous-représentés dans la carte.
