@@ -45,7 +45,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code or Visual Studio 2022+ | Editing the exercises | Any editor works. |
 
-> **Agent Framework version:** the 14 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -56,7 +56,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab13, with Lab06 server and client; MultiAgentSystem Lab01), in the order of the [learning path](#learning-path) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab15, with Lab06 server and client; MultiAgentSystem Lab01), in the order of the [learning path](#learning-path) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -217,7 +217,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab13, MultiAgentSystem Lab01), in the order of the [learning path](#learning-path): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab15, MultiAgentSystem Lab01), in the order of the [learning path](#learning-path): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab12: needs its MongoDB container (`docker compose up -d` in its `MongoDB/` folder). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
@@ -412,6 +412,30 @@ This lab is split into two parts: start the server, then run the client.
 
 ---
 
+### Lab 14 - Evaluate an Agent
+
+**Learn how to test an agent like code: a dataset of questions with expected answers and expected tool calls, deterministic checks, LLM-as-judge scores, and a regression caught before it ships**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Evaluate an agent with deterministic checks (`EvaluateAsync`, `LocalEvaluator`, `EvalChecks.ContainsExpected` / `ToolCallArgsMatch`, a custom `FunctionEvaluator`): per question, each check with its reason |
+| Scenario 2 | Score the same answers with an LLM judge (`RelevanceEvaluator`, `CoherenceEvaluator`, `ChatConfiguration`), evaluating responses already obtained |
+| Scenario 3 | Catch a regression: the same dataset on the reference and on new instructions, compared question by question; consistency measured with `numRepetitions` |
+
+---
+
+### Lab 15 - Give an Agent Skills
+
+**Learn how to package expertise as Agent Skills — `SKILL.md` files and skills defined in code — loaded on demand by the agent, with approvals on the skill tools**
+
+| Scenario | Description |
+|----------|-------------|
+| Scenario 1 | Skills from `SKILL.md` files (`AgentSkillsProvider`): the agent loads the matching skill and reads its reference document (progressive disclosure), and no skill for an unrelated question |
+| Scenario 2 | A skill defined in code (`AgentInlineSkill`): a static resource, a resource computed at read time, and a script run in the program |
+| Scenario 3 | Approve the skill tools (`UseToolApproval`): every skill tool waits for an approval by default; the read-only tools are auto-approved and a policy decides on scripts (approved for 2.5 kg, rejected for 120 kg) |
+
+---
+
 ### Lab 13 - Host an Agent in an ASP.NET Core API
 
 **Learn how to turn an agent into a web API for an application: the agent in dependency injection, an endpoint protected by JWT bearer tokens that streams the answer (Server-Sent Events), and conversations kept between requests and bound to each user**
@@ -602,14 +626,15 @@ The labs keep their numbers, but the **essential path** follows the order below 
 │    Lab05 Sessions and chat history → Lab09 Human approval and guardrails                     │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 3. Knowledge and memory                                                                      │
-│    Lab07 RAG → Lab12 Memory (context provider)                                               │
+│    Lab07 RAG → Lab12 Memory (context provider) → Lab15 Agent Skills                          │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 4. Agents working with agents                                                                │
 │    MultiAgentSystem Lab01 Delegate a task to another agent (same process)                    │
 │    → Lab06 A2A server → Lab06 A2A client (remote agents, A2A — preview packages)             │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 5. In production                                                                             │
-│    Lab11 Observe an agent (HTTP, OpenTelemetry) → Lab13 Host an agent in an ASP.NET Core API │
+│    Lab11 Observe an agent (HTTP, OpenTelemetry) → Lab14 Evaluate an agent                    │
+│    → Lab13 Host an agent in an ASP.NET Core API                                              │
 └──────────────────────────────────────────────────────────────────────────────────────────────┘
   Optional: Lab10 Expose an agent as an MCP tool · Lab08 Data formats and token usage
 ```

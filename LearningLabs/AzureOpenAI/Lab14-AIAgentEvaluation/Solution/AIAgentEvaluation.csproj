@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Shared by every lab: set your Azure OpenAI secrets once with `dotnet user-secrets`. -->
+    <UserSecretsId>microsoft-agent-framework-learninglabs</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively).
+         The evaluation API (EvaluateAsync, LocalEvaluator, EvalChecks) is part of Microsoft.Agents.AI. -->
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
+    <!-- LLM-as-judge evaluators: RelevanceEvaluator, CoherenceEvaluator (scenario 2). -->
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.11.0" />
+    <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <!-- Configuration: appsettings.json + user secrets + environment variables, bound to AzureOpenAISettings. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\CommonUtilities\CommonUtilities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

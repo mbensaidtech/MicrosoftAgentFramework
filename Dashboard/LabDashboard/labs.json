@@ -825,6 +825,104 @@
       }
     },
     {
+      "id": "azureopenai-lab15",
+      "number": "15",
+      "track": "Azure OpenAI",
+      "title": "Give an Agent Skills",
+      "summary": "Package expertise as Agent Skills: SKILL.md files with instructions and reference documents, and skills defined in code with resources and an in-process script. The agent sees only their names and descriptions and loads them on demand; you control which skill tools may run with approvals and a policy.",
+      "level": "Intermediate",
+      "objectives": [
+        "Write a skill as a SKILL.md file (frontmatter, instructions, resources) and give it to an agent with AgentSkillsProvider",
+        "Watch progressive disclosure: advertise, load_skill, read_skill_resource, run_skill_script",
+        "Define a skill in code with AgentInlineSkill: static and dynamic resources, an in-process script",
+        "Control the skill tools with UseToolApproval: auto-approve the read-only tools, decide on scripts with a policy",
+        "Choose between a tool, a skill and a workflow, and treat third-party skills like third-party code"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab15-AIAgentWithSkills",
+      "startProject": "Start/AIAgentWithSkills.csproj",
+      "solutionProject": "Solution/AIAgentWithSkills.csproj",
+      "timeoutSeconds": 300,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-advertised",
+          "description": "Scenario 1 - both file-based skills were found and advertised (name and description)",
+          "pattern": "(?s)^=== Scenario 1:(?=(?:(?!^=== Scenario).)*?^Skill advertised: expense-policy - \\S)(?=(?:(?!^=== Scenario).)*?^Skill advertised: it-support - \\S)"
+        },
+        {
+          "id": "scenario1-load",
+          "description": "Scenario 1 - the agent loaded the expense-policy skill for the expense question",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Skill\\] load_skill\\(skillName: expense-policy\\) -> "
+        },
+        {
+          "id": "scenario1-resource",
+          "description": "Scenario 1 - the agent read the resource references/limits.md and answered with its limit (145)",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Skill\\] read_skill_resource\\(skillName: expense-policy, resourceName: references/limits\\.md\\) -> (?:(?!^=== Scenario).)*?^Agent: [^\\n]*\\b145\\b"
+        },
+        {
+          "id": "scenario1-no-skill",
+          "description": "Scenario 1 - no skill tool ran for the question that no skill covers",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^User: What is the capital of Italy\\?(?:(?!^=== Scenario).)*?^Skill tools run for this question: 0\\s*$"
+        },
+        {
+          "id": "scenario2-dynamic",
+          "description": "Scenario 2 - the dynamic resource was computed when read (validity date)",
+          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Skill\\] read_skill_resource\\(skillName: shipping-quote, resourceName: validity\\) -> Quotes made today are valid until \\d{4}-\\d{2}-\\d{2}"
+        },
+        {
+          "id": "scenario2-script",
+          "description": "Scenario 2 - the in-process script ran and the answer gave its quote id",
+          "pattern": "^\\[Skill\\] run_skill_script\\(skillName: shipping-quote, scriptName: quote, [^\\n]*-> \\{\"quoteId\":\"(QT-[A-C]\\d+-\\d{3})\"[^\\n]*\\n(?:(?!=== Scenario)[^\\n]*\\n)*?Agent:(?:[^\\n]|\\n(?!=== Scenario))*?\\1"
+        },
+        {
+          "id": "scenario3-default",
+          "description": "Scenario 3 - without auto-approval, the first skill tool call waited for an approval",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Without auto-approval, approval requested for load_skill\\("
+        },
+        {
+          "id": "scenario3-approved",
+          "description": "Scenario 3 - the policy approved the script for 2.5 kg, which then ran",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Policy decision: approved - Parcel of 2\\.5 kg[^\\n]*\\n\\[Skill\\] run_skill_script\\([^\\n]*-> \\{\\\"quoteId\\\":\\\"QT-"
+        },
+        {
+          "id": "scenario3-rejected",
+          "description": "Scenario 3 - the policy rejected the script for 120 kg, which never ran",
+          "pattern": "^Policy decision: rejected - Parcel of 120 kg[^\\n]*\\n(?:(?!\\[Skill\\] run_skill_script|=== Scenario)[^\\n]*\\n)*?Agent: "
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Donner des skills à un agent",
+          "level": "Intermédiaire",
+          "summary": "Empaquetez une expertise sous forme d'Agent Skills : des fichiers SKILL.md avec instructions et documents de référence, et des skills définies en code avec ressources et script exécuté dans le programme. L'agent ne voit que leurs noms et descriptions et les charge à la demande ; vous contrôlez quels outils de skill peuvent s'exécuter avec des approbations et une politique.",
+          "objectives": [
+            "Écrire une skill sous forme de fichier SKILL.md (frontmatter, instructions, ressources) et la donner à un agent avec AgentSkillsProvider",
+            "Observer la divulgation progressive : annonce, load_skill, read_skill_resource, run_skill_script",
+            "Définir une skill en code avec AgentInlineSkill : ressources statiques et dynamiques, script exécuté dans le programme",
+            "Contrôler les outils de skill avec UseToolApproval : approuver automatiquement les outils en lecture seule, décider des scripts avec une politique",
+            "Choisir entre un outil, une skill et un workflow, et traiter les skills de tiers comme du code tiers"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-advertised": "Scénario 1 - les deux skills en fichiers ont été trouvées et annoncées (nom et description)",
+            "scenario1-load": "Scénario 1 - l'agent a chargé la skill expense-policy pour la question de dépenses",
+            "scenario1-resource": "Scénario 1 - l'agent a lu la ressource references/limits.md et répondu avec son plafond (145)",
+            "scenario1-no-skill": "Scénario 1 - aucun outil de skill n'a été exécuté pour la question qu'aucune skill ne couvre",
+            "scenario2-dynamic": "Scénario 2 - la ressource dynamique a été calculée à la lecture (date de validité)",
+            "scenario2-script": "Scénario 2 - le script exécuté dans le programme a tourné et la réponse a donné son identifiant de devis",
+            "scenario3-default": "Scénario 3 - sans approbation automatique, le premier appel d'outil de skill a attendu une approbation",
+            "scenario3-approved": "Scénario 3 - la politique a approuvé le script pour 2,5 kg, qui a ensuite été exécuté",
+            "scenario3-rejected": "Scénario 3 - la politique a rejeté le script pour 120 kg, qui n'a jamais été exécuté"
+          }
+        }
+      }
+    },
+    {
       "id": "multiagent-lab01",
       "number": "01",
       "track": "Multi-Agent System",
@@ -1340,6 +1438,104 @@
             "scenario3-inner-tokens": "Scénario 3 - le span de l'agent météo affiche sa propre consommation de tokens",
             "scenario3-no-http-log": "Scénario 3 - le journal HTTP a été coupé pendant l'exécution tracée, les requêtes ont quand même été comptées",
             "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+          }
+        }
+      }
+    },
+    {
+      "id": "azureopenai-lab14",
+      "number": "14",
+      "track": "Azure OpenAI",
+      "title": "Evaluate an Agent",
+      "summary": "Test an agent like code: run it on a dataset of questions with expected answers and expected tool calls, check each answer with deterministic checks, score it with an LLM judge, and catch a regression of the instructions before it ships.",
+      "level": "Intermediate",
+      "objectives": [
+        "Build an evaluation dataset: questions, expected outputs, expected tool calls",
+        "Evaluate an agent with EvaluateAsync and a LocalEvaluator (EvalChecks, FunctionEvaluator)",
+        "Score answers with LLM-as-judge evaluators (RelevanceEvaluator, CoherenceEvaluator) and a ChatConfiguration",
+        "Evaluate responses you already have, without running the agent again",
+        "Compare two versions of an agent, detect a regression, and measure consistency with numRepetitions"
+      ],
+      "path": "LearningLabs/AzureOpenAI/Lab14-AIAgentEvaluation",
+      "startProject": "Start/AIAgentEvaluation.csproj",
+      "solutionProject": "Solution/AIAgentEvaluation.csproj",
+      "timeoutSeconds": 300,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-tool",
+          "description": "Scenario 1 - the expected tool call was checked: get_order_status with the right order number",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[pass\\] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match"
+        },
+        {
+          "id": "scenario1-expected",
+          "description": "Scenario 1 - the answer contained a fact only the tool knows (tracking number)",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[pass\\] contains_expected: Response contains expected output: \\\"TRK-48213\\\""
+        },
+        {
+          "id": "scenario1-custom",
+          "description": "Scenario 1 - the custom check is_concise ran on the answers",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[(?:pass|fail)\\] is_concise:"
+        },
+        {
+          "id": "scenario1-summary",
+          "description": "Scenario 1 - every question of the dataset passed its checks",
+          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Summary: 4/4 questions passed\\s*$"
+        },
+        {
+          "id": "scenario2-judge",
+          "description": "Scenario 2 - the chat client used as judge is named",
+          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Judge: \\S"
+        },
+        {
+          "id": "scenario2-scores",
+          "description": "Scenario 2 - the judge scored relevance and coherence from 1 to 5, with a reason",
+          "pattern": "(?s)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^\\s*\\[score [1-5]\\] Relevance: \\S)(?=(?:(?!^=== Scenario).)*?^\\s*\\[score [1-5]\\] Coherence: \\S)"
+        },
+        {
+          "id": "scenario3-comparison",
+          "description": "Scenario 3 - both versions were compared question by question, with the checks that failed",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Q1: [^\\n]*\\bpass\\s+FAIL \\([^)\\n]*\\)"
+        },
+        {
+          "id": "scenario3-regression",
+          "description": "Scenario 3 - the regression of the candidate instructions was detected",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Regression detected: [1-9]\\d* question\\(s\\)"
+        },
+        {
+          "id": "scenario3-repetitions",
+          "description": "Scenario 3 - a question was repeated 3 times to measure consistency",
+          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Repetitions of Q1: \\d/3 passed\\s*$"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Azure OpenAI",
+          "title": "Évaluer un agent",
+          "level": "Intermédiaire",
+          "summary": "Testez un agent comme du code : exécutez-le sur un jeu de questions avec réponses et appels d'outils attendus, vérifiez chaque réponse avec des contrôles déterministes, notez-la avec un LLM juge, et détectez une régression des instructions avant sa mise en production.",
+          "objectives": [
+            "Construire un jeu d'évaluation : questions, réponses attendues, appels d'outils attendus",
+            "Évaluer un agent avec EvaluateAsync et un LocalEvaluator (EvalChecks, FunctionEvaluator)",
+            "Noter les réponses avec des évaluateurs LLM juges (RelevanceEvaluator, CoherenceEvaluator) et une ChatConfiguration",
+            "Évaluer des réponses déjà obtenues, sans relancer l'agent",
+            "Comparer deux versions d'un agent, détecter une régression et mesurer la constance avec numRepetitions"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-tool": "Scénario 1 - l'appel d'outil attendu a été vérifié : get_order_status avec le bon numéro de commande",
+            "scenario1-expected": "Scénario 1 - la réponse contenait un fait que seul l'outil connaît (numéro de suivi)",
+            "scenario1-custom": "Scénario 1 - le contrôle personnalisé is_concise a été appliqué aux réponses",
+            "scenario1-summary": "Scénario 1 - chaque question du jeu de données a passé ses contrôles",
+            "scenario2-judge": "Scénario 2 - le chat client utilisé comme juge est indiqué",
+            "scenario2-scores": "Scénario 2 - le juge a noté la pertinence et la cohérence de 1 à 5, avec une raison",
+            "scenario3-comparison": "Scénario 3 - les deux versions ont été comparées question par question, avec les contrôles en échec",
+            "scenario3-regression": "Scénario 3 - la régression des instructions candidates a été détectée",
+            "scenario3-repetitions": "Scénario 3 - une question a été répétée 3 fois pour mesurer la constance"
           }
         }
       }

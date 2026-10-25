@@ -2425,4 +2425,243 @@ public class OutputAnalyzerTests
             ["scenario1-unauthorized", "scenario1-validation", "scenario4-isolated"],
             OutputAnalyzer.EvaluateExpectations(lab13.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
     }
+
+    // Standard output of the Lab14 solution (real run).
+    private static readonly string[] Lab14SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Instructions of the agent under test:",
+        "You are the customer support assistant of an online store.",
+        "For any question about an order, call get_order_status with the order number, and answer with the facts it returns:",
+        "tracking number, carrier, locker code, dates.",
+        "Returns are accepted within 30 days of delivery.",
+        "Answer in at most three sentences.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Evaluate an agent with deterministic checks ===",
+        "Evaluator: LocalEvaluator",
+        "Q1: Where is my order ORD-1042?  (expected: TRK-48213)",
+        "  Answer: Your order ORD-1042 has been shipped on October 24, 2026, with the carrier ParcelExpress. The tracking number is TRK-48213, and it's expected to be delivered on October 27, 2026.",
+        "  [pass] non_empty: Response length 178 meets minimum 1",
+        "  [pass] contains_expected: Response contains expected output: \"TRK-48213\"",
+        "  [pass] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match",
+        "  [pass] is_concise: Passed",
+        "Q2: Which carrier delivers my order ORD-1042?  (expected: ParcelExpress)",
+        "  Answer: Your order ORD-1042 is being delivered by ParcelExpress. The tracking number is TRK-48213, and it is expected to arrive on 2026-10-27.",
+        "  [pass] non_empty: Response length 134 meets minimum 1",
+        "  [pass] contains_expected: Response contains expected output: \"ParcelExpress\"",
+        "  [pass] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match",
+        "  [pass] is_concise: Passed",
+        "Q3: Where can I pick up my order ORD-1043?  (expected: LCK-305)",
+        "  Answer: Your order ORD-1043 was delivered on October 22, 2026, to the parcel locker LCK-305. You can pick it up using the code 6621.",
+        "  [pass] non_empty: Response length 124 meets minimum 1",
+        "  [pass] contains_expected: Response contains expected output: \"LCK-305\"",
+        "  [pass] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match",
+        "  [pass] is_concise: Passed",
+        "Q4: How many days do I have to return an item?  (expected: 30)",
+        "  Answer: You can return an item within 30 days of delivery.",
+        "  [pass] non_empty: Response length 50 meets minimum 1",
+        "  [pass] contains_expected: Response contains expected output: \"30\"",
+        "  [pass] tool_call_args_match: No expected tool calls specified.",
+        "  [pass] is_concise: Passed",
+        "Summary: 4/4 questions passed",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Score the answers with an LLM judge ===",
+        "Judge: the chat client of the deployment (the same model as the agent)",
+        "Evaluator: CompositeEvaluator",
+        "Q1: Where is my order ORD-1042?",
+        "  Answer: Your order ORD-1042 was shipped on October 24, 2026, with the carrier ParcelExpress. The tracking number is TRK-48213, and the expected delivery date is October 27, 2026.",
+        "  [score 4] Relevance: The RESPONSE fully addresses the QUERY by providing accurate and complete information about the order's shipping status, including the carrier and expected delivery date. It does not omit any key details necessary for understanding the order's location.",
+        "  [score 4] Coherence: The RESPONSE effectively addresses the QUERY with clear and relevant information, demonstrating a logical flow and organization. It provides all necessary details about the order status, making it coherent and easy to follow.",
+        "Q2: Which carrier delivers my order ORD-1042?",
+        "  Answer: Your order ORD-1042 is being delivered by ParcelExpress. The tracking number is TRK-48213, and it was shipped on October 24, 2026, with expected delivery on October 27, 2026.",
+        "  [score 4] Coherence: The RESPONSE is coherent and directly addresses the QUERY with relevant information, making it easy to understand. It provides a logical flow of information regarding the order's delivery, which aligns well with the definition of coherence. Therefore, it deserves a high score for coherence.",
+        "  [score 4] Relevance: The RESPONSE fully addresses the QUERY by providing the name of the carrier and additional relevant details about the order, making it a complete response. Thus, it deserves a high score for relevance.",
+        "Q3: Where can I pick up my order ORD-1043?",
+        "  Answer: Your order ORD-1043 was delivered on October 22, 2026, to the parcel locker LCK-305. You can pick it up using the code 6621.",
+        "  [score 4] Relevance: The RESPONSE accurately and completely answers the QUERY by providing the location and code for picking up the order, making it a complete response.",
+        "  [score 4] Coherence: The RESPONSE is coherent and directly addresses the QUERY, providing clear and relevant information about the order pickup location and code. It is well-structured and easy to understand, which aligns with the definition of a coherent response.",
+        "Q4: How many days do I have to return an item?",
+        "  Answer: Returns are accepted within 30 days of delivery.",
+        "  [score 4] Coherence: The RESPONSE is coherent and effectively answers the QUERY with clear information about the return policy, making it easy for the reader to understand the timeframe for returns.",
+        "  [score 4] Relevance: The RESPONSE accurately and completely answers the QUERY regarding the return policy, providing the exact number of days allowed for returns. There are no inaccuracies or omissions, making it a complete response.",
+        "Summary: 4/4 questions passed",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Catch a regression of the instructions ===",
+        "Question                                         reference                    candidate",
+        "Q1: Where is my order ORD-1042?                  pass                         FAIL (contains_expected, tool_call_args_match)",
+        "Q2: Which carrier delivers my order ORD-1042?    pass                         FAIL (contains_expected, tool_call_args_match)",
+        "Q3: Where can I pick up my order ORD-1043?       pass                         FAIL (contains_expected, tool_call_args_match)",
+        "Q4: How many days do I have to return an item?   pass                         pass",
+        "Regression detected: 3 question(s) pass with the reference instructions and fail with the candidate",
+        "Repetitions of Q1: 3/3 passed",
+    ];
+
+    // Standard output of the Lab14 exercise as delivered (TODOs not done yet).
+    private static readonly string[] Lab14StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Instructions of the agent under test:",
+        "You are the customer support assistant of an online store.",
+        "For any question about an order, call get_order_status with the order number, and answer with the facts it returns:",
+        "tracking number, carrier, locker code, dates.",
+        "Returns are accepted within 30 days of delivery.",
+        "Answer in at most three sentences.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Evaluate an agent with deterministic checks ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Score the answers with an LLM judge ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Catch a regression of the instructions ===",
+    ];
+
+    [Fact]
+    public void Every_lab14_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab14 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab14")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab14.Expectations, Lab14SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab14.Expectations, Lab14StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab14_checks_fail_when_the_tool_is_not_called_and_the_regression_is_not_reported()
+    {
+        LabDefinition lab14 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab14")!;
+        // The agent answered without its tool (no tracking number, tool call missing), and the candidate was compared
+        // without reporting the regression.
+        string[] output =
+        [
+            "=== Scenario 1: Evaluate an agent with deterministic checks ===",
+            "Evaluator: LocalEvaluator",
+            "Q1: Where is my order ORD-1042?  (expected: TRK-48213)",
+            "  Answer: I cannot check orders.",
+            "  [pass] non_empty: Response length 22 meets minimum 1",
+            "  [fail] contains_expected: Response does not contain expected output: \"TRK-48213\"",
+            "  [fail] tool_call_args_match: Tool call args match: 0/1 get_order_status: not called",
+            "Summary: 1/4 questions passed",
+            "=== Scenario 3: Catch a regression of the instructions ===",
+            "Question                                         reference                    candidate",
+            "Q1: Where is my order ORD-1042?                  pass                         pass",
+            "No regression: every question that passed with the reference still passes",
+        ];
+
+        // Scenario 2 is absent from this output: only the checks of scenarios 1 and 3 are asserted
+        string[] concerned = ["scenario1-tool", "scenario1-expected", "scenario1-custom", "scenario1-summary", "scenario3-comparison", "scenario3-regression"];
+        Assert.Equal(
+            concerned,
+            OutputAnalyzer.EvaluateExpectations(lab14.Expectations, output).Where(r => concerned.Contains(r.Id) && !r.Passed).Select(r => r.Id));
+    }
+
+    // Standard output of the Lab15 solution (real run).
+    private static readonly string[] Lab15SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Skills folder: skills/ (2 skills)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Skills from SKILL.md files, loaded on demand ===",
+        "Skill advertised: expense-policy - The expense policy of Contoso. Use for questions about business expenses, reimbursement rules, spending limits for hotels and meals, and how to file an expense report.",
+        "Skill advertised: it-support - IT support procedures of Contoso. Use when an employee has a problem with the VPN, a password, a laptop or a phone.",
+        "User: What is the maximum I can spend on a hotel night in Paris for a business trip?",
+        "[Skill] load_skill(skillName: expense-policy) -> --- name: expense-policy description: The expense policy of Contoso. Use for questions about business expen...",
+        "[Skill] read_skill_resource(skillName: expense-policy, resourceName: references/limits.md) -> # Spending limits (2026) | Expense | Limit | |---|---| | Hotel night, Paris | 145 EUR | | Hotel night, othe...",
+        "Agent: The maximum you can spend on a hotel night in Paris for a business trip is **145 EUR**.",
+        "Skill tools run for this question: 2",
+        "User: What is the capital of Italy?",
+        "Agent: The capital of Italy is Rome.",
+        "Skill tools run for this question: 0",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: A skill defined in code, with a dynamic resource and a script ===",
+        "User: How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id and until when it is valid.",
+        "[Skill] load_skill(skillName: shipping-quote) -> <name>shipping-quote</name> <description>Quotes the cost of shipping a parcel. Use when asked how much it c...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: rates) -> # Shipping rates Price = base price of the zone + price per kg x weight (kg). Parcels up to 30 kg. | Zone |...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: validity) -> Quotes made today are valid until 2026-11-01.",
+        "[Skill] run_skill_script(skillName: shipping-quote, scriptName: quote, arguments: {\"weightKg\":2.5,\"zone\":\"B\"}) -> {\"quoteId\":\"QT-B250-096\",\"priceEur\":\"13.75\"}",
+        "Agent: The cost to ship a 2.5 kg parcel to Germany is **€13.75**. The quote ID is **QT-B250-096**, and it is valid until **November 1, 2026**.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Approve the skill tools ===",
+        "Without auto-approval, approval requested for load_skill(skillName: shipping-quote)",
+        "User: How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id.",
+        "[Skill] load_skill(skillName: shipping-quote) -> <name>shipping-quote</name> <description>Quotes the cost of shipping a parcel. Use when asked how much it c...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: rates) -> # Shipping rates Price = base price of the zone + price per kg x weight (kg). Parcels up to 30 kg. | Zone |...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: validity) -> Quotes made today are valid until 2026-11-01.",
+        "Approval requested for run_skill_script(skillName: shipping-quote, scriptName: quote, arguments: {\"weightKg\":2.5,\"zone\":\"B\"})",
+        "Policy decision: approved - Parcel of 2.5 kg: within the 30 kg limit.",
+        "[Skill] run_skill_script(skillName: shipping-quote, scriptName: quote, arguments: {\"weightKg\":2.5,\"zone\":\"B\"}) -> {\"quoteId\":\"QT-B250-096\",\"priceEur\":\"13.75\"}",
+        "Agent: The cost to ship a 2.5 kg parcel to Germany is **13.75 EUR**, and the quote ID is **QT-B250-096**.",
+        "User: How much does it cost to ship a 120 kg parcel to Germany? Give me the quote id.",
+        "[Skill] load_skill(skillName: shipping-quote) -> <name>shipping-quote</name> <description>Quotes the cost of shipping a parcel. Use when asked how much it c...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: rates) -> # Shipping rates Price = base price of the zone + price per kg x weight (kg). Parcels up to 30 kg. | Zone |...",
+        "[Skill] read_skill_resource(skillName: shipping-quote, resourceName: validity) -> Quotes made today are valid until 2026-11-01.",
+        "Approval requested for run_skill_script(skillName: shipping-quote, scriptName: quote, arguments: {\"weightKg\":120,\"zone\":\"B\"})",
+        "Policy decision: rejected - Parcel of 120 kg: over the 30 kg limit, a freight quote is needed from the logistics team.",
+        "Agent: The parcel of 120 kg exceeds the 30 kg limit for standard shipping quotes. A freight quote is required for such heavy parcels, and you'll need to contact the logistics team to obtain that information.",
+    ];
+
+    // Standard output of the Lab15 exercise as delivered (TODOs not done yet).
+    private static readonly string[] Lab15StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Skills folder: skills/ (2 skills)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Skills from SKILL.md files, loaded on demand ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: A skill defined in code, with a dynamic resource and a script ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Approve the skill tools ===",
+    ];
+
+    [Fact]
+    public void Every_lab15_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab15 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab15")!;
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab15.Expectations, Lab15SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab15.Expectations, Lab15StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab15_checks_fail_when_the_skill_is_not_used_or_a_rejected_script_still_runs()
+    {
+        LabDefinition lab15 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab15")!;
+        // Scenario 1: the agent guessed the limit without loading the skill. Scenario 3: the script ran after its rejection.
+        string[] output = [.. Lab15SolutionOutput
+            .Where(line => !line.StartsWith("[Skill] load_skill(skillName: expense-policy)", StringComparison.Ordinal)
+                && !line.StartsWith("[Skill] read_skill_resource(skillName: expense-policy", StringComparison.Ordinal))
+            .Select(line => line.StartsWith("Agent: The maximum you can spend", StringComparison.Ordinal) ? "Agent: Usually around 150 EUR per night." : line)
+            .SelectMany(line => line.StartsWith("Policy decision: rejected - Parcel of 120 kg", StringComparison.Ordinal)
+                ? new[] { line, "[Skill] run_skill_script(skillName: shipping-quote, scriptName: quote, arguments: {\"weightKg\":120,\"zone\":\"B\"}) -> {\"quoteId\":\"QT-B12000-543\",\"priceEur\":\"213.50\"}" }
+                : new[] { line })];
+
+        Assert.Equal(
+            ["scenario1-load", "scenario1-resource", "scenario3-rejected"],
+            OutputAnalyzer.EvaluateExpectations(lab15.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+    }
 }

@@ -138,7 +138,7 @@ Pas de lab dédié au middleware : couvert par A7 (garde-fous), A11 (niveau chat
 | Orchestration multi-agent et workflows MAF, `MultiAgentSystem/Lab02` et `Lab03` | Hors périmètre (décision précédente) |
 | Coordination d'agents : Handoff, Group Chat, Magentic, `BackgroundAgentsProvider` | Orchestration ; `BackgroundAgentsProvider` est en outre expérimental |
 | Un outil par compétence A2A, tâches longues A2A, liaison gRPC | Utiles mais non indispensables ; préversion ; documentation Learn en retard sur le code pour les tâches |
-| Agent Harness, Agent Skills, évaluation | Premiers candidats d'une phase suivante |
+| Agent Harness, Agent Skills, évaluation | Premiers candidats d'une phase suivante. **Mise à jour 2026-10-25** : évaluation et Agent Skills faits (Lab14, Lab15, API stables — [rapport](Migration/Evaluation-Skills-Report.md)) ; Agent Harness reporté (compaction, mémoire de fichiers et boucle expérimentales, `MAAI001`) |
 | Multimodal, background responses (hors A2A), agents déclaratifs (RC), compaction et réducteur intégrés (expérimentaux), routage multi-modèles, agents personnalisés | Fonctionnalités avancées ou spécialisées |
 | AG-UI, DevUI, CodeAct, Durable Extension, Foundry Hosted Agents | Non indispensables pour débuter ni pour une première solution complète |
 
