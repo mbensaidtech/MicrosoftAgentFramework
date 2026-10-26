@@ -206,7 +206,7 @@ The dashboard implements the **Admin API contract v1** (`Lab Bench Admin — AI 
 | Envelope protocol: version 1, AES-256-GCM, PBKDF2-HMAC-SHA256 (600,000 to 10,000,000 iterations, 16-byte salt), the labels `labs-admin/model-unlock/v1` and `labs-admin/model-envelope/v1`, the official test vector | `AdminEnvelopeDecryptor` (tests: `AdminEnvelopeDecryptorTests`) |
 | Plaintext `{ v, envelopeId, configs: { <id>: { apiKey } } }`; `settings.endpoint` / `settings.deployment` of the default configuration of each kind | `AdminEnvelopeDecryptor` |
 
-Status: on 2026-10-26 the routes are not deployed on the hosted admin dashboard yet: the tab then says *The trainer configuration is not available on this server yet*, and *My configuration* works as usual. The tests use the official test vector and an in-process fake of the admin dashboard (`FakeModelConfigServer`).
+Status: deployed on the hosted admin dashboard and checked end to end on 2026-10-26 (unlock with an access code, then Lab01 and Lab07 with the trainer's keys). A server without these routes answers 404: the tab then says *The trainer configuration is not available on this server yet*, and *My configuration* works as usual. The automated tests use the official test vector and an in-process fake of the admin dashboard (`FakeModelConfigServer`).
 
 ## Interactive labs
 
@@ -423,7 +423,7 @@ and end-to-end runs of a throwaway project answering three `ReadLine` calls (non
 ## Limitations
 
 - Token usage is only what the exercise prints; model calls whose usage is not printed are not counted. No cost estimate.
-- AI models: Azure OpenAI only (the labs only call Azure OpenAI); the trainer's configuration needs the model configuration routes of the admin dashboard, not deployed on the hosted one yet (the tab says so, *My configuration* works).
+- AI models: Azure OpenAI only (the labs only call Azure OpenAI); the trainer's configuration needs the model configuration routes of the admin dashboard (contract v1) and an access code created by the trainer.
 - Reporting: a help request clicked while the admin server is down is kept in memory only (it is sent when the server answers, but lost if the dashboard is restarted before); copying `identity.json` to another machine makes both report as the same developer.
 - One run at a time (the labs share `CommonUtilities`, parallel builds would conflict). A companion is part of the run, not a second run.
 - Interactive labs must be declared `"interactive": true`; `Console.ReadKey` is not supported (see [Interactive labs](#interactive-labs)).

@@ -1,6 +1,6 @@
 ---
 title: Dashboard AI Model Configuration - Trainer and Custom Models
-status: implemented (T12 pending: hosted routes)
+status: implemented
 priority: high
 author: PM Agent
 created: 2026-10-25
@@ -60,6 +60,7 @@ The Admin Dashboard routes are defined by the **Admin API contract v1** (OpenAPI
   - T6 layout: one *Trainer's configuration* bar above the cards (Refresh, errors with the action that helps, Unlock, the code entry with a countdown) and, in each card, the trainer's default with its *Use the trainer's configuration* tick. A refused switch to *Trainer configuration* ticks the kind. In trainer mode, an offer identical to what is in use is not repeated; the bar then says the configuration is up to date.
   - T13: the trainer's command is `dotnet run --project Dashboard/LabDashboard -- invitation` (no dashboard started). Whitespace inside a pasted code (a line wrapped by a mail client) is ignored; keys must be visible ASCII (they travel as HTTP headers). The admin API key is read at each call by the reporting and the trainer flow.
   - The `Dashboard/README.md#azure-openai-settings` anchor is kept as an alias of *AI models settings*: 17 lab READMEs link to it and the other labs are out of scope.
+- **v1.5** (2026-10-26) — The routes are deployed on the hosted admin dashboard: **T12 delivered**, every task is done. Checked with the owner's workshop (all workshops are test ones) and the owner's dashboard identity, in an isolated dashboard (temporary user profile, copies of the identity and the history; reporting refused for lack of the workshop key, so no event was sent): overview without a code (LLM and embedding defaults, applicable); `noAccessCode` shown while no code was active; Unlock (3 attempts), a wrong code (*Wrong code (2 attempt(s) left)*), then the right code: both models in trainer mode; Lab01 10/10 and Lab07 12/12 with the trainer's keys only (Lab07 on the trainer's embedding endpoint, API key); a wrong admin API key gives `unauthorized` (`apiKey`), an unreachable server `network`. No key and no code in the logs, the history, the outbox or the answers of the dashboard. Not run live: the invitation code (no workshop key at hand; covered by the automated tests).
 
 ---
 
@@ -245,7 +246,7 @@ Common: headers of Rule 16 on every call; HTTPS only; JSON UTF-8; base64url with
 
 Client security requirements of the contract (all binding): decrypt only in the .NET server process; never log or persist the code, `K_code`, the proof, the unlock request/response bodies, `unlockKey`, the plaintext or the keys; validate the envelope before deriving and the plaintext after decrypting; wipe derived keys and buffers; register opened keys with the output redaction; store opened values only in the shared user-secrets file.
 
-Status on 2026-10-25: the routes answer 404 on the hosted admin (not deployed yet). Until then, phase 2 is tested with the official test vector and an in-process fake admin server.
+Status on 2026-10-25: the routes answered 404 on the hosted admin (not deployed yet); phase 2 was built against the official test vector and an in-process fake admin server. Deployed on 2026-10-26 and checked end to end (T12, changelog v1.5).
 
 ### Edge Cases
 
@@ -583,9 +584,9 @@ Status on 2026-10-25: the routes answer 404 on the hosted admin (not deployed ye
 - No secret is printed in the test output
 
 **Success criteria**:
-- [ ] Overview, Unlock and code work against the hosted routes; Lab01 and Lab07 pass afterwards
-- [ ] Wrong code (attempts left), wrong admin API key and network failure give the expected messages
-- [ ] The phase 1 tests still pass
+- [x] Overview, Unlock and code work against the hosted routes; Lab01 and Lab07 pass afterwards
+- [x] Wrong code (attempts left), wrong admin API key and network failure give the expected messages
+- [x] The phase 1 tests still pass
 
 **References**: Stories 1, 3, Admin API contract v1
 
@@ -618,7 +619,7 @@ Status on 2026-10-25: the routes answer 404 on the hosted admin (not deployed ye
 
 ## Test Plan
 
-> Status: ready (2026-10-26), T12 excepted. Run it with a **temporary user profile**, never your real secrets, and without reporting. From `Dashboard/`: `dotnet test` (601 tests), `dotnet build`, then in `Dashboard/LabDashboard` (macOS/Linux; on Windows set `APPDATA` instead of `HOME`):
+> Status: ready (2026-10-26). Run it with a **temporary user profile**, never your real secrets, and without reporting. From `Dashboard/`: `dotnet test` (601 tests), `dotnet build`, then in `Dashboard/LabDashboard` (macOS/Linux; on Windows set `APPDATA` instead of `HOME`):
 >
 > ```bash
 > HOME=$(mktemp -d) NUGET_PACKAGES=~/.nuget/packages Dashboard__Port=5091 Dashboard__DataDirectory=$(mktemp -d) Dashboard__Reporting__ServerUrl= \
@@ -639,7 +640,7 @@ Status on 2026-10-25: the routes answer 404 on the hosted admin (not deployed ye
 10. **FR, keyboard, phone width** — switch to FR: every text of the bar, the offers, the code entry and the errors is translated. At 390 px: no horizontal scroll. Tab reaches the ticks, Unlock, the code field, its buttons; Enter submits the code, never the dialog.
 11. **Invitation code (T13)** — `dotnet run --project Dashboard/LabDashboard -- invitation`: it asks for both keys without echoing them and prints `LB1.…` only. Start a dashboard **with** reporting on a profile without `appsettings.Local.json` and without `LABS_ADMIN_API_KEY`, paste the code in *Join the workshop*: the reporting pill turns *Reporting* without a restart; the *Workshop* tab shows *Admin API key: from the trainer's invitation*. A code starting with `LB2.` gives *…made for a newer Lab Bench*, a truncated one *Paste the invitation code… exactly…*; nothing is stored.
 12. **Nothing secret anywhere** — after the steps above: `grep` your key, `K7QX9` and the invitation code in the data folder (`history.json`, `outbox.json`, `identity.json`) and in the dashboard console: no match. `GET /api/settings/models` shows `stored` and 4-character hints only.
-13. **T12 (pending)** — once the routes are deployed on the hosted admin dashboard: a test workshop with an access code, steps 2–3 and 6 without the mock, then Lab01 and Lab07 pass with the trainer's keys; a wrong code shows the attempts left; a wrong admin API key shows *refused the project's API key*.
+13. **Hosted admin dashboard (T12)** — without the mock, on a dashboard that joined a workshop whose trainer created an access code: steps 2–3 and 6 against the real routes, then Lab01 and Lab07 pass with the trainer's keys; a wrong code shows *Wrong code (2 attempt(s) left)*; no active code shows *No access code is active for this workshop…*; `LABS_ADMIN_API_KEY=wrong` shows *refused the project's API key*; `Dashboard__Reporting__ServerUrl=https://labs-admin.invalid` shows *cannot be reached*. Verified on 2026-10-26 (changelog v1.5).
 
 ## Dependencies
 
