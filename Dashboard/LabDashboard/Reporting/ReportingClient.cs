@@ -12,7 +12,10 @@ using LabDashboard.Settings;
 
 namespace LabDashboard.Reporting;
 
-/// <summary>What the UI shows about the reporting (never the workshop key nor the dev token).</summary>
+/// <summary>
+/// What the UI shows about the reporting: never the workshop key, the admin API key nor the dev token, only whether the keys are configured and
+/// where they come from (<c>environment</c>, <c>dashboard</c> = the user secrets, <c>appsettings</c>, <c>missing</c>).
+/// </summary>
 public sealed record ReportingStatus(
     bool Enabled,
     string State,
@@ -22,6 +25,8 @@ public sealed record ReportingStatus(
     string? ServerHost,
     bool WorkshopKeyConfigured,
     string WorkshopKeySource,
+    bool ApiKeyConfigured,
+    string ApiKeySource,
     string? UserId,
     string? Username,
     string? LastError,
@@ -45,7 +50,10 @@ public sealed record HelpState(
     public bool IsActive => Status is "pending" or "open" or "acknowledged";
 }
 
-/// <summary>Values entered in the UI (welcome dialog or settings). A null field keeps the current value; the key is write-only.</summary>
+/// <summary>
+/// Values entered in the UI (welcome dialog or settings). A null field keeps the current value; the key is write-only.
+/// <see cref="WorkshopKey"/> is a plain workshop key or the trainer's invitation code (<see cref="InvitationCode"/>), which carries the admin API key too.
+/// </summary>
 public sealed record ReportingSettingsUpdate(string? Username, string? WorkshopKey);
 
 /// <summary>
@@ -59,6 +67,8 @@ public sealed class ReportingClient : BackgroundService
     public const string WorkshopKeyName = "WorkshopKey";
     public const string WorkshopKeyVariable = "Dashboard__Reporting__WorkshopKey";
     public const string ApiKeyVariable = "LABS_ADMIN_API_KEY";
+    /// <summary>The admin API key of an invitation, in the user secrets (section <see cref="WorkshopKeySection"/>), next to the workshop key.</summary>
+    public const string ApiKeyName = "ApiKey";
     public const string ApiKeyHeader = "X-API-Key";
 
     private static readonly JsonSerializerOptions JsonOptions = ProgressSnapshot.JsonOptions;
@@ -72,7 +82,6 @@ public sealed class ReportingClient : BackgroundService
     private readonly ILogger<ReportingClient> _logger;
     private readonly Func<string, string?> _environment;
     private readonly HttpClient _http;
-    private readonly string? _apiKey;
     private readonly SemaphoreSlim _wake = new(0, 1);
     private readonly SemaphoreSlim _network = new(1, 1);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _labOpened = new(StringComparer.OrdinalIgnoreCase);
@@ -81,6 +90,8 @@ public sealed class ReportingClient : BackgroundService
 
     private string _state = "disabled";
     private string? _lastError;
+    // The admin API key in use: resolved again at each pass of the loop and when an invitation is entered (no restart needed).
+    private string? _apiKey;
     // Set when retrying cannot help (API key missing or refused, workshop key refused): no request at all until the cause changes,
     // so a wrong value never trips the server's lockout (30 failures per minute block the machine).
     private string? _halted;
@@ -119,11 +130,7 @@ public sealed class ReportingClient : BackgroundService
             Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.RequestTimeoutSeconds)),
         };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd($"LabDashboard/{DashboardVersion}");
-        _apiKey = Normalize(_environment(ApiKeyVariable)) ?? Normalize(_options.ApiKey);
-        if (_apiKey is null)
-        {
-            _halted = "apiKeyMissing";
-        }
+        RefreshApiKey();
 
         // The catalog and the snapshot come before anything the runner reports.
         Bootstrap();
@@ -136,7 +143,28 @@ public sealed class ReportingClient : BackgroundService
     public static string Platform { get; } = OperatingSystem.IsMacOS() ? "macOS" : OperatingSystem.IsWindows() ? "Windows" : "Linux";
 
     /// <summary>The admin dashboard URL, fixed in the project configuration (Dashboard:Reporting:ServerUrl); never editable in the UI.</summary>
-    public string? ServerUrl => Normalize(_options.ServerUrl);
+    public string? ServerUrl => ResolveServerUrl(_options);
+
+    /// <summary>
+    /// The admin dashboard URL of the project configuration, or null. With <see cref="ResolveApiKey"/>, the single resolution of the admin API
+    /// shared by every caller (the reporting, the trainer configuration): they can never disagree on whether the admin API is configured.
+    /// </summary>
+    internal static string? ResolveServerUrl(ReportingOptions options) => Normalize(options.ServerUrl);
+
+    /// <summary>The admin API key (see <see cref="ResolveApiKeyWithSource"/>), or null.</summary>
+    internal static string? ResolveApiKey(ReportingOptions options, Func<string, string?> environment, Func<string?>? stored = null) =>
+        ResolveApiKeyWithSource(options, environment, stored).Key;
+
+    /// <summary>
+    /// The admin API key and where it comes from (Business Rule 22), in this order: the <c>LABS_ADMIN_API_KEY</c> environment variable
+    /// (<c>environment</c>), the key of the trainer's invitation saved in the user secrets (<paramref name="stored"/>: <c>dashboard</c>), then
+    /// <c>Dashboard:Reporting:ApiKey</c> of appsettings.Local.json / appsettings.json (<c>appsettings</c>). <c>(null, "missing")</c> when none is set.
+    /// </summary>
+    internal static (string? Key, string Source) ResolveApiKeyWithSource(ReportingOptions options, Func<string, string?> environment, Func<string?>? stored = null) =>
+        Normalize(environment(ApiKeyVariable)) is { } fromEnvironment ? (fromEnvironment, "environment")
+        : Normalize(stored?.Invoke()) is { } fromSecrets ? (fromSecrets, "dashboard")
+        : Normalize(options.ApiKey) is { } configured ? (configured, "appsettings")
+        : (null, "missing");
 
     /// <summary>Reporting runs only once the developer joined a workshop (identity created) and a server URL is known.</summary>
     public bool Enabled => ServerUrl is not null && _identity.Current is not null;
@@ -144,6 +172,27 @@ public sealed class ReportingClient : BackgroundService
     public HelpState? Help
     {
         get { lock (_gate) { return _help; } }
+    }
+
+    private (string? Key, string Source) ApiKey() =>
+        ResolveApiKeyWithSource(_options, _environment, () => _secrets.GetEntry(WorkshopKeySection, ApiKeyName));
+
+    /// <summary>Reads the admin API key again: a key that appears lifts the <c>apiKeyMissing</c> stop, a key that disappears sets it.</summary>
+    private void RefreshApiKey()
+    {
+        string? key = ApiKey().Key;
+        lock (_gate)
+        {
+            _apiKey = key;
+            if (key is null)
+            {
+                _halted ??= "apiKeyMissing";
+            }
+            else if (_halted == "apiKeyMissing")
+            {
+                _halted = null;
+            }
+        }
     }
 
     private (string? Key, string Source) WorkshopKey()
@@ -166,6 +215,7 @@ public sealed class ReportingClient : BackgroundService
         DevIdentity? identity = _identity.Current;
         string? serverUrl = ServerUrl;
         (string? key, string keySource) = WorkshopKey();
+        (string? apiKey, string apiKeySource) = ApiKey();
         lock (_gate)
         {
             bool enabled = serverUrl is not null && identity is not null;
@@ -179,6 +229,8 @@ public sealed class ReportingClient : BackgroundService
                 ServerHost: serverUrl is null ? null : new Uri(serverUrl).Host,
                 WorkshopKeyConfigured: key is not null,
                 WorkshopKeySource: keySource,
+                ApiKeyConfigured: apiKey is not null,
+                ApiKeySource: apiKeySource,
                 UserId: identity?.UserId,
                 Username: identity?.Username,
                 LastError: _halted ?? _lastError,
@@ -273,6 +325,7 @@ public sealed class ReportingClient : BackgroundService
         Dictionary<string, string> errors = [];
         string? username = Normalize(update.Username);
         string? workshopKey = Normalize(update.WorkshopKey);
+        Invitation? invitation = null;
         DevIdentity? current = _identity.Current;
 
         if (username is not null && IdentityStore.ValidateUsername(username) is { } usernameError)
@@ -284,7 +337,18 @@ public sealed class ReportingClient : BackgroundService
             errors["username"] = "required";
         }
 
-        if (workshopKey is not null && workshopKey.Any(char.IsWhiteSpace))
+        if (workshopKey is not null && InvitationCode.IsInvitation(workshopKey))
+        {
+            // The trainer's invitation code (Business Rule 21): the workshop key and the admin API key at once.
+            invitation = InvitationCode.Parse(workshopKey, out string? invitationError);
+            if (invitation is null)
+            {
+                errors["workshopKey"] = invitationError!;
+            }
+
+            workshopKey = invitation?.WorkshopKey;
+        }
+        else if (workshopKey is not null && workshopKey.Any(char.IsWhiteSpace))
         {
             errors["workshopKey"] = "invalid";
         }
@@ -308,7 +372,16 @@ public sealed class ReportingClient : BackgroundService
             return errors;
         }
 
-        if (workshopKey is not null)
+        if (invitation is not null)
+        {
+            // One write: both keys are stored, or none (Business Rule 22).
+            await _secrets.SetEntriesAsync(WorkshopKeySection, new Dictionary<string, string?>
+            {
+                [WorkshopKeyName] = invitation.WorkshopKey,
+                [ApiKeyName] = invitation.ApiKey,
+            });
+        }
+        else if (workshopKey is not null)
         {
             await _secrets.SetEntryAsync(WorkshopKeySection, WorkshopKeyName, workshopKey);
         }
@@ -332,12 +405,20 @@ public sealed class ReportingClient : BackgroundService
             _lastError = null;
             if (_halted == "workshopKey" && workshopKey is not null)
             {
-                // A new workshop key is worth one more try; the API key is project configuration and needs a restart.
+                // A new workshop key is worth one more try.
+                _halted = null;
+            }
+
+            if (_halted == "apiKey" && invitation is not null)
+            {
+                // A new invitation brings an admin API key: worth one more try too, without a restart (Business Rule 22).
                 _halted = null;
             }
 
             _state = Enabled ? "registering" : "disabled";
         }
+
+        RefreshApiKey();
 
         // A new identity (or server) starts with the catalog and a snapshot, before anything else is reported.
         Bootstrap();
@@ -493,9 +574,10 @@ public sealed class ReportingClient : BackgroundService
         }
 
         Bootstrap();
+        RefreshApiKey();
         if (Halted == "apiKeyMissing")
         {
-            WarnOnce("apiKeyMissing", "Reporting is off: the admin API key is not configured (Dashboard:Reporting:ApiKey in appsettings.Local.json, or the {Variable} environment variable).",
+            WarnOnce("apiKeyMissing", "Reporting is off: the admin API key is not configured (the trainer's invitation code entered in the settings, Dashboard:Reporting:ApiKey in appsettings.Local.json, or the {Variable} environment variable).",
                 ApiKeyVariable);
         }
 
@@ -907,7 +989,7 @@ public sealed class ReportingClient : BackgroundService
             switch ((await ReadJsonAsync(response, cancellationToken))?["error"]?.ToString())
             {
                 case "invalidApiKey":
-                    Halt("apiKey", "The admin API refused the API key (401 invalidApiKey): reporting is stopped until the dashboard is restarted with a valid Dashboard:Reporting:ApiKey.");
+                    Halt("apiKey", "The admin API refused the API key (401 invalidApiKey): reporting is stopped until a new invitation code is entered in the settings, or the dashboard is restarted with a valid key.");
                     break;
                 case "invalidWorkshopKey":
                     Halt("workshopKey", "The admin API refused the workshop key (401 invalidWorkshopKey): reporting is stopped until a new key is entered in the settings.");
@@ -937,9 +1019,11 @@ public sealed class ReportingClient : BackgroundService
         }
 
         // Never an empty header (a missing key halts the reporting before any request), never in the URL.
-        if (_apiKey is not null && RequiresApiKey(path))
+        string? apiKey;
+        lock (_gate) { apiKey = _apiKey; }
+        if (apiKey is not null && RequiresApiKey(path))
         {
-            request.Headers.TryAddWithoutValidation(ApiKeyHeader, _apiKey);
+            request.Headers.TryAddWithoutValidation(ApiKeyHeader, apiKey);
         }
 
         return request;
@@ -972,7 +1056,7 @@ public sealed class ReportingClient : BackgroundService
 
     // ---------- state ----------
 
-    /// <summary>Why the reporting is stopped (<c>apiKeyMissing</c>, <c>apiKey</c>, <c>workshopKey</c>), or null.</summary>
+    /// <summary>Why the reporting is stopped (<c>apiKeyMissing</c>, <c>apiKey</c>, <c>workshopKey</c>), or null. The last two are lifted by a new key entered in the settings.</summary>
     private string? Halted
     {
         get { lock (_gate) { return _halted; } }

@@ -22,6 +22,11 @@ public sealed class ReportingClientTests : IAsyncDisposable
     private readonly string _root = Directory.CreateTempSubdirectory("labbench-reporting-client-").FullName;
     private readonly List<FakeAdminServer> _servers = [];
 
+    private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    /// <summary>The shared user-secrets file of <see cref="CreateLab"/>.</summary>
+    private string SecretsFile => Path.Combine(_root, "secrets", "secrets.json");
+
     public async ValueTask DisposeAsync()
     {
         foreach (FakeAdminServer server in _servers)
@@ -583,6 +588,111 @@ public sealed class ReportingClientTests : IAsyncDisposable
                 Assert.DoesNotContain(secret, File.ReadAllText(c.Identity.File));
                 Assert.True(!File.Exists(c.Outbox.File) || !File.ReadAllText(c.Outbox.File).Contains(secret));
             });
+        }
+    }
+
+    // ---------- invitation code (Business Rules 21–22) ----------
+
+    [Fact]
+    public async Task On_a_fresh_machine_an_invitation_joins_the_workshop_with_both_keys_without_a_restart()
+    {
+        FakeAdminServer server = await StartServerAsync();
+        Context ctx = CreateClient(server.Url, workshopKey: "", apiKey: null, createIdentity: false);
+        ReportingStatus before = ctx.Client.GetStatus();
+        Assert.Equal((false, "missing", false, "missing"), (before.ApiKeyConfigured, before.ApiKeySource, before.WorkshopKeyConfigured, before.WorkshopKeySource));
+
+        string invitation = InvitationCode.Create(FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey);
+        Assert.Empty(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", invitation)));
+        await ctx.Client.TickAsync(Token);
+
+        ReportingStatus joined = ctx.Client.GetStatus();
+        Assert.Equal("connected", joined.State);
+        Assert.Equal((true, "dashboard", true, "dashboard"), (joined.ApiKeyConfigured, joined.ApiKeySource, joined.WorkshopKeyConfigured, joined.WorkshopKeySource));
+        AdminRequest register = Assert.Single(server.RequestsTo("/api/v1/devs/register"));
+        Assert.Equal((FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey), (register.ApiKey, register.WorkshopKey));
+
+        // Both keys in the shared user-secrets file, next to each other; never the invitation itself.
+        AzureOpenAISettingsStore secrets = new(SecretsFile, "test", [], () => new Dictionary<string, string>());
+        Assert.Equal(FakeAdminServer.ApiKey, secrets.GetEntry(ReportingClient.WorkshopKeySection, ReportingClient.ApiKeyName));
+        Assert.Equal(FakeAdminServer.WorkshopKey, secrets.GetEntry(ReportingClient.WorkshopKeySection, ReportingClient.WorkshopKeyName));
+        Assert.DoesNotContain(invitation, File.ReadAllText(SecretsFile));
+    }
+
+    [Theory]
+    [InlineData("LB1.%%%", "invalid")]
+    [InlineData("LB1.eyJhcGlLZXkiOiJsYmtfYSJ9", "invalid")] // {"apiKey":"lbk_a"}: no workshop key
+    [InlineData("LB2.e30", "unsupportedVersion")]
+    public async Task A_malformed_or_newer_invitation_is_refused_on_the_field_and_nothing_is_stored(string code, string error)
+    {
+        FakeAdminServer server = await StartServerAsync();
+        Context ctx = CreateClient(server.Url, workshopKey: "", apiKey: null, createIdentity: false);
+
+        IReadOnlyDictionary<string, string> errors = await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", code));
+        await ctx.Client.TickAsync(Token);
+
+        Assert.Equal(error, Assert.Single(errors, e => e.Key == "workshopKey").Value);
+        Assert.Null(ctx.Identity.Current);
+        Assert.False(File.Exists(SecretsFile));
+        Assert.Empty(server.Requests);
+    }
+
+    [Fact]
+    public async Task A_plain_workshop_key_still_works_as_before_and_the_environment_variable_still_wins_over_an_invitation()
+    {
+        FakeAdminServer server = await StartServerAsync();
+        Context plain = CreateClient(server.Url, workshopKey: "", apiKey: null, configuredApiKey: FakeAdminServer.ApiKey, createIdentity: false);
+        Assert.Empty(await plain.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", FakeAdminServer.WorkshopKey)));
+        await plain.Client.TickAsync(Token);
+        Assert.Equal(("connected", "appsettings"), (plain.Client.GetStatus().State, plain.Client.GetStatus().ApiKeySource));
+
+        Context overridden = CreateClient(server.Url, workshopKey: "", apiKey: "lbk_from_environment", createIdentity: false);
+        Assert.Empty(await overridden.Client.ApplySettingsAsync(
+            new ReportingSettingsUpdate("joe", InvitationCode.Create("lbk_from_invitation", FakeAdminServer.WorkshopKey))));
+        using HttpRequestMessage request = overridden.Client.CreateRequest(HttpMethod.Get, "/api/v1/devs/me", null, null);
+        Assert.Equal(["lbk_from_environment"], request.Headers.GetValues(ReportingClient.ApiKeyHeader));
+        Assert.Equal("environment", overridden.Client.GetStatus().ApiKeySource);
+    }
+
+    [Fact]
+    public async Task After_a_refused_api_key_a_new_invitation_resumes_the_reporting_without_a_restart()
+    {
+        FakeAdminServer server = await StartServerAsync();
+        Context ctx = CreateClient(server.Url, apiKey: null, configuredApiKey: "lbk_wrong_key", retryBaseSeconds: 0.01);
+        ctx.Client.Report("lab.opened", "asking", null);
+        await ctx.Client.TickAsync(Token);
+        Assert.Equal(("rejected", "apiKey"), (ctx.Client.GetStatus().State, ctx.Client.GetStatus().LastError));
+
+        Assert.Empty(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate(null, InvitationCode.Create(FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey))));
+        await ctx.Client.TickAsync(Token);
+
+        ReportingStatus status = ctx.Client.GetStatus();
+        Assert.Equal("connected", status.State);
+        Assert.Null(status.LastError);
+        Assert.Equal("dashboard", status.ApiKeySource);
+        Assert.Equal(FakeAdminServer.ApiKey, server.RequestsTo("/api/v1/devs/register").Last().ApiKey);
+        Assert.Contains("lab.opened", server.EventTypes);
+    }
+
+    [Fact]
+    public async Task The_invitation_and_its_keys_never_appear_in_the_status_the_logs_or_the_local_files()
+    {
+        FakeAdminServer server = await StartServerAsync();
+        ListLogger logger = new();
+        Context ctx = CreateClient(server.Url, workshopKey: "", apiKey: null, createIdentity: false, logger: logger);
+        string invitation = InvitationCode.Create(FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey);
+
+        await ctx.Client.TickAsync(Token);
+        Assert.Empty(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", invitation)));
+        await ctx.Client.TickAsync(Token);
+
+        Assert.NotEmpty(logger.Entries);
+        string status = System.Text.Json.JsonSerializer.Serialize(ctx.Client.GetStatus());
+        foreach (string secret in new[] { invitation, FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey })
+        {
+            Assert.DoesNotContain(secret, status);
+            Assert.All(logger.Entries, e => Assert.DoesNotContain(secret, e.Message + e.Exception));
+            Assert.DoesNotContain(secret, File.ReadAllText(ctx.Identity.File));
+            Assert.True(!File.Exists(ctx.Outbox.File) || !File.ReadAllText(ctx.Outbox.File).Contains(secret));
         }
     }
 

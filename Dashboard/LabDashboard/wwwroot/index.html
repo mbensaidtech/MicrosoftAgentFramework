@@ -40,6 +40,9 @@
     <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.8 4.3h10.4M6.3 4.3V2.9h3.4v1.4M4.2 4.3l.6 8.6c.1.7.6 1.2 1.3 1.2h3.8c.7 0 1.2-.5 1.3-1.2l.6-8.6"/></symbol>
     <symbol id="i-reset" viewBox="0 0 16 16"><path d="M2.9 8.6A5.2 5.2 0 1 0 4.4 4.3"/><path d="M2.6 1.9v3h3"/></symbol>
     <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.3l6 10.9H2z"/><path d="M8 6.6v3M8 11.4v.1"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.6"/><path d="M6.5 1.8V4M9.5 1.8V4M6.5 12v2.2M9.5 12v2.2M1.8 6.5H4M1.8 9.5H4M12 6.5h2.2M12 9.5h2.2"/><circle cx="8" cy="8" r="1.3"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 16 16"><path d="M2.6 4.3c0-1 .8-1.8 1.8-1.8h7.2c1 0 1.8.8 1.8 1.8v4.9c0 1-.8 1.8-1.8 1.8H7.2l-3 2.4V11h.2c-1 0-1.8-.8-1.8-1.8z"/><path d="M5.4 6.3h5.2M5.4 8.3h3.2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16"><path d="M8 2.2l5.8 3L8 8.2 2.2 5.2z"/><path d="M2.2 8.1L8 11.1l5.8-3M2.2 10.9L8 13.9l5.8-3"/></symbol>
   </svg>
 
   <header class="top">
@@ -126,7 +129,8 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <!-- SETTINGS: two tabs. Azure OpenAI (shared by the labs, saved in the user-secrets store) and Workshop (identity sent to the trainer's dashboard). -->
+  <!-- SETTINGS: two tabs. AI models (the LLM and the embedding model used by the labs, saved in the user-secrets store; each card saves itself)
+       and Workshop (identity sent to the trainer's dashboard; saved with the footer button). -->
   <dialog id="settings" class="dialog dialog-wide" aria-labelledby="settings-title">
     <form id="settings-form" novalidate>
       <header class="dialog-head">
@@ -137,13 +141,13 @@
 
       <div class="settings-layout">
         <nav class="settings-nav" role="tablist" aria-orientation="vertical" data-i18n-aria="settings.sections">
-          <button role="tab" type="button" id="settings-tab-azure" data-settings-tab="azure" aria-controls="settings-panel-azure" aria-selected="true">
-            <span class="settings-nav-ico" aria-hidden="true"><svg class="ico"><use href="#i-cloud"/></svg></span>
+          <button role="tab" type="button" id="settings-tab-models" data-settings-tab="models" aria-controls="settings-panel-models" aria-selected="true">
+            <span class="settings-nav-ico" aria-hidden="true"><svg class="ico"><use href="#i-chip"/></svg></span>
             <span class="settings-nav-text">
-              <span class="settings-nav-title" data-i18n="settings.tabAzure"></span>
-              <span class="settings-nav-meta"><i class="status-dot" id="settings-nav-azure-dot" aria-hidden="true"></i><span id="settings-nav-azure-state"></span></span>
+              <span class="settings-nav-title" data-i18n="settings.tabModels"></span>
+              <span class="settings-nav-meta"><i class="status-dot" id="settings-nav-models-dot" aria-hidden="true"></i><span id="settings-nav-models-state"></span></span>
             </span>
-            <i class="settings-nav-alert" id="settings-nav-azure-alert" aria-hidden="true" hidden></i>
+            <i class="settings-nav-alert" id="settings-nav-models-alert" aria-hidden="true" hidden></i>
           </button>
           <button role="tab" type="button" id="settings-tab-workshop" data-settings-tab="workshop" aria-controls="settings-panel-workshop" aria-selected="false" tabindex="-1">
             <span class="settings-nav-ico" aria-hidden="true"><svg class="ico"><use href="#i-user"/></svg></span>
@@ -158,47 +162,229 @@
         <div class="dialog-body settings-panels">
           <p class="notice notice-bad" id="settings-store-error" role="alert" hidden></p>
 
-          <!-- Azure OpenAI: used by every lab run (dashboard and dotnet run). -->
-          <section class="settings-panel" id="settings-panel-azure" role="tabpanel" aria-labelledby="settings-tab-azure">
+          <!-- AI models: the LLM (every lab) and the embedding model (Lab07), each with its mode: the trainer's configuration or my own.
+               Used by every lab run (dashboard and dotnet run). Ids are model-{kind}-{field}, kind = chat | embedding. -->
+          <section class="settings-panel" id="settings-panel-models" role="tabpanel" aria-labelledby="settings-tab-models">
             <div class="panel-head">
-              <h3 data-i18n="settings.azureTitle"></h3>
-              <p class="hint" data-i18n="settings.intro"></p>
+              <h3 data-i18n="models.title"></h3>
+              <p class="hint" data-i18n="models.intro"></p>
             </div>
 
-            <div class="field">
-              <div class="field-label-row">
-                <label for="set-endpoint"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="settings.endpoint"></span></label>
-                <span class="pill pill-machine" id="machine-endpoint" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+            <!-- The trainer's configurations (Business Rules 13–20): read without any code when this tab opens or on Refresh; Unlock for the kinds
+                 ticked in the cards below, then the access code announced by the trainer. The code is cleared after each attempt and never stored
+                 by the page; the keys never reach it (only "provided"). -->
+            <section class="trainer-bar" id="trainer-bar" aria-labelledby="trainer-title" aria-busy="false">
+              <div class="trainer-bar-head">
+                <span class="model-card-ico" aria-hidden="true"><svg class="ico"><use href="#i-ticket"/></svg></span>
+                <h4 id="trainer-title" data-i18n="trainer.title"></h4>
+                <span class="pill running" id="trainer-simulated" data-i18n="trainer.simulated" hidden></span>
+                <button class="btn btn-sm" type="button" id="trainer-refresh"><svg class="ico"><use href="#i-reset"/></svg><span data-i18n="trainer.refresh"></span></button>
               </div>
-              <input id="set-endpoint" name="endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-resource.openai.azure.com/" aria-describedby="src-endpoint err-endpoint">
-              <p class="field-source" id="src-endpoint"></p>
-              <p class="field-error" id="err-endpoint" hidden></p>
-            </div>
+              <p class="trainer-status" id="trainer-status" aria-live="polite"></p>
+              <div class="notice model-notice" id="trainer-error" role="alert" hidden>
+                <span id="trainer-error-text"></span>
+                <button class="btn btn-sm" type="button" id="trainer-error-action" hidden></button>
+              </div>
+              <div class="trainer-actions" id="trainer-actions">
+                <button class="btn btn-primary" type="button" id="trainer-unlock" aria-describedby="trainer-unlock-hint"><svg class="ico"><use href="#i-key"/></svg><span data-i18n="trainer.unlock"></span></button>
+                <p class="field-hint" id="trainer-unlock-hint"></p>
+              </div>
+              <div class="trainer-code" id="trainer-code" hidden>
+                <label for="trainer-code-input" data-i18n="trainer.codeLabel"></label>
+                <div class="trainer-code-row">
+                  <input id="trainer-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" aria-describedby="trainer-code-hint trainer-code-error">
+                  <button class="btn btn-primary" type="button" id="trainer-code-submit" data-i18n="trainer.codeSubmit"></button>
+                  <button class="btn" type="button" id="trainer-code-cancel" data-i18n="trainer.codeCancel"></button>
+                </div>
+                <p class="field-hint" id="trainer-code-hint"></p>
+                <p class="field-error" id="trainer-code-error" role="alert" hidden></p>
+              </div>
+            </section>
 
-            <div class="field">
-              <div class="field-label-row">
-                <label for="set-deployment"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cube"/></svg><span data-i18n="settings.deployment"></span></label>
-                <span class="pill pill-machine" id="machine-deployment" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
-              </div>
-              <input id="set-deployment" name="chatDeploymentName" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" aria-describedby="hint-deployment src-deployment err-deployment">
-              <p class="field-hint" id="hint-deployment" data-i18n="settings.deploymentHint"></p>
-              <p class="field-source" id="src-deployment"></p>
-              <p class="field-error" id="err-deployment" hidden></p>
-            </div>
+            <div class="model-cards">
+              <!-- LLM -->
+              <article class="model-card" id="model-card-chat" data-kind="chat" aria-labelledby="model-title-chat">
+                <header class="model-card-head">
+                  <span class="model-card-ico" aria-hidden="true"><svg class="ico"><use href="#i-chat"/></svg></span>
+                  <div class="model-card-heading">
+                    <h4 id="model-title-chat" data-i18n="models.chat.title"></h4>
+                    <p class="model-card-sub" data-i18n="models.chat.sub"></p>
+                  </div>
+                  <span class="model-card-status"><i class="status-dot" id="model-dot-chat" aria-hidden="true"></i><span id="model-state-chat"></span></span>
+                </header>
 
-            <div class="field">
-              <div class="field-label-row">
-                <label for="set-apikey"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-key"/></svg><span data-i18n="settings.apiKey"></span></label>
-                <span class="pill passed" id="apikey-stored" data-i18n="settings.apiKeyStored" hidden></span>
-                <span class="pill pill-machine" id="machine-apikey" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
-              </div>
-              <div class="field-inline">
-                <input id="set-apikey" name="apiKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="hint-apikey src-apikey err-apikey">
-                <button class="btn" type="button" data-action="remove-key" hidden><svg class="ico"><use href="#i-trash"/></svg><span data-i18n="settings.removeKey"></span></button>
-              </div>
-              <p class="field-hint" id="hint-apikey" data-i18n="settings.apiKeyHint"></p>
-              <p class="field-source" id="src-apikey"></p>
-              <p class="field-error" id="err-apikey" hidden></p>
+                <!-- Mode switch: the pressed button is the mode the labs use; a refused switch keeps it. -->
+                <div class="seg model-mode" role="group" data-i18n-aria="models.chat.modeAria">
+                  <button type="button" data-model-mode="trainer" aria-pressed="false" aria-controls="model-trainer-chat"><svg class="ico" aria-hidden="true"><use href="#i-ticket"/></svg><span data-i18n="models.modeTrainer"></span></button>
+                  <button type="button" data-model-mode="custom" aria-pressed="true" aria-controls="model-custom-chat"><svg class="ico" aria-hidden="true"><use href="#i-user"/></svg><span data-i18n="models.modeCustom"></span></button>
+                </div>
+                <p class="sr-only" id="model-live-chat" aria-live="polite"></p>
+
+                <!-- The trainer's configuration of this kind (overview, no code): what Unlock would bring, and the tick that selects it for Unlock. -->
+                <div class="model-offer" id="model-offer-chat" hidden></div>
+
+                <div class="notice notice-warn model-notice" id="model-applied-chat" hidden>
+                  <span data-i18n="models.notApplied"></span>
+                  <button class="btn btn-sm" type="button" data-action="reapply-model" data-i18n="models.reapply"></button>
+                </div>
+
+                <!-- Trainer configuration in use: read-only summary of the profile saved at the last unlock, or "not unlocked yet". -->
+                <div class="model-trainer" id="model-trainer-chat" hidden>
+                  <p class="model-trainer-empty" id="model-trainer-empty-chat"></p>
+                  <dl class="model-summary" id="model-trainer-summary-chat" hidden></dl>
+                  <ul class="model-overrides" id="model-trainer-env-chat"></ul>
+                </div>
+
+                <!-- My configuration: the Azure OpenAI form of this kind, saved with the card's Save button. -->
+                <div class="model-custom" id="model-custom-chat">
+                  <p class="notice model-notice" id="model-custom-note-chat" hidden></p>
+
+                  <div class="field">
+                    <label for="model-chat-provider"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cloud"/></svg><span data-i18n="models.provider"></span></label>
+                    <select id="model-chat-provider" aria-describedby="err-model-chat-provider"></select>
+                    <p class="field-error" id="err-model-chat-provider" hidden></p>
+                  </div>
+
+                  <div class="field" id="field-model-chat-endpoint">
+                    <div class="field-label-row">
+                      <label for="model-chat-endpoint"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="settings.endpoint"></span></label>
+                      <span class="pill pill-machine" id="machine-model-chat-endpoint" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <input id="model-chat-endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-resource.openai.azure.com/" aria-describedby="hint-model-chat-endpoint src-model-chat-endpoint err-model-chat-endpoint">
+                    <p class="field-hint" id="hint-model-chat-endpoint" data-i18n="models.endpointHint"></p>
+                    <p class="field-source" id="src-model-chat-endpoint"></p>
+                    <p class="field-error" id="err-model-chat-endpoint" hidden></p>
+                  </div>
+
+                  <div class="field" id="field-model-chat-deployment">
+                    <div class="field-label-row">
+                      <label for="model-chat-deployment"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cube"/></svg><span data-i18n="settings.deployment"></span></label>
+                      <span class="pill pill-machine" id="machine-model-chat-deployment" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <input id="model-chat-deployment" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-4o-mini" aria-describedby="hint-model-chat-deployment src-model-chat-deployment err-model-chat-deployment">
+                    <p class="field-hint" id="hint-model-chat-deployment" data-i18n="settings.deploymentHint"></p>
+                    <p class="field-source" id="src-model-chat-deployment"></p>
+                    <p class="field-error" id="err-model-chat-deployment" hidden></p>
+                  </div>
+
+                  <div class="field" id="field-model-chat-apikey">
+                    <div class="field-label-row">
+                      <label for="model-chat-apikey"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-key"/></svg><span data-i18n="settings.apiKey"></span></label>
+                      <span class="pill passed" id="model-chat-apikey-stored" hidden></span>
+                      <span class="pill pill-machine" id="machine-model-chat-apikey" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <div class="field-inline">
+                      <input id="model-chat-apikey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="model-chat-apikey-stored hint-model-chat-apikey src-model-chat-apikey err-model-chat-apikey">
+                      <button class="btn" type="button" data-action="remove-model-key" hidden><svg class="ico"><use href="#i-trash"/></svg><span data-i18n="settings.removeKey"></span></button>
+                    </div>
+                    <p class="field-hint" id="hint-model-chat-apikey" data-i18n="settings.apiKeyHint"></p>
+                    <p class="field-source" id="src-model-chat-apikey"></p>
+                    <p class="field-error" id="err-model-chat-apikey" hidden></p>
+                  </div>
+
+                  <div class="model-card-foot">
+                    <button class="btn btn-primary" type="button" data-action="save-model" data-i18n-aria="models.chat.saveAria"><svg class="ico"><use href="#i-check"/></svg><span data-i18n="settings.save"></span></button>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Embedding model (Lab07): on the resource of the LLM in use (deployment only) or on its own resource. -->
+              <article class="model-card" id="model-card-embedding" data-kind="embedding" aria-labelledby="model-title-embedding">
+                <header class="model-card-head">
+                  <span class="model-card-ico" aria-hidden="true"><svg class="ico"><use href="#i-layers"/></svg></span>
+                  <div class="model-card-heading">
+                    <h4 id="model-title-embedding" data-i18n="models.embedding.title"></h4>
+                    <p class="model-card-sub" data-i18n="models.embedding.sub"></p>
+                  </div>
+                  <span class="model-card-status"><i class="status-dot" id="model-dot-embedding" aria-hidden="true"></i><span id="model-state-embedding"></span></span>
+                </header>
+
+                <div class="seg model-mode" role="group" data-i18n-aria="models.embedding.modeAria">
+                  <button type="button" data-model-mode="trainer" aria-pressed="false" aria-controls="model-trainer-embedding"><svg class="ico" aria-hidden="true"><use href="#i-ticket"/></svg><span data-i18n="models.modeTrainer"></span></button>
+                  <button type="button" data-model-mode="custom" aria-pressed="true" aria-controls="model-custom-embedding"><svg class="ico" aria-hidden="true"><use href="#i-user"/></svg><span data-i18n="models.modeCustom"></span></button>
+                </div>
+                <p class="sr-only" id="model-live-embedding" aria-live="polite"></p>
+
+                <!-- The trainer's configuration of this kind (overview, no code): what Unlock would bring, and the tick that selects it for Unlock. -->
+                <div class="model-offer" id="model-offer-embedding" hidden></div>
+
+                <div class="notice notice-warn model-notice" id="model-applied-embedding" hidden>
+                  <span data-i18n="models.notApplied"></span>
+                  <button class="btn btn-sm" type="button" data-action="reapply-model" data-i18n="models.reapply"></button>
+                </div>
+
+                <div class="model-trainer" id="model-trainer-embedding" hidden>
+                  <p class="model-trainer-empty" id="model-trainer-empty-embedding"></p>
+                  <dl class="model-summary" id="model-trainer-summary-embedding" hidden></dl>
+                  <ul class="model-overrides" id="model-trainer-env-embedding"></ul>
+                </div>
+
+                <div class="model-custom" id="model-custom-embedding">
+                  <p class="notice model-notice" id="model-custom-note-embedding" hidden></p>
+
+                  <div class="field">
+                    <label for="model-embedding-provider"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cloud"/></svg><span data-i18n="models.provider"></span></label>
+                    <select id="model-embedding-provider" aria-describedby="err-model-embedding-provider"></select>
+                    <p class="field-error" id="err-model-embedding-provider" hidden></p>
+                  </div>
+
+                  <fieldset class="model-resource">
+                    <legend data-i18n="models.embedding.resource"></legend>
+                    <div class="choice-row">
+                      <label class="choice">
+                        <input type="radio" name="model-embedding-resource" value="same" checked>
+                        <span><b data-i18n="models.embedding.same"></b><small data-i18n="models.embedding.sameHint"></small></span>
+                      </label>
+                      <label class="choice">
+                        <input type="radio" name="model-embedding-resource" value="own">
+                        <span><b data-i18n="models.embedding.own"></b><small data-i18n="models.embedding.ownHint"></small></span>
+                      </label>
+                    </div>
+                    <p class="field-hint model-same-info" id="model-embedding-same-info"></p>
+                  </fieldset>
+
+                  <div class="field" id="field-model-embedding-endpoint" hidden>
+                    <div class="field-label-row">
+                      <label for="model-embedding-endpoint"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="models.embedding.endpoint"></span></label>
+                      <span class="pill pill-machine" id="machine-model-embedding-endpoint" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <input id="model-embedding-endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://my-embedding-resource.openai.azure.com/" aria-describedby="hint-model-embedding-endpoint src-model-embedding-endpoint err-model-embedding-endpoint">
+                    <p class="field-hint" id="hint-model-embedding-endpoint" data-i18n="models.endpointHint"></p>
+                    <p class="field-source" id="src-model-embedding-endpoint"></p>
+                    <p class="field-error" id="err-model-embedding-endpoint" hidden></p>
+                  </div>
+
+                  <div class="field" id="field-model-embedding-deployment">
+                    <div class="field-label-row">
+                      <label for="model-embedding-deployment"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-cube"/></svg><span data-i18n="models.embedding.deployment"></span></label>
+                      <span class="pill pill-machine" id="machine-model-embedding-deployment" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <input id="model-embedding-deployment" type="text" autocomplete="off" spellcheck="false" placeholder="text-embedding-3-small" aria-describedby="hint-model-embedding-deployment src-model-embedding-deployment err-model-embedding-deployment">
+                    <p class="field-hint" id="hint-model-embedding-deployment" data-i18n="models.embedding.deploymentHint"></p>
+                    <p class="field-source" id="src-model-embedding-deployment"></p>
+                    <p class="field-error" id="err-model-embedding-deployment" hidden></p>
+                  </div>
+
+                  <div class="field" id="field-model-embedding-apikey" hidden>
+                    <div class="field-label-row">
+                      <label for="model-embedding-apikey"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-key"/></svg><span data-i18n="settings.apiKey"></span></label>
+                      <span class="pill passed" id="model-embedding-apikey-stored" hidden></span>
+                      <span class="pill pill-machine" id="machine-model-embedding-apikey" hidden><svg class="ico ico-sm" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="settings.setOnComputer"></span></span>
+                    </div>
+                    <div class="field-inline">
+                      <input id="model-embedding-apikey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="model-embedding-apikey-stored hint-model-embedding-apikey src-model-embedding-apikey err-model-embedding-apikey">
+                      <button class="btn" type="button" data-action="remove-model-key" hidden><svg class="ico"><use href="#i-trash"/></svg><span data-i18n="settings.removeKey"></span></button>
+                    </div>
+                    <p class="field-hint" id="hint-model-embedding-apikey" data-i18n="models.embedding.apiKeyHint"></p>
+                    <p class="field-source" id="src-model-embedding-apikey"></p>
+                    <p class="field-error" id="err-model-embedding-apikey" hidden></p>
+                  </div>
+
+                  <div class="model-card-foot">
+                    <button class="btn btn-primary" type="button" data-action="save-model" data-i18n-aria="models.embedding.saveAria"><svg class="ico"><use href="#i-check"/></svg><span data-i18n="settings.save"></span></button>
+                  </div>
+                </div>
+              </article>
             </div>
           </section>
 
@@ -222,8 +408,10 @@
                 <label for="rep-key"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-ticket"/></svg><span data-i18n="reporting.workshopKey"></span></label>
                 <span class="pill passed" id="rep-key-stored" data-i18n="reporting.workshopKeyStored" hidden></span>
               </div>
-              <input id="rep-key" name="workshopKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="src-rep-key err-rep-key">
+              <input id="rep-key" name="workshopKey" type="password" autocomplete="new-password" spellcheck="false" aria-describedby="src-rep-key src-rep-api-key err-rep-key">
               <p class="field-source" id="src-rep-key"></p>
+              <!-- The admin API key comes with the trainer's invitation code: only whether it is configured and where from, never its value. -->
+              <p class="field-source" id="src-rep-api-key"></p>
               <p class="field-error" id="err-rep-key" hidden></p>
             </div>
           </section>
@@ -232,13 +420,15 @@
 
       <footer class="dialog-foot">
         <p class="dialog-foot-note"><svg class="ico ico-sm" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="settings.footNote"></span></p>
-        <button class="btn" type="button" data-action="close-settings" data-i18n="settings.cancel"></button>
-        <button class="btn btn-primary" type="submit"><svg class="ico"><use href="#i-check"/></svg><span data-i18n="settings.save"></span></button>
+        <!-- AI models tab: each card has its own Save, so the footer only closes; Workshop tab: Cancel + Save. -->
+        <button class="btn" type="button" id="settings-foot-cancel" data-action="close-settings" data-i18n="settings.cancel"></button>
+        <button class="btn btn-primary" type="submit" id="settings-foot-save"><svg class="ico"><use href="#i-check"/></svg><span data-i18n="settings.save"></span></button>
       </footer>
     </form>
   </dialog>
 
-  <!-- WELCOME: first launch. Join the workshop (username + key; the admin URL is fixed in appsettings.json) or work on your own (nothing is sent). -->
+  <!-- WELCOME: first launch. Join the workshop (username + the trainer's invitation code or workshop key; the admin URL is fixed in appsettings.json)
+       or work on your own (nothing is sent). -->
   <dialog id="welcome" class="dialog dialog-sm" aria-labelledby="welcome-title">
     <form id="welcome-form" novalidate>
       <header class="dialog-head">

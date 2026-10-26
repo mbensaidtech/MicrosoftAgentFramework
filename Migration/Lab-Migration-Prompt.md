@@ -9,7 +9,7 @@
 ```markdown
 Migre le lab suivant vers la dernière version stable de Microsoft Agent Framework retenue pour ce dépôt :
 
-**Lab à migrer : `Lab09-AIAgentWithFunctionToolsHumanApproval`**
+**Lab à migrer : `Lab12-AIAgentWithAIContextProvider`**
 
 Ne migre aucun autre lab.
 

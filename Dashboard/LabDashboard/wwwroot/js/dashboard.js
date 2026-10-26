@@ -31,7 +31,11 @@ const state = {
   labs: [], currentId: null, view: null, details: null,
   eventSource: null, clockTimer: null, runId: null, runTarget: null,
   record: null, recordIsHistory: false, target: "start",
-  settings: null,
+  // AI models settings: status from the server, a refused switch per kind ("trainer" | "custom": what it opened), kinds with a request in flight.
+  models: null, modelAsk: { chat: null, embedding: null }, modelBusy: new Set(), settingsTab: "models",
+  // The trainer's configurations: the overview (GET /trainer-models), the unlock under way on the server, the kinds ticked for Unlock,
+  // the error of the last action, a request in flight, and the countdown of the code entry. Never a code nor a key.
+  trainer: { view: null, unlock: null, ticked: new Set(), flowError: null, loading: false, failed: false, busy: false, busyText: "", timer: null },
   reporting: null, reportingTimer: null, helpBusy: false,
 };
 
@@ -215,7 +219,7 @@ async function selectLab(id) {
   wireInput(main);
   resetInput();
   wireSolution(main);
-  main.querySelector('[data-action="open-settings"]').addEventListener("click", () => openSettings("azure"));
+  main.querySelector('[data-action="open-settings"]').addEventListener("click", (event) => openSettings("models", { kind: event.currentTarget.dataset.kind }));
   main.querySelector('[data-action="help"]').addEventListener("click", openHelp);
   main.querySelector('[data-action="reset-lab"]').addEventListener("click", () => openReset(state.currentId));
   renderHelpButtons();
@@ -680,11 +684,12 @@ function renderResults(record) {
 
   $(main, "errorsCard").hidden = record.errors.length === 0;
   $(main, "errors").textContent = record.errors.join("\n");
-  // The lab stopped because its Azure OpenAI configuration is missing: point to the settings.
-  const missingConfig = record.errors.some((e) => /AzureOpenAI:\w+' is not configured/.test(e));
+  // The lab stopped because its Azure OpenAI configuration is missing: point to the AI models settings, on the model concerned.
+  const missingConfig = record.errors.find((e) => /AzureOpenAI:\w+' is not configured/.test(e));
   const fix = $(main, "errorsFix");
   fix.hidden = !missingConfig;
   $(main, "errorsFixBar").hidden = !missingConfig;
+  fix.dataset.kind = /AzureOpenAI:Embedding\w*' is not configured/.test(missingConfig ?? "") ? "embedding" : "chat";
   fix.textContent = t("settings.fixLink");
 
   $(main, "warningsCard").hidden = record.buildWarnings.length === 0;
@@ -726,73 +731,141 @@ function renderTokens(container, usage) {
   container.replaceChildren(totals, table, el("p", "hint", `${t("tokens.source")} ${t("tokens.cost")}`));
 }
 
-// ---------- Settings: Azure OpenAI (shared by the labs; the API key is write-only) and Workshop (reporting identity) ----------
-const settingsFields = [
-  { key: "endpoint", input: "set-endpoint", source: "src-endpoint", error: "err-endpoint", machine: "machine-endpoint" },
-  { key: "chatDeploymentName", input: "set-deployment", source: "src-deployment", error: "err-deployment", machine: "machine-deployment" },
-];
+// ---------- Settings: AI models (LLM and embedding, each in trainer or custom mode; keys are write-only) and Workshop (reporting identity) ----------
+// GET /settings/models gives, per kind ("chat" = the LLM, "embedding"), the mode in use, the custom and trainer profiles (a key is only
+// "stored" + its last 4 characters) and what the labs use ("active"), each value with its source. Each card saves its own custom profile
+// (PUT /settings/models/{kind}/custom); its mode switch asks the server (PUT /settings/models/{kind}/mode), which refuses an incomplete
+// profile (409 profileIncomplete) without writing anything: the mode in use then stays selected and what is missing opens.
+const modelKinds = ["chat", "embedding"];
+const modelFormFields = ["provider", "endpoint", "deployment", "apiKey"];
+const modelButtons = '[data-model-mode], [data-action="save-model"], [data-action="remove-model-key"], [data-action="reapply-model"]';
+const storeErrors = ["storeInvalid", "storeReadFailed", "storeWriteFailed"];
+
+/** Element ids of a field of a model card: model-chat-endpoint, err-model-chat-endpoint, src-…, machine-…, hint-…, field-…. */
+function modelIds(kind, field) {
+  const name = `model-${kind}-${field.toLowerCase()}`;
+  return { input: name, error: `err-${name}`, source: `src-${name}`, machine: `machine-${name}`, hint: `hint-${name}`, field: `field-${name}` };
+}
 
 /** A key is never sent to the page: only its last 4 characters, shown behind a mask. */
-const maskedKey = (hint) => `••••••••${hint ?? ""}`;
+const maskedKey = (hint) => `••••${hint ?? ""}`;
+
+const modeLabel = (mode) => t(mode === "trainer" ? "models.modeTrainer" : "models.modeCustom");
+
+function providerLabel(id) {
+  const key = `models.provider.${id}`;
+  return t(key) !== key ? t(key) : (id ?? "—");
+}
+
+/** The host of an endpoint: enough to recognise a resource in a summary. */
+function hostOf(endpoint) {
+  try { return new URL(endpoint).host; } catch { return endpoint || "—"; }
+}
 
 async function loadSettings() {
   try {
-    state.settings = await api.get("/settings/azure-openai");
+    state.models = await api.get("/settings/models");
   } catch {
-    state.settings = null;
+    state.models = null;
   }
   renderConfigChip();
 }
 
-function configState(settings) {
-  if (!settings) return { kind: "unknown", dot: "" };
-  if (!settings.configured) return { kind: "notConfigured", dot: "ko" };
-  return settings.authentication === "apiKey" ? { kind: "apiKey", dot: "ok" } : { kind: "entraId", dot: "warn" };
+/** Authentication of a model in use ({ authentication, configured }); the top bar chip shows the LLM's, as before. */
+function configState(active) {
+  if (!active) return { kind: "unknown", dot: "" };
+  if (!active.configured) return { kind: "notConfigured", dot: "ko" };
+  return active.authentication === "apiKey" ? { kind: "apiKey", dot: "ok" } : { kind: "entraId", dot: "warn" };
 }
 
 function renderConfigChip() {
-  const { kind, dot } = configState(state.settings);
+  const { kind, dot } = configState(state.models?.chat?.active);
   document.getElementById("config-dot").className = `status-dot ${dot}`;
   document.getElementById("config-state").textContent = t(`config.${kind}`);
 }
 
-function sourceText(field, status) {
+/** The one-line state of a card. An embedding model not configured stays grey: only Lab07 needs it. */
+function modelCardState(kind, active) {
+  if (!active.configured) return { text: t("config.notConfigured"), dot: kind === "chat" ? "ko" : "" };
+  const auth = configState(active);
+  return kind === "embedding" && active.sameResourceAsLlm
+    ? { text: t("models.state.llmResource", { auth: t(`config.${auth.kind}`) }), dot: auth.dot }
+    : { text: t(`config.${auth.kind}`), dot: auth.dot };
+}
+
+function sourceText(status, missingKey = "settings.sourceMissing") {
   switch (status.source) {
     case "environment": return t("settings.sourceEnvironment", { variable: status.environmentVariable, value: status.effectiveValue || "—" });
     case "dashboard": return t("settings.sourceDashboard");
     case "labDefault": return t("settings.sourceLabDefault", { value: status.effectiveValue });
-    default: return t("settings.sourceMissing");
+    default: return t(missingKey);
   }
 }
 
-function apiKeySourceText(apiKey) {
+const missingSourceKey = (kind, field) => (kind === "chat" ? "settings.sourceMissing"
+  : field === "endpoint" ? "models.embedding.endpointMissing" : "models.embedding.sourceMissing");
+
+function apiKeySourceText(apiKey, kind = "chat") {
   if (apiKey.source === "environment") {
     return apiKey.environmentValueEmpty
       ? t("settings.keyEnvironmentEmpty", { variable: apiKey.environmentVariable })
       : t(apiKey.stored ? "settings.keyEnvironmentOverrides" : "settings.keyEnvironment", { variable: apiKey.environmentVariable });
   }
-  return apiKey.source === "dashboard" ? t("settings.keyDashboard") : t("settings.keyMissing");
+  if (kind === "embedding") return t(apiKey.source === "dashboard" ? "models.embedding.keyDashboard" : "models.embedding.keyMissing");
+  return t(apiKey.source === "dashboard" ? "settings.keyDashboard" : "settings.keyMissing");
 }
 
-function setFieldError(errorId, inputId, code) {
-  const node = document.getElementById(errorId);
+/** In trainer mode, an AzureOpenAI__* variable of this computer still wins over the trainer's values. */
+function environmentOverrides(active) {
+  const lines = [];
+  for (const setting of [active.endpoint, active.deployment]) {
+    if (setting.source === "environment") lines.push(t("models.envOverride", { variable: setting.environmentVariable, value: setting.effectiveValue || "—" }));
+  }
+  if (active.apiKey.source === "environment") {
+    lines.push(t(active.apiKey.environmentValueEmpty ? "models.envKeyEmpty" : "models.envKeyOverride", { variable: active.apiKey.environmentVariable }));
+  }
+  return lines;
+}
+
+/** "Same resource as the LLM": the endpoint and the authentication Lab07 then uses, unless a variable gives the embeddings their own endpoint. */
+function sameResourceText() {
+  const llm = state.models.chat.active;
+  const endpoint = state.models.embedding.active.endpoint;
+  if (endpoint.source === "environment" && endpoint.effectiveValue) {
+    return t("models.embedding.sameOverridden", { variable: endpoint.environmentVariable, value: endpoint.effectiveValue });
+  }
+  if (!llm.configured) return t("models.embedding.sameNoLlm");
+  return t("models.embedding.sameInfo", { host: hostOf(llm.endpoint.effectiveValue), auth: t(`config.${configState(llm).kind}`) });
+}
+
+/** Inline error of a model field; the code is the server's (invalid, placeholder, tooShort, required, unsupportedProvider). */
+function setModelFieldError(kind, field, code) {
+  const ids = modelIds(kind, field);
+  const node = document.getElementById(ids.error);
+  const input = document.getElementById(ids.input);
+  if (!node || !input) return;
+  const key = `settings.error.${field}.${code}`;
   node.hidden = !code;
-  node.textContent = code ? t(`settings.error.${code}`) : "";
-  document.getElementById(inputId).setAttribute("aria-invalid", String(Boolean(code)));
+  node.textContent = !code ? "" : t(key) !== key ? t(key) : t("settings.error.generic");
+  input.setAttribute("aria-invalid", String(Boolean(code)));
+}
+
+function clearModelErrors(kind) {
+  for (const field of modelFormFields) setModelFieldError(kind, field, null);
 }
 
 function clearSettingsErrors() {
-  for (const field of settingsFields) setFieldError(field.error, field.input, null);
-  setFieldError("err-apikey", "set-apikey", null);
+  for (const kind of modelKinds) clearModelErrors(kind);
   for (const field of reportingFields) setReportingFieldError(field.error, field.input, null);
   document.getElementById("settings-store-error").hidden = true;
   markSettingsTabErrors();
 }
 
-const settingsTabs = ["azure", "workshop"];
+const settingsTabs = ["models", "workshop"];
 
-/** Shows one tab of the settings dialog (roving tabindex), optionally focusing its first field. */
-function selectSettingsTab(name, { focusField = false } = {}) {
+/** Shows one tab of the settings dialog (roving tabindex), optionally focusing its first field (in a given model card). */
+function selectSettingsTab(name, { focusField = false, kind = null } = {}) {
+  state.settingsTab = name;
   for (const tab of settingsTabs) {
     const selected = tab === name;
     const button = document.getElementById(`settings-tab-${tab}`);
@@ -800,7 +873,28 @@ function selectSettingsTab(name, { focusField = false } = {}) {
     button.tabIndex = selected ? 0 : -1;
     document.getElementById(`settings-panel-${tab}`).hidden = !selected;
   }
-  if (focusField) document.querySelector(`#settings-panel-${name} input`)?.focus();
+  renderSettingsFooter();
+  // The trainer's configurations are read when the AI models tab opens (Rule 19), again only if that failed (after joining the workshop…).
+  if (name === "models" && !state.trainer.loading && (!state.trainer.view || state.trainer.view.error)) loadTrainer();
+  if (focusField) focusSettingsField(name, kind);
+}
+
+/** The first visible field of a tab, or of a model card; a card showing no field (trainer mode) focuses its mode switch. */
+function focusSettingsField(tab, kind = null) {
+  const root = document.getElementById(tab === "models" ? `model-card-${kind ?? "chat"}` : `settings-panel-${tab}`);
+  const visible = (node) => !node.disabled && node.getClientRects().length > 0;
+  const target = [...root.querySelectorAll('input:not([type="radio"])')].find(visible)
+    ?? root.querySelector('[data-model-mode][aria-pressed="true"]');
+  target?.focus();
+}
+
+/** AI models: each card saves itself, so the footer only closes the dialog. Workshop: Cancel and Save. */
+function renderSettingsFooter() {
+  const models = state.settingsTab === "models";
+  document.getElementById("settings-foot-save").hidden = models;
+  const cancel = document.getElementById("settings-foot-cancel");
+  cancel.dataset.i18n = models ? "settings.close" : "settings.cancel";
+  cancel.textContent = t(cancel.dataset.i18n);
 }
 
 /** A red mark on each tab holding a field in error; switches to the first such tab so the error is visible. */
@@ -817,11 +911,11 @@ function markSettingsTabErrors({ reveal = false } = {}) {
   }
 }
 
-/** The one-line state under each tab name: authentication mode, and reporting state. */
+/** The one-line state under each tab name: the LLM's authentication (as the top bar chip), and the reporting state. */
 function renderSettingsNav() {
-  const { kind, dot } = configState(state.settings);
-  document.getElementById("settings-nav-azure-dot").className = `status-dot ${dot}`;
-  document.getElementById("settings-nav-azure-state").textContent = t(`config.${kind}`);
+  const { kind, dot } = configState(state.models?.chat?.active);
+  document.getElementById("settings-nav-models-dot").className = `status-dot ${dot}`;
+  document.getElementById("settings-nav-models-state").textContent = t(`config.${kind}`);
 
   const status = state.reporting;
   const workshop = !status ? { key: "unknown", dot: "" }
@@ -837,89 +931,769 @@ function renderSettingsNav() {
 
 /** Renders the status; fills the inputs only when asked, so that a language switch keeps what the user typed. */
 function renderSettings({ fill = false } = {}) {
-  const settings = state.settings;
-  if (!settings) return;
+  renderModels({ fill: fill ? modelKinds : [] });
+  renderReportingSettings({ fill });
+  renderSettingsNav();
+  renderSettingsFooter();
+}
 
-  for (const field of settingsFields) {
-    const status = settings[field.key];
-    // Set on this computer (AzureOpenAI__* variable): shown as the labs see it, read-only, since that value wins over the form.
-    const onComputer = status.source === "environment";
-    const input = document.getElementById(field.input);
-    if (fill) input.value = (onComputer ? status.effectiveValue : status.dashboardValue) ?? "";
-    input.readOnly = onComputer;
-    document.getElementById(field.machine).hidden = !onComputer;
-    const source = document.getElementById(field.source);
-    source.className = `field-source ${status.source}`;
-    source.textContent = sourceText(field, status);
+/** Both model cards; only the kinds listed in `fill` get their inputs (re)filled from the saved profiles. */
+function renderModels({ fill = [] } = {}) {
+  const models = state.models;
+  if (!models) return;
+  for (const kind of modelKinds) renderModelCard(kind, models[kind], { fill: fill.includes(kind) });
+  renderTrainer();
+  showStoreError(models.storeError);
+}
+
+function renderModelBusy(kind) {
+  const busy = state.modelBusy.has(kind);
+  const card = document.getElementById(`model-card-${kind}`);
+  card.setAttribute("aria-busy", String(busy));
+  // aria-disabled, not disabled: the focused button keeps the focus while a request is in flight.
+  card.querySelectorAll(modelButtons).forEach((button) => button.setAttribute("aria-disabled", String(busy)));
+}
+
+function setModelBusy(kind, busy) {
+  if (busy) state.modelBusy.add(kind);
+  else state.modelBusy.delete(kind);
+  renderModelBusy(kind);
+}
+
+/**
+ * One card. Visible areas: the trainer area in trainer mode, or after a refused switch to it ("not retrieved yet");
+ * my configuration in custom mode, or after a refused switch to it (the form, with what is missing).
+ */
+function renderModelCard(kind, status, { fill = false } = {}) {
+  const card = document.getElementById(`model-card-${kind}`);
+  const ask = state.modelAsk[kind];
+  renderModelBusy(kind);
+
+  const head = modelCardState(kind, status.active);
+  document.getElementById(`model-dot-${kind}`).className = `status-dot ${head.dot}`;
+  document.getElementById(`model-state-${kind}`).textContent = head.text;
+
+  card.querySelectorAll("[data-model-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.modelMode === status.mode)));
+  // The keys the labs read were changed outside the dashboard: they no longer hold the selected profile.
+  document.getElementById(`model-applied-${kind}`).hidden = status.applied !== false;
+
+  document.getElementById(`model-trainer-${kind}`).hidden = !(status.mode === "trainer" || ask === "trainer");
+  document.getElementById(`model-custom-${kind}`).hidden = !(status.mode === "custom" || ask === "custom");
+  renderModelTrainer(kind, status);
+  renderModelCustom(kind, status, { fill });
+}
+
+/** The trainer profile in use: a read-only summary of the last unlock, otherwise a calm "not unlocked yet" (the offer above the card says what Unlock brings). */
+function renderModelTrainer(kind, status) {
+  const { trainer, mode, active } = status;
+  const empty = document.getElementById(`model-trainer-empty-${kind}`);
+  empty.hidden = trainer.complete;
+  empty.textContent = trainer.complete ? ""
+    : trainer.provider && !trainer.missing.length ? t("models.trainerUnsupported")
+    : t(mode === "custom" ? "models.trainerNotRetrievedKeep" : "models.trainerNotRetrieved");
+
+  const summary = document.getElementById(`model-trainer-summary-${kind}`);
+  summary.hidden = !trainer.complete;
+  summary.replaceChildren(...(!trainer.complete ? [] : [
+    ["models.summary.configuration", trainer.configName],
+    ["models.summary.provider", providerLabel(trainer.provider)],
+    ["models.summary.endpoint", hostOf(trainer.endpoint)],
+    ["models.summary.deployment", trainer.deployment],
+    ["models.summary.key", t(trainer.apiKey.stored ? "models.keyProvided" : "models.keyNotProvided")],
+    ["models.summary.retrieved", trainer.retrievedAt ? fmtDate(trainer.retrievedAt) : "—"],
+  ].map(([label, value]) => {
+    const row = el("div");
+    row.append(el("dt", null, t(label)), el("dd", null, value || "—"));
+    return row;
+  })));
+
+  const overrides = mode === "trainer" ? environmentOverrides(active) : [];
+  const list = document.getElementById(`model-trainer-env-${kind}`);
+  list.hidden = !overrides.length;
+  list.replaceChildren(...overrides.map((text) => {
+    const item = el("li");
+    item.append(icon("lock", "ico-sm"), el("span", null, text));
+    return item;
+  }));
+}
+
+/** My configuration: the saved custom profile. A field set by an AzureOpenAI__* variable shows that value, read-only, since it wins. */
+function renderModelCustom(kind, status, { fill = false } = {}) {
+  const { custom, active, mode } = status;
+  const inUse = mode === "custom";
+  const card = document.getElementById(`model-card-${kind}`);
+
+  const note = document.getElementById(`model-custom-note-${kind}`);
+  note.hidden = inUse;
+  note.textContent = inUse ? "" : t(state.modelAsk[kind] === "custom" && custom.missing.length ? "models.customIncomplete" : "models.customNotInUse");
+
+  // Provider: only those the server accepts (Azure OpenAI in phase 1).
+  const select = document.getElementById(modelIds(kind, "provider").input);
+  const provider = fill || !select.value ? (custom.provider ?? state.models.providers[0]) : select.value;
+  select.replaceChildren(...state.models.providers.map((id) => {
+    const option = el("option", null, providerLabel(id));
+    option.value = id;
+    return option;
+  }));
+  select.value = provider;
+  if (select.selectedIndex < 0) select.selectedIndex = 0;
+
+  // Embedding: on the resource of the LLM in use (deployment only), or on its own resource (endpoint, deployment, optional key).
+  let own = true;
+  if (kind === "embedding") {
+    const radios = card.querySelectorAll('input[name="model-embedding-resource"]');
+    if (fill) radios.forEach((radio) => { radio.checked = radio.value === (custom.sameResourceAsLlm === false ? "own" : "same"); });
+    own = card.querySelector('input[name="model-embedding-resource"]:checked')?.value === "own";
+    document.getElementById(modelIds(kind, "endpoint").field).hidden = !own;
+    document.getElementById(modelIds(kind, "apiKey").field).hidden = !own;
+    const info = document.getElementById("model-embedding-same-info");
+    info.hidden = own;
+    info.textContent = own ? "" : sameResourceText();
   }
 
-  const apiKey = settings.apiKey;
-  const keyInput = document.getElementById("set-apikey");
-  const keyOnComputer = apiKey.source === "environment";
+  for (const field of ["endpoint", "deployment"]) {
+    const ids = modelIds(kind, field);
+    const setting = active[field];
+    const onComputer = setting.source === "environment";
+    const input = document.getElementById(ids.input);
+    if (fill) input.value = (onComputer ? setting.effectiveValue : custom[field]) ?? "";
+    input.readOnly = onComputer;
+    document.getElementById(ids.machine).hidden = !onComputer;
+    // The source says what the labs use: shown while my configuration is in use, and whenever a variable of this computer wins.
+    const source = document.getElementById(ids.source);
+    source.hidden = !inUse && !onComputer;
+    source.className = `field-source ${setting.source}`;
+    source.textContent = sourceText(setting, missingSourceKey(kind, field));
+  }
+
+  const ids = modelIds(kind, "apiKey");
+  const key = active.apiKey;
+  const keyOnComputer = key.source === "environment";
+  const stored = custom.apiKey.stored;
+  const keyInput = document.getElementById(ids.input);
   if (fill) keyInput.value = "";
   keyInput.readOnly = keyOnComputer;
   keyInput.placeholder = keyOnComputer
-    ? (apiKey.environmentValueEmpty ? t("settings.apiKeyOnComputerEmpty") : maskedKey(apiKey.hint))
-    : apiKey.stored ? t("settings.apiKeyKeep", { masked: maskedKey(apiKey.hint) }) : t("settings.apiKeyOptional");
-  document.getElementById("machine-apikey").hidden = !keyOnComputer;
-  document.getElementById("hint-apikey").hidden = keyOnComputer;
-  document.getElementById("apikey-stored").hidden = !apiKey.stored || keyOnComputer;
-  document.querySelector('[data-action="remove-key"]').hidden = !apiKey.stored || keyOnComputer;
-  const keySource = document.getElementById("src-apikey");
-  keySource.className = `field-source ${apiKey.source}`;
-  keySource.textContent = apiKeySourceText(apiKey);
-
-  showStoreError(settings.storeError);
-  renderReportingSettings({ fill });
-  renderSettingsNav();
+    ? (key.environmentValueEmpty ? t("settings.apiKeyOnComputerEmpty") : maskedKey(key.hint))
+    : stored ? t("settings.apiKeyKeep", { masked: maskedKey(custom.apiKey.hint) }) : t("settings.apiKeyOptional");
+  document.getElementById(ids.machine).hidden = !keyOnComputer;
+  document.getElementById(ids.hint).hidden = keyOnComputer;
+  const storedPill = document.getElementById(`${ids.input}-stored`);
+  storedPill.hidden = !stored || keyOnComputer;
+  storedPill.textContent = stored ? t("models.keyStored", { masked: maskedKey(custom.apiKey.hint) }) : "";
+  card.querySelector('[data-action="remove-model-key"]').hidden = !stored || keyOnComputer;
+  const keySource = document.getElementById(ids.source);
+  keySource.hidden = !inUse && !keyOnComputer;
+  keySource.className = `field-source ${key.source}`;
+  keySource.textContent = apiKeySourceText(key, kind);
 }
 
-function showStoreError(code) {
+function showStoreError(code, file) {
   const node = document.getElementById("settings-store-error");
   node.hidden = !code;
-  node.textContent = code ? t(`settings.store.${code}`, { file: state.settings?.secretsFile ?? "" }) : "";
+  node.textContent = code ? t(`settings.store.${code}`, { file: file ?? state.models?.secretsFile ?? "" }) : "";
 }
 
-/** Opens the settings on a tab: "azure" (the labs' Azure OpenAI values) or "workshop" (username and workshop key). */
-async function openSettings(tab = "azure") {
+/** Opens the settings on a tab: "models" (the AI models the labs use; `kind` = the card to focus) or "workshop" (username and workshop key). */
+async function openSettings(tab = "models", { kind = null } = {}) {
   await Promise.all([loadSettings(), loadReportingStatus()]);
+  const name = settingsTabs.includes(tab) ? tab : "models";
+  state.modelAsk = { chat: null, embedding: null };
+  Object.assign(state.trainer, { view: null, flowError: null, failed: false });
+  state.trainer.ticked.clear();
+  for (const model of modelKinds) document.getElementById(`model-live-${model}`).textContent = "";
   clearSettingsErrors();
+  selectSettingsTab(name);
   renderSettings({ fill: true });
-  selectSettingsTab(settingsTabs.includes(tab) ? tab : "azure");
   document.getElementById("settings").showModal();
-  selectSettingsTab(settingsTabs.includes(tab) ? tab : "azure", { focusField: true });
+  focusSettingsField(name, modelKinds.includes(kind) ? kind : null);
+}
+
+/** Never keep the keys nor the access code in the page once the dialog is closed. */
+function clearSecretInputs() {
+  for (const kind of modelKinds) document.getElementById(modelIds(kind, "apiKey").input).value = "";
+  document.getElementById("rep-key").value = "";
+  document.getElementById("trainer-code-input").value = "";
 }
 
 function closeSettings() {
-  // Never keep the keys in the page once the dialog is closed.
-  document.getElementById("set-apikey").value = "";
-  document.getElementById("rep-key").value = "";
+  clearSecretInputs();
+  dropTrainerUnlock();
   document.getElementById("settings").close();
 }
 
-function applySettingsResponse({ ok, status, payload }) {
+/** A model response: the new status (200), inline errors (400), the store error with its file, or a toast. Returns true when applied. */
+function applyModelsResponse(kind, { ok, status, payload }) {
   if (ok) {
-    state.settings = payload;
+    state.models = payload;
     renderConfigChip();
     return true;
   }
 
   if (status === 400 && payload.errors) {
-    const ids = { endpoint: ["err-endpoint", "set-endpoint"], chatDeploymentName: ["err-deployment", "set-deployment"], apiKey: ["err-apikey", "set-apikey"] };
     for (const [field, code] of Object.entries(payload.errors)) {
-      if (ids[field]) setFieldError(ids[field][0], ids[field][1], `${field}.${code}`);
+      if (modelFormFields.includes(field)) setModelFieldError(kind, field, code);
+      else toast(t("settings.saveError", { status }));
     }
-  } else if (payload.error) {
-    showStoreError(payload.error);
+  } else if (storeErrors.includes(payload.error)) {
+    showStoreError(payload.error, payload.file);
   } else {
     toast(t("settings.saveError", { status }));
   }
   return false;
 }
 
+/** Saves my configuration of one kind; the labs use it at once when this kind is in custom mode. */
+async function saveModel(kind) {
+  const status = state.models?.[kind];
+  if (!status || state.modelBusy.has(kind)) return;
+  clearModelErrors(kind);
+  document.getElementById("settings-store-error").hidden = true;
+
+  const card = document.getElementById(`model-card-${kind}`);
+  // A read-only field shows a value set on this computer: send back what was saved here, never copy the computer's value.
+  const value = (field) => {
+    const input = document.getElementById(modelIds(kind, field).input);
+    return input.readOnly ? (status.custom[field] ?? "") : input.value;
+  };
+  const own = kind === "chat" || card.querySelector('input[name="model-embedding-resource"]:checked')?.value === "own";
+  const keyInput = document.getElementById(modelIds(kind, "apiKey").input);
+  const body = { provider: document.getElementById(modelIds(kind, "provider").input).value, deployment: value("deployment") };
+  if (kind === "embedding") body.sameResourceAsLlm = !own;
+  // An empty key keeps the stored one; on the resource of the LLM, the embedding has no endpoint nor key of its own.
+  if (own) Object.assign(body, { endpoint: value("endpoint"), apiKey: keyInput.readOnly ? "" : keyInput.value });
+
+  setModelBusy(kind, true);
+  let saved = false;
+  try {
+    saved = applyModelsResponse(kind, await api.send("PUT", `/settings/models/${kind}/custom`, body));
+  } catch {
+    toast(t("settings.saveError", { status: "—" }));
+  } finally {
+    setModelBusy(kind, false);
+  }
+
+  if (!saved) {
+    markSettingsTabErrors();
+    card.querySelector('[aria-invalid="true"]')?.focus();
+    return;
+  }
+  renderModels({ fill: [kind] });
+  renderSettingsNav();
+  markSettingsTabErrors();
+  // Saved after a refused switch to my configuration: switch to it now, as asked.
+  if (state.modelAsk[kind] === "custom") {
+    await switchModelMode(kind, "custom");
+    return;
+  }
+  toast(t(state.models[kind].mode === "custom" ? "settings.saved" : "models.savedNotInUse"));
+}
+
+/**
+ * Asks the server to use the trainer or my configuration for a kind (or, with reapply, to write the selected one again).
+ * Refused because the profile is incomplete: nothing was written, the mode in use stays selected and what is missing opens.
+ */
+async function switchModelMode(kind, mode, { reapply = false } = {}) {
+  const status = state.models?.[kind];
+  if (!status || state.modelBusy.has(kind)) return;
+  const live = document.getElementById(`model-live-${kind}`);
+  const model = t(`models.${kind}.title`);
+
+  if (mode === status.mode && !reapply) {
+    // Already in use: closes what a refused switch had opened.
+    if (state.modelAsk[kind]) {
+      state.modelAsk[kind] = null;
+      clearModelErrors(kind);
+      markSettingsTabErrors();
+      renderModels();
+    }
+    live.textContent = t("models.inUse", { model, mode: modeLabel(mode) });
+    return;
+  }
+
+  setModelBusy(kind, true);
+  let response = null;
+  try {
+    response = await api.send("PUT", `/settings/models/${kind}/mode`, { mode });
+  } catch {
+    toast(t("settings.saveError", { status: "—" }));
+  } finally {
+    setModelBusy(kind, false);
+  }
+  if (!response) return;
+
+  const { ok, status: code, payload } = response;
+  if (ok) {
+    state.models = payload;
+    state.modelAsk[kind] = null;
+    clearModelErrors(kind);
+    markSettingsTabErrors();
+    renderConfigChip();
+    renderModels();
+    renderSettingsNav();
+    live.textContent = "";
+    toast(t(reapply ? "models.reapplied" : "models.switched", { model, mode: modeLabel(mode) }));
+    return;
+  }
+
+  if (code === 409 && payload.error === "profileIncomplete") {
+    state.modelAsk[kind] = mode;
+    renderModels();
+    if (mode === "custom") {
+      for (const field of payload.missing ?? []) setModelFieldError(kind, field, "required");
+      markSettingsTabErrors();
+      live.textContent = t("models.customIncomplete");
+      document.querySelector(`#model-custom-${kind} [aria-invalid="true"]`)?.focus();
+    } else {
+      // Nothing unlocked yet for this kind: tick it for Unlock when the trainer provides a usable configuration.
+      if (trainerOffer(kind)?.canUse && state.trainer.unlock?.status !== "codeRequired") {
+        state.trainer.ticked.add(kind);
+        renderTrainer();
+        document.getElementById("trainer-unlock").focus();
+      }
+      live.textContent = t("models.trainerNotRetrievedKeep");
+    }
+  } else if (code === 409 && payload.error === "unsupportedProvider") {
+    live.textContent = t("models.unsupportedProvider");
+    toast(t("models.unsupportedProvider"));
+  } else if (storeErrors.includes(payload.error)) {
+    showStoreError(payload.error, payload.file);
+  } else {
+    toast(t("settings.saveError", { status: code }));
+  }
+}
+
+/** Removes the key of my configuration of a kind (Microsoft Entra ID then), at once. */
+async function removeModelKey(kind) {
+  if (!state.models?.[kind] || state.modelBusy.has(kind)) return;
+  if (!confirm(t(kind === "chat" ? "settings.removeKeyConfirm" : "models.embedding.removeKeyConfirm"))) return;
+  clearModelErrors(kind);
+  setModelBusy(kind, true);
+  let removed = false;
+  try {
+    removed = applyModelsResponse(kind, await api.send("DELETE", `/settings/models/${kind}/custom/api-key`));
+  } catch {
+    toast(t("settings.saveError", { status: "—" }));
+  } finally {
+    setModelBusy(kind, false);
+  }
+  if (!removed) return;
+  renderModels();
+  renderSettingsNav();
+  // The Remove button is now hidden: the focus goes back to the key field.
+  document.getElementById(modelIds(kind, "apiKey").input).focus();
+  toast(t("settings.keyRemoved"));
+}
+
+// ---------- Settings: the trainer's configurations (Business Rules 13–20) ----------
+// GET /trainer-models: per kind the trainer's default (state applicable | notApplicable | unusable | none, warnings, updatedSinceUnlock), or the
+// error that prevents reading it, and the unlock under way. POST /trainer-models/unlock { kinds } makes the dashboard server fetch and hold one
+// envelope; POST /trainer-models/code { code } opens it: the keys of the ticked kinds are saved and those kinds switch to trainer mode.
+// The code is read from its field, sent once and cleared at once; the page never stores it and never receives a key.
+const trainerReasonGroups = {
+  "envelopeExpired.expired": "expired", "envelopeExpired.unknown": "expired", "envelopeExpired.keyRotated": "expired", "envelopeExpired.noEnvelope": "expired",
+  "envelopeExpired.exhausted": "used", "envelopeExpired.used": "used",
+  "envelopeExpired.accessCodeChanged": "codeChanged", "envelopeExpired.accessCodeRevoked": "codeChanged", "envelopeExpired.accessCodeExpired": "codeChanged",
+  "envelopeExpired.workshopChanged": "workshop", "envelopeExpired.workshopClosed": "workshop",
+  "rateLimited.lockedOut": "wrongCodes", "rateLimited.accessCodeFrozen": "wrongCodes",
+};
+
+const trainerOffer = (kind) => state.trainer.view?.overview?.[kind] ?? null;
+
+/** In trainer mode, an offer identical to what is in use (same configuration, not updated since the last unlock) says nothing new: it is not shown. */
+function trainerOfferInUse(kind) {
+  const offer = trainerOffer(kind);
+  const status = state.models?.[kind];
+  return status?.mode === "trainer" && !!offer?.default && status.trainer.configId === offer.default.id && !offer.updatedSinceUnlock;
+}
+const trainerPending = () => state.trainer.unlock?.status === "codeRequired";
+const modelNames = (kinds) => kinds.map((kind) => t(`models.${kind}.title`)).join(t("trainer.and"));
+const fmtWait = (seconds) => (seconds == null ? "—" : seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`);
+
+/** The overview (one call to the admin dashboard, never polled) and the unlock under way on the server. */
+async function loadTrainer() {
+  const trainer = state.trainer;
+  trainer.loading = true;
+  renderTrainer();
+  try {
+    trainer.view = await api.get("/trainer-models");
+    trainer.failed = false;
+  } catch {
+    trainer.view = null;
+    trainer.failed = true;
+  } finally {
+    trainer.loading = false;
+  }
+  for (const kind of [...trainer.ticked]) if (!trainerOffer(kind)?.canUse) trainer.ticked.delete(kind);
+  setTrainerUnlock(trainer.view?.unlock ?? null);
+  renderTrainer();
+}
+
+/** The unlock state the server returned; the countdown of the code entry follows its expiry. */
+function setTrainerUnlock(unlock) {
+  const trainer = state.trainer;
+  trainer.unlock = unlock;
+  clearInterval(trainer.timer);
+  trainer.timer = null;
+  if (unlock?.status !== "codeRequired" || !unlock.expiresAt) return;
+  trainer.timer = setInterval(() => {
+    if (Date.parse(unlock.expiresAt) > Date.now()) {
+      renderTrainerCodeHint();
+      return;
+    }
+    // Expired: the server has dropped the envelope too; the candidate clicks Unlock again.
+    setTrainerUnlock(null);
+    trainer.flowError = { kind: "envelopeExpired", reason: "noEnvelope" };
+    document.getElementById("trainer-code-input").value = "";
+    renderTrainer();
+  }, 1000);
+}
+
+/** The dialog closes with an unlock under way: the server drops the envelope (Rule 14). */
+function dropTrainerUnlock() {
+  if (!trainerPending()) return;
+  setTrainerUnlock(null);
+  api.post("/trainer-models/cancel").catch(() => {});
+}
+
+function trainerErrorText(error) {
+  if (!error) return "";
+  const { kind, reason } = error;
+  const keys = [];
+  if (kind === "local") keys.push("trainer.error.local");
+  if (kind === "notConfigured") keys.push(`trainer.error.notConfigured.${error.missing?.[0]}`);
+  if (kind === "unauthorized") keys.push(`trainer.error.unauthorized.${error.credential}`);
+  if (kind === "invalidCode" && reason !== "invalidCodeFormat") {
+    keys.push(error.attemptsLeft === 0 ? "trainer.error.invalidCode.last" : error.attemptsLeft == null ? "trainer.error.invalidCode.noCount" : "trainer.error.invalidCode");
+  }
+  const group = trainerReasonGroups[`${kind}.${reason}`];
+  if (group) keys.push(`trainer.error.${kind}.${group}`);
+  if (reason) keys.push(`trainer.error.${kind}.${reason}`);
+  keys.push(`trainer.error.${kind}`, "trainer.error.unknown");
+  const key = keys.find((candidate) => t(candidate) !== candidate);
+  return t(key, {
+    wait: fmtWait(error.retryAfterSeconds), reason: reason ?? "—", count: error.attemptsLeft ?? "—",
+    length: state.trainer.unlock?.codeLength ?? 5,
+  });
+}
+
+/** What the candidate can do about an error, when something helps: open the Workshop tab, or try again (never for a rate limit). */
+function trainerErrorAction(error) {
+  if (!error) return null;
+  // notConfigured: the action of the first missing setting, the one the message names.
+  if ((error.kind === "notConfigured" && ["workshop", "apiKey"].includes(error.missing?.[0])) || error.kind === "unauthorized") {
+    return { label: "trainer.action.workshop", run: () => selectSettingsTab("workshop", { focusField: true }) };
+  }
+  if (["network", "unavailable", "unknown", "local"].includes(error.kind)) {
+    return { label: "trainer.action.retry", run: () => (state.trainer.flowError ? startTrainerUnlock() : loadTrainer()) };
+  }
+  return null;
+}
+
+function renderTrainer() {
+  renderTrainerBar();
+  for (const kind of modelKinds) renderTrainerOffer(kind);
+}
+
+/** The bar: loading, the simulated notice, the error, Unlock for the ticked kinds, or the code entry. */
+function renderTrainerBar() {
+  const trainer = state.trainer;
+  const view = trainer.view;
+  const pending = trainerPending();
+  document.getElementById("trainer-bar").setAttribute("aria-busy", String(trainer.loading || trainer.busy));
+  document.getElementById("trainer-simulated").hidden = !view?.simulated;
+  document.getElementById("trainer-refresh").setAttribute("aria-disabled", String(trainer.loading || trainer.busy));
+
+  const status = document.getElementById("trainer-status");
+  const busyText = trainer.loading ? t("trainer.loading") : trainer.busy ? t(trainer.busyText) : "";
+  status.replaceChildren(...(busyText ? [el("span", "spinner"), el("span", null, busyText)] : []));
+
+  // While a code is asked, the error of the last attempt shows under the field; otherwise in the bar, before the overview's.
+  const error = pending ? null : trainer.flowError ?? view?.error ?? (trainer.failed ? { kind: "local" } : null);
+  const notice = document.getElementById("trainer-error");
+  notice.hidden = !error || trainer.loading;
+  notice.className = `notice model-notice ${error?.kind === "notFound" ? "" : "notice-warn"}`.trim();
+  document.getElementById("trainer-error-text").textContent = trainerErrorText(error);
+  const action = trainerErrorAction(error);
+  const button = document.getElementById("trainer-error-action");
+  button.hidden = !action;
+  button.textContent = action ? t(action.label) : "";
+  button.onclick = action ? action.run : null;
+
+  // Unlock for the ticked kinds; nothing to tick: up to date (everything in use) or nothing usable here.
+  const ticked = modelKinds.filter((kind) => trainer.ticked.has(kind));
+  const tickable = modelKinds.filter((kind) => trainerOffer(kind)?.canUse && !trainerOfferInUse(kind));
+  document.getElementById("trainer-actions").hidden = pending || !view?.overview;
+  const unlockButton = document.getElementById("trainer-unlock");
+  unlockButton.hidden = !ticked.length && !tickable.length;
+  unlockButton.setAttribute("aria-disabled", String(!ticked.length || trainer.busy));
+  document.getElementById("trainer-unlock-hint").textContent = ticked.length ? t("trainer.unlockFor", { models: modelNames(ticked) })
+    : tickable.length ? t("trainer.tickFirst")
+    : modelKinds.some(trainerOfferInUse) ? t("trainer.upToDate")
+    : t("trainer.nothingUsable");
+
+  document.getElementById("trainer-code").hidden = !pending;
+  if (pending) {
+    renderTrainerCodeHint();
+    const codeError = document.getElementById("trainer-code-error");
+    const local = trainer.codeFormatError;
+    const message = local ? t(local, { length: trainer.unlock.codeLength }) : trainerErrorText(trainer.flowError);
+    codeError.hidden = !message;
+    codeError.textContent = message;
+    document.getElementById("trainer-code-input").setAttribute("aria-invalid", String(Boolean(message)));
+    updateTrainerCodeSubmit();
+  }
+}
+
+function renderTrainerCodeHint() {
+  const unlock = state.trainer.unlock;
+  if (!unlock || unlock.status !== "codeRequired") return;
+  const seconds = Math.max(0, (Date.parse(unlock.expiresAt) - Date.now()) / 1000);
+  const parts = [t("trainer.codeHint", { length: unlock.codeLength, models: modelNames(unlock.kinds), time: fmtClock(seconds) })];
+  if (unlock.attemptsLeft != null) parts.push(t("trainer.attemptsLeft", { count: unlock.attemptsLeft }));
+  document.getElementById("trainer-code-hint").textContent = parts.join(" ");
+}
+
+/** The offer of one card: the trainer's default of this kind, why it cannot be used, its warnings, and the tick for Unlock. */
+function renderTrainerOffer(kind) {
+  const node = document.getElementById(`model-offer-${kind}`);
+  const offer = trainerOffer(kind);
+  const inUse = trainerOfferInUse(kind);
+  node.hidden = !offer || inUse;
+  if (!offer || inUse) {
+    node.replaceChildren();
+    return;
+  }
+
+  const head = el("div", "model-offer-head");
+  head.append(el("span", null, t("trainer.offer")));
+  if (offer.default) head.append(el("b", null, offer.default.name));
+  if (offer.updatedSinceUnlock) head.append(pill("running", t("trainer.updated")));
+  const parts = [head];
+
+  const config = offer.default;
+  if (config) {
+    const key = t(config.keyProvided ? "trainer.keyProvided" : "trainer.keyNotProvided");
+    parts.push(el("p", "model-offer-line", [providerLabel(config.provider), config.deployment, config.endpointHost, key].filter(Boolean).join(" · ")));
+  }
+
+  const note = offer.state === "none" ? t(`trainer.none.${kind}`)
+    : offer.state === "notApplicable" ? t(offer.reason === "unknownProvider" ? "trainer.unknownProvider" : "trainer.notApplicable", { provider: providerLabel(config?.provider) })
+    : offer.state === "unusable" ? t(offer.reason === "invalidSettings" ? "trainer.unusableSettings" : "trainer.unusable")
+    : "";
+  if (note) parts.push(el("p", `model-offer-note${offer.state === "none" ? "" : " warn"}`, note));
+  for (const warning of offer.warnings ?? []) parts.push(el("p", "model-offer-note warn", t(`trainer.warning.${warning}`)));
+
+  if (offer.canUse) {
+    const label = el("label", "model-offer-tick");
+    const box = el("input");
+    box.type = "checkbox";
+    box.dataset.trainerKind = kind;
+    box.checked = state.trainer.ticked.has(kind);
+    box.disabled = trainerPending() || state.trainer.busy;
+    label.append(box, el("span", null, t("trainer.useIt")));
+    parts.push(label);
+  }
+  node.replaceChildren(...parts);
+}
+
+/** Keeps the characters of the code alphabet only: upper-cased as typed, spaces and dashes dropped (pasting "k7qx-9" works). */
+function normalizeTrainerCode(value, alphabet) {
+  const cleaned = value.toUpperCase().replace(/[\s-]/g, "");
+  const kept = [...cleaned].filter((c) => alphabet.includes(c)).join("");
+  return { kept, dropped: kept.length !== cleaned.length };
+}
+
+function updateTrainerCodeSubmit() {
+  const unlock = state.trainer.unlock;
+  const value = document.getElementById("trainer-code-input").value;
+  const ready = !!unlock && value.length === unlock.codeLength && !state.trainer.busy;
+  document.getElementById("trainer-code-submit").setAttribute("aria-disabled", String(!ready));
+  document.getElementById("trainer-code-cancel").setAttribute("aria-disabled", String(state.trainer.busy));
+  return ready;
+}
+
+/** Unlock: the dashboard server fetches one envelope for the ticked kinds and holds it; then the code is asked. */
+async function startTrainerUnlock() {
+  const trainer = state.trainer;
+  const kinds = modelKinds.filter((kind) => trainer.ticked.has(kind));
+  if (trainer.busy || trainer.loading) return;
+  if (!kinds.length) {
+    toast(t("trainer.tickFirst"));
+    return;
+  }
+
+  Object.assign(trainer, { busy: true, busyText: "trainer.starting", flowError: null, codeFormatError: null });
+  renderTrainer();
+  let response = null;
+  try {
+    response = await api.post("/trainer-models/unlock", { kinds });
+  } catch {
+    trainer.flowError = { kind: "local" };
+  } finally {
+    trainer.busy = false;
+  }
+
+  if (response?.ok) {
+    setTrainerUnlock(response.payload);
+    trainer.flowError = response.payload.error ?? null;
+  } else if (response) {
+    trainer.flowError = { kind: "unknown" };
+  }
+  renderTrainer();
+  if (trainerPending()) document.getElementById("trainer-code-input").focus();
+  else await reviewAgainIfChanged(trainer.flowError);
+}
+
+/** The code: sent once, cleared from the field at once (Rule 13). Success saves the keys and switches the ticked kinds. */
+async function submitTrainerCode() {
+  const trainer = state.trainer;
+  const input = document.getElementById("trainer-code-input");
+  if (!trainerPending() || !updateTrainerCodeSubmit()) return;
+  const code = input.value;
+  input.value = "";
+
+  Object.assign(trainer, { busy: true, busyText: "trainer.opening", flowError: null, codeFormatError: null });
+  renderTrainer();
+  let response = null;
+  try {
+    response = await api.post("/trainer-models/code", { code });
+  } catch {
+    trainer.flowError = { kind: "local" };
+  } finally {
+    trainer.busy = false;
+  }
+
+  if (response && !response.ok) {
+    if (storeErrors.includes(response.payload.error)) showStoreError(response.payload.error, response.payload.file);
+    else trainer.flowError = { kind: "unknown" };
+    // The server dropped the envelope whatever happened: the state is read again.
+    await loadTrainer();
+    return;
+  }
+  if (!response) {
+    renderTrainer();
+    return;
+  }
+
+  const view = response.payload;
+  setTrainerUnlock(view);
+  trainer.flowError = view.error ?? null;
+  if (view.status === "unlocked") {
+    trainer.ticked.clear();
+    state.models = view.models;
+    for (const kind of view.kinds) {
+      state.modelAsk[kind] = null;
+      const offer = trainerOffer(kind);
+      if (offer) offer.updatedSinceUnlock = false;
+      document.getElementById(`model-live-${kind}`).textContent = t("trainer.unlockedLive", { model: t(`models.${kind}.title`) });
+    }
+    renderConfigChip();
+    renderModels();
+    renderSettingsNav();
+    toast(t("trainer.unlocked"));
+    return;
+  }
+
+  renderTrainer();
+  if (trainerPending()) input.focus();
+  else await reviewAgainIfChanged(trainer.flowError);
+}
+
+/** Rule 20: the trainer changed the configuration (or a ticked kind is no longer usable): the overview is read again for a new review. */
+async function reviewAgainIfChanged(error) {
+  if (error?.reason === "configChanged" || error?.reason === "notApplicable") await loadTrainer();
+}
+
+async function cancelTrainerUnlock() {
+  const trainer = state.trainer;
+  if (trainer.busy) return;
+  document.getElementById("trainer-code-input").value = "";
+  Object.assign(trainer, { flowError: null, codeFormatError: null });
+  setTrainerUnlock(null);
+  renderTrainer();
+  try {
+    const response = await api.post("/trainer-models/cancel");
+    if (response.ok) setTrainerUnlock(response.payload);
+  } catch {
+    // The server drops the envelope at its expiry anyway.
+  }
+  renderTrainer();
+  document.getElementById("trainer-unlock").focus();
+}
+
+function wireTrainer() {
+  document.getElementById("trainer-refresh").addEventListener("click", () => {
+    if (state.trainer.loading || state.trainer.busy) return;
+    state.trainer.flowError = null;
+    loadTrainer();
+  });
+  document.getElementById("trainer-unlock").addEventListener("click", startTrainerUnlock);
+  document.getElementById("trainer-code-submit").addEventListener("click", submitTrainerCode);
+  document.getElementById("trainer-code-cancel").addEventListener("click", cancelTrainerUnlock);
+
+  const input = document.getElementById("trainer-code-input");
+  input.addEventListener("input", () => {
+    const unlock = state.trainer.unlock;
+    if (!unlock) return;
+    const { kept, dropped } = normalizeTrainerCode(input.value, unlock.codeAlphabet);
+    input.value = kept;
+    state.trainer.codeFormatError = dropped ? "trainer.codeAlphabet" : kept.length > unlock.codeLength ? "trainer.codeTooLong" : null;
+    state.trainer.flowError = null;
+    renderTrainerBar();
+  });
+  // Enter submits the code, never the settings form.
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    submitTrainerCode();
+  });
+
+  // The ticks of the cards: only the bar changes (the checkbox keeps the focus).
+  for (const kind of modelKinds) {
+    document.getElementById(`model-offer-${kind}`).addEventListener("change", (event) => {
+      const box = event.target.closest("[data-trainer-kind]");
+      if (!box) return;
+      if (box.checked) state.trainer.ticked.add(kind);
+      else state.trainer.ticked.delete(kind);
+      renderTrainerBar();
+    });
+  }
+}
+
+function wireModels() {
+  for (const kind of modelKinds) {
+    const card = document.getElementById(`model-card-${kind}`);
+    card.addEventListener("click", (event) => {
+      const button = event.target.closest(modelButtons);
+      if (!button || !card.contains(button)) return;
+      if (button.dataset.modelMode) switchModelMode(kind, button.dataset.modelMode);
+      else if (button.dataset.action === "save-model") saveModel(kind);
+      else if (button.dataset.action === "remove-model-key") removeModelKey(kind);
+      else if (button.dataset.action === "reapply-model" && state.models) switchModelMode(kind, state.models[kind].mode, { reapply: true });
+    });
+    // Enter in a field of my configuration saves this card only (both cards and the workshop share the dialog's form).
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement) || !event.target.closest(".model-custom")) return;
+      event.preventDefault();
+      saveModel(kind);
+    });
+    // Embedding: "same resource as the LLM" / "its own resource" only changes the form until it is saved.
+    card.addEventListener("change", (event) => {
+      if (event.target.name !== "model-embedding-resource") return;
+      if (event.target.value === "same") {
+        setModelFieldError(kind, "endpoint", null);
+        setModelFieldError(kind, "apiKey", null);
+        markSettingsTabErrors();
+      }
+      renderModels();
+    });
+  }
+}
+
 function wireSettings() {
   const dialog = document.getElementById("settings");
-  document.getElementById("config-chip").addEventListener("click", () => openSettings("azure"));
+  document.getElementById("config-chip").addEventListener("click", () => openSettings("models"));
   const reportingChip = document.getElementById("reporting-chip");
   reportingChip.addEventListener("click", () => openSettings("workshop"));
   reportingChip.addEventListener("keydown", (event) => {
@@ -945,29 +1719,24 @@ function wireSettings() {
     document.getElementById(`settings-tab-${settingsTabs[next]}`).focus();
   });
   dialog.querySelectorAll('[data-action="close-settings"]').forEach((b) => b.addEventListener("click", closeSettings));
-  dialog.addEventListener("cancel", () => { document.getElementById("set-apikey").value = ""; document.getElementById("rep-key").value = ""; });
+  dialog.addEventListener("cancel", () => {
+    clearSecretInputs();
+    dropTrainerUnlock();
+  });
 
+  // The footer Save (Workshop tab only): the AI models cards save themselves.
   document.getElementById("settings-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    clearSettingsErrors();
-    const submit = event.submitter ?? dialog.querySelector('[type="submit"]');
+    if (state.settingsTab !== "workshop") return;
+    for (const field of reportingFields) setReportingFieldError(field.error, field.input, null);
+    document.getElementById("settings-store-error").hidden = true;
+    const submit = document.getElementById("settings-foot-save");
     submit.disabled = true;
     try {
-      // A read-only field shows a value set on this computer: send back what was saved here, never copy the computer's value.
-      const formValue = (id, key) => {
-        const input = document.getElementById(id);
-        return input.readOnly ? (state.settings?.[key]?.dashboardValue ?? "") : input.value;
-      };
-      const keyInput = document.getElementById("set-apikey");
-      const response = await api.send("PUT", "/settings/azure-openai", {
-        endpoint: formValue("set-endpoint", "endpoint"),
-        chatDeploymentName: formValue("set-deployment", "chatDeploymentName"),
-        apiKey: keyInput.readOnly ? "" : keyInput.value,
-      });
-      const azureOk = applySettingsResponse(response);
-      const reportingOk = await submitReportingSettings();
-      if (azureOk && reportingOk) {
-        renderSettings({ fill: true });
+      if (await submitReportingSettings()) {
+        renderReportingSettings({ fill: true });
+        renderSettingsNav();
+        markSettingsTabErrors();
         toast(t("settings.saved"));
       } else {
         markSettingsTabErrors({ reveal: true });
@@ -978,14 +1747,8 @@ function wireSettings() {
     }
   });
 
-  dialog.querySelector('[data-action="remove-key"]').addEventListener("click", async () => {
-    if (!confirm(t("settings.removeKeyConfirm"))) return;
-    clearSettingsErrors();
-    if (applySettingsResponse(await api.send("DELETE", "/settings/azure-openai/api-key"))) {
-      renderSettings();
-      toast(t("settings.keyRemoved"));
-    }
-  });
+  wireModels();
+  wireTrainer();
 }
 
 // ---------- boot ----------
@@ -1146,7 +1909,8 @@ function openWelcome() {
   document.getElementById("welcome-server").textContent = status.serverUrl ? t("welcome.server", { url: status.serverUrl }) : "";
   document.getElementById("welcome-no-server").hidden = !!status.serverUrl;
   dialog.querySelector('[type="submit"]').hidden = !status.serverUrl;
-  document.getElementById("wel-key-field").hidden = status.workshopKeyConfigured;
+  // The field takes the trainer's invitation code too: shown until both the workshop key and the admin API key are configured.
+  document.getElementById("wel-key-field").hidden = status.workshopKeyConfigured && status.apiKeyConfigured;
   if (!dialog.open) dialog.showModal();
   document.getElementById("wel-username").focus();
 }
@@ -1188,6 +1952,13 @@ function renderReportingSettings({ fill = false } = {}) {
     : status.workshopKeySource === "dashboard" ? t("reporting.keyDashboard")
     : status.workshopKeySource === "appsettings" ? t("reporting.keyAppsettings")
     : t("reporting.keyMissing");
+
+  const apiKey = document.getElementById("src-rep-api-key");
+  apiKey.className = `field-source ${status.apiKeySource}`;
+  apiKey.textContent = status.apiKeySource === "environment" ? t("reporting.apiKeyEnvironment", { variable: "LABS_ADMIN_API_KEY" })
+    : status.apiKeySource === "dashboard" ? t("reporting.apiKeyDashboard")
+    : status.apiKeySource === "appsettings" ? t("reporting.apiKeyAppsettings")
+    : t("reporting.apiKeyMissing");
 }
 
 /** Sends the reporting fields of the settings dialog when at least one was filled. Returns true when nothing failed. */

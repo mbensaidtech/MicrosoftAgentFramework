@@ -24,7 +24,7 @@ The FAQ is stored in a **vector store**: each entry is turned into a vector (an 
 - .NET 10 SDK or later
 - An Azure OpenAI (or Microsoft Foundry) resource with **two deployments**:
   - a chat model (for example `gpt-4o-mini` or `gpt-5.4-mini`)
-  - an embedding model (for example `text-embedding-3-small`)
+  - an embedding model (for example `text-embedding-3-small`); it can also be on another resource (optional, see Step 1)
 - One of the following for authentication:
   - the resource **API key**, or
   - Azure CLI logged in (`az login`) with the **Cognitive Services OpenAI User** role on the resource
@@ -47,6 +47,7 @@ Lab07-AgenticRAG-VectorStore/
 │   │   └── sav-faq.json            <-- The 20 FAQ entries
 │   ├── FaqData.cs                  <-- Reads sav-faq.json (provided)
 │   ├── RagConsole.cs               <-- Display helpers (provided)
+│   ├── EmbeddingResource.cs        <-- Chooses the resource of the embeddings (provided)
 │   ├── ConfigurationHelper.cs
 │   ├── AzureOpenAISettings.cs
 │   ├── appsettings.json
@@ -91,13 +92,32 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
    - **Microsoft Entra ID** — leave `APIKey` unset and run `az login`. `DefaultAzureCredential` picks up your Azure CLI identity.
 
-3. **Or use the dashboard**: the *Azure OpenAI settings* of the optional [Lab Bench dashboard](../../../Dashboard/README.md#azure-openai-settings) write the endpoint, the chat deployment and the API key to the same user secrets. The embedding deployment is not part of the form: set it in `appsettings.json` or as a user secret.
+3. **Optional: the embedding deployment on another resource.** By default, the embeddings use the resource of the chat deployment (`Endpoint`, with `APIKey` or Entra ID): nothing to do. If your embedding deployment is on another Azure OpenAI resource, set its endpoint, and its key if you use one:
+
+   ```bash
+   cd Start
+   dotnet user-secrets set "AzureOpenAI:EmbeddingEndpoint" "https://<embedding-resource>.openai.azure.com/"
+   dotnet user-secrets set "AzureOpenAI:EmbeddingAPIKey" "<embedding-api-key>"
+   ```
+
+   You can also use the environment variables `AzureOpenAI__EmbeddingEndpoint` and `AzureOpenAI__EmbeddingAPIKey`. Both settings are optional:
+
+   | `EmbeddingEndpoint` | `EmbeddingAPIKey` | The embeddings use |
+   |---------------------|-------------------|--------------------|
+   | not set | ignored | the resource of the chat deployment: `Endpoint`, with `APIKey` or Entra ID (default) |
+   | set | set | `EmbeddingEndpoint`, with `EmbeddingAPIKey` |
+   | set | not set | `EmbeddingEndpoint`, with Microsoft Entra ID (`az login` and the **Cognitive Services OpenAI User** role on that resource) |
+
+   The `APIKey` of the chat deployment is **never** sent to `EmbeddingEndpoint`. `EmbeddingDeploymentName` is the name of the deployment on the resource in use. When `EmbeddingEndpoint` is set, the program prints it after the deployments, with the authentication used (`API key` or `Microsoft Entra ID`), never the key. To go back to a single resource: `dotnet user-secrets remove "AzureOpenAI:EmbeddingEndpoint"` (and the same for `AzureOpenAI:EmbeddingAPIKey`).
+
+4. **Or use the dashboard**: the *Azure OpenAI settings* of the optional [Lab Bench dashboard](../../../Dashboard/README.md#azure-openai-settings) write the endpoint, the chat deployment and the API key to the same user secrets. The embedding deployment is not part of the form: set it in `appsettings.json` or as a user secret.
 
 ### Step 2: Look at the provided files
 
 - `Models/FaqRecord.cs` — a FAQ entry as the vector store sees it. The attributes define the schema of the collection: `[VectorStoreKey]` on `Id`, `[VectorStoreData]` on `Question` and `Answer`, and `[VectorStoreVector]` on `Embedding`. `Embedding` is a **string** (question + answer): when a record is upserted, the store generates its vector itself with the `EmbeddingGenerator` you give it, and when you search with a string, the store embeds the question the same way. The same class reads `Data/sav-faq.json`.
 - `Tools/FaqSearchTool.cs` — the function tool of scenario 3: `SearchFaqAsync(question, top)` searches the collection and returns the closest entries as text (id, score, question, answer). The `[Description]` attributes are what the model reads to decide when to call it.
 - `FaqData.cs` — `LoadAsync()` reads the 20 entries of `Data/sav-faq.json` (an after-sales FAQ: returns, refunds, delivery, payment, warranty...).
+- `EmbeddingResource.cs` — `client.ForEmbeddings(settings)` returns the client to get the embedding client from: `client` itself by default, or a client for `AzureOpenAI:EmbeddingEndpoint` when the embedding deployment is on another resource (Step 1). You use it in TODO 4.
 - `RagConsole.cs` — `WriteSearchResult(rank, result)`, `WriteToolCalls(response)` and `WriteTokenUsage(response, heading)`. `Program.cs` imports them with `using static`, so you can call them directly.
 
 ### Step 3: Complete the Program.cs
@@ -115,7 +135,7 @@ TODO 1 to 3 are the same as in Lab 01.
 | **TODO 1** | Create the `OpenAIClientOptions` for the Azure OpenAI v1 endpoint | • `new OpenAIClientOptions { Endpoint = ... }` <br> • `AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint)` (from `CommonUtilities`) returns the `.../openai/v1/` URI |
 | **TODO 2** | Create the `OpenAIClient` | • API key: `new OpenAIClient(new ApiKeyCredential(settings.APIKey), clientOptions)` <br> • Entra ID: `new OpenAIClient(new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"), clientOptions)` <br> • Use a conditional on `string.IsNullOrWhiteSpace(settings.APIKey)` to support both |
 | **TODO 3** | Get a `ChatClient` for the chat deployment | • `client.GetChatClient(settings.ChatDeploymentName)` |
-| **TODO 4** | Get an embedding generator for the embedding deployment | • `IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator = client.GetEmbeddingClient(settings.EmbeddingDeploymentName).AsIEmbeddingGenerator();` <br> • `AsIEmbeddingGenerator()` wraps the `EmbeddingClient` of the OpenAI SDK into the `Microsoft.Extensions.AI` abstraction that the vector store understands |
+| **TODO 4** | Get an embedding generator for the embedding deployment | • `IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator = client.ForEmbeddings(settings).GetEmbeddingClient(settings.EmbeddingDeploymentName).AsIEmbeddingGenerator();` <br> • `ForEmbeddings(settings)` (provided, `EmbeddingResource.cs`) returns `client` itself, or a client for `AzureOpenAI:EmbeddingEndpoint` when the embedding deployment is on another resource (Step 1) <br> • `AsIEmbeddingGenerator()` wraps the `EmbeddingClient` of the OpenAI SDK into the `Microsoft.Extensions.AI` abstraction that the vector store understands |
 | **TODO 5** | Create the vector store with the embedding generator | • `VectorStore vectorStore = new InMemoryVectorStore(new InMemoryVectorStoreOptions { EmbeddingGenerator = embeddingGenerator });` <br> • `InMemoryVectorStore` comes from `CommunityToolkit.VectorData.InMemory`; any other `Microsoft.Extensions.VectorData` store has the same API |
 | **TODO 6** | Get the FAQ collection | • `VectorStoreCollection<string, FaqRecord> faqCollection = vectorStore.GetCollection<string, FaqRecord>("sav-faq");` <br> • `string` is the type of the key (`FaqRecord.Id`), `FaqRecord` the type of the records |
 
@@ -295,15 +315,17 @@ Token Usage (follow-up):
 ```
 
 Answers, scores and token counts vary from one run to another and from one embedding model to another (the scores above come from `text-embedding-3-small`).
+When the embedding deployment is on another resource (`EmbeddingEndpoint` set), one more line follows `Embedding deployment`, for example `Embedding endpoint: https://your-embedding-resource.openai.azure.com/ (Microsoft Entra ID)`.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `'AzureOpenAI:Endpoint' is not configured` (or `EmbeddingDeploymentName`) | Replace the `YOUR-...` placeholders in `appsettings.json` (or use user secrets / environment variables) |
+| `'AzureOpenAI:Endpoint' is not configured` (or `EmbeddingDeploymentName`, `EmbeddingEndpoint`) | Replace the `YOUR-...` placeholders in `appsettings.json` (or use user secrets / environment variables) |
 | `401 Unauthorized` with an API key | Check the key (user secret `AzureOpenAI:APIKey`) and that it belongs to the resource of the endpoint |
 | `401` / `403` with Entra ID | Run `az login` and make sure your identity has the **Cognitive Services OpenAI User** role on the resource |
 | `404 DeploymentNotFound` on scenario 1 | `EmbeddingDeploymentName` must be the name of an **embedding** deployment (not the model name) |
+| `401`, `403` or `404` on scenario 1 (the first embedding call), with `EmbeddingEndpoint` set | The embeddings use that resource: `EmbeddingAPIKey` must be a key of that resource (without it, your Entra ID identity needs the **Cognitive Services OpenAI User** role on it), and `EmbeddingDeploymentName` a deployment of that resource |
 | Scenarios 2-4 find nothing, or `VectorStoreException` about the collection | Run scenario 1 first: the vector store is in memory and starts empty |
 | The scores are all very close (0.7-0.9) | Normal with some embedding models: only the **order** of the results matters |
 | Scenario 3: the agent answers without calling the tool | Check the `[Description]` of `SearchFaqAsync` and the instructions of TODO 12; the model decides from them |
@@ -341,7 +363,8 @@ The following files are provided and should not be modified:
 
 - `AgenticRAG.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
-- `AzureOpenAISettings.cs` - Settings class for Azure OpenAI (chat and embedding deployments)
+- `AzureOpenAISettings.cs` - Settings class for Azure OpenAI (chat and embedding deployments, optional embedding resource)
+- `EmbeddingResource.cs` - Chooses the resource of the embeddings (`ForEmbeddings`)
 - `Models/FaqRecord.cs` - The record of the vector store
 - `Tools/FaqSearchTool.cs` - The function tool of scenario 3
 - `FaqData.cs` - Reads the FAQ file

@@ -40,7 +40,15 @@ public sealed record AzureOpenAISettingsStatus(
     bool Configured);
 
 /// <summary>Values sent by the settings form. Empty Endpoint / ChatDeploymentName remove the value; an empty ApiKey keeps the stored key.</summary>
-public sealed record AzureOpenAISettingsUpdate(string? Endpoint, string? ChatDeploymentName, string? ApiKey);
+public sealed record AzureOpenAISettingsUpdate(string? Endpoint, string? ChatDeploymentName, string? ApiKey)
+{
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        // Never print the key (a record prints every property by default).
+        builder.Append($"Endpoint = {Endpoint}, ChatDeploymentName = {ChatDeploymentName}, ApiKey = {(ApiKey is null ? "none" : "set")}");
+        return true;
+    }
+}
 
 public sealed class AzureOpenAISettingsStoreException(string code, string message, Exception? inner = null) : Exception(message, inner)
 {
@@ -127,77 +135,36 @@ public sealed partial class AzureOpenAISettingsStore
         }
 
         IReadOnlyDictionary<string, string> environment = _environment();
-        SettingStatus endpoint = Resolve(EndpointName, secrets, environment);
-        SettingStatus deployment = Resolve(DeploymentName, secrets, environment);
-
-        string? storedKey = Get(secrets, ApiKeyName);
-        bool keyInEnvironment = TryGetEnvironment(environment, ApiKeyName, out string? environmentKey);
-        ApiKeyStatus apiKey = new(
-            Stored: !string.IsNullOrWhiteSpace(storedKey),
-            Source: keyInEnvironment ? SettingSource.Environment
-                : !string.IsNullOrWhiteSpace(storedKey) ? SettingSource.Dashboard
-                : SettingSource.Missing,
-            EnvironmentValueEmpty: keyInEnvironment && string.IsNullOrWhiteSpace(environmentKey),
-            EnvironmentVariable: EnvironmentVariableName(ApiKeyName),
-            Hint: KeyHint(keyInEnvironment ? environmentKey : storedKey));
-
-        // Same rule as the labs: a non-empty key means API key authentication, otherwise Microsoft Entra ID.
-        bool usesApiKey = keyInEnvironment ? !string.IsNullOrWhiteSpace(environmentKey) : apiKey.Stored;
+        ActiveModelStatus llm = ResolveActiveChat(secrets, environment);
 
         return new AzureOpenAISettingsStatus(
             SecretsFile,
             UserSecretsId,
             storeError,
-            endpoint,
-            deployment,
-            apiKey,
-            usesApiKey ? "apiKey" : "entraId",
+            llm.Endpoint,
+            llm.Deployment,
+            llm.ApiKey,
+            llm.Authentication,
             // An empty environment variable also hides the other sources: the lab then reports the value as not configured.
-            Configured: !string.IsNullOrWhiteSpace(endpoint.EffectiveValue) && !string.IsNullOrWhiteSpace(deployment.EffectiveValue));
+            llm.Configured);
     }
 
-    /// <summary>Validates and saves the settings. Returns the validation errors (field → code), empty when saved.</summary>
+    /// <summary>
+    /// Validates and saves the custom LLM profile (the settings form of the LLM); when the LLM is in custom mode, the labs use it at once.
+    /// Returns the validation errors (field → code), empty when saved.
+    /// </summary>
     public async Task<IReadOnlyDictionary<string, string>> SaveAsync(AzureOpenAISettingsUpdate update)
     {
-        string? endpoint = Normalize(update.Endpoint);
-        string? deployment = Normalize(update.ChatDeploymentName);
-        string? apiKey = Normalize(update.ApiKey);
+        IReadOnlyDictionary<string, string> errors = await SaveCustomProfileAsync(
+            ModelKind.Chat,
+            new ModelProfileUpdate(AzureOpenAIProvider, update.Endpoint, update.ChatDeploymentName, update.ApiKey));
 
-        Dictionary<string, string> errors = [];
-        if (endpoint is not null && ValidateEndpoint(endpoint) is { } endpointError)
-        {
-            errors["endpoint"] = endpointError;
-        }
-
-        if (deployment is not null && ValidateDeployment(deployment) is { } deploymentError)
-        {
-            errors["chatDeploymentName"] = deploymentError;
-        }
-
-        if (apiKey is not null && ValidateApiKey(apiKey) is { } apiKeyError)
-        {
-            errors["apiKey"] = apiKeyError;
-        }
-
-        if (errors.Count > 0)
-        {
-            return errors;
-        }
-
-        await UpdateAsync(secrets =>
-        {
-            Set(secrets, EndpointName, endpoint);
-            Set(secrets, DeploymentName, deployment);
-            if (apiKey is not null)
-            {
-                Set(secrets, ApiKeyName, apiKey);
-            }
-        });
-
-        return errors;
+        // Field names of this form.
+        return errors.ToDictionary(error => error.Key == "deployment" ? "chatDeploymentName" : error.Key, error => error.Value);
     }
 
-    public Task RemoveApiKeyAsync() => UpdateAsync(secrets => Set(secrets, ApiKeyName, null));
+    /// <summary>Removes the key of the custom LLM profile (Microsoft Entra ID); applied at once when the LLM is in custom mode.</summary>
+    public Task RemoveApiKeyAsync() => RemoveCustomApiKeyAsync(ModelKind.Chat);
 
     /// <summary>
     /// Reads another entry of the shared file (flat <c>"Section:Name"</c> or nested spelling), e.g. the workshop key of the reporting.
@@ -218,15 +185,34 @@ public sealed partial class AzureOpenAISettingsStore
     /// <summary>Writes (or removes, with null) another entry of the shared file, keeping everything else.</summary>
     public Task SetEntryAsync(string section, string name, string? value) => UpdateAsync(secrets => Set(secrets, section, name, value));
 
-    /// <summary>The API keys the labs may receive (stored and environment), to mask in the run output.</summary>
+    /// <summary>Writes (or removes, with null) several entries of one section in a single write: all of them, or none when the file cannot be read.</summary>
+    public Task SetEntriesAsync(string section, IReadOnlyDictionary<string, string?> entries) => UpdateAsync(secrets =>
+    {
+        foreach ((string name, string? value) in entries)
+        {
+            Set(secrets, section, name, value);
+        }
+    });
+
+    /// <summary>
+    /// Every API key to mask in the run output: the active keys (LLM and embedding), the key of every profile (custom and trainer, both kinds)
+    /// and the <c>AzureOpenAI__APIKey</c> / <c>AzureOpenAI__EmbeddingAPIKey</c> environment values.
+    /// </summary>
     public IReadOnlyList<string> SecretValues()
     {
-        List<string> values = [];
+        List<string?> values = [];
         try
         {
-            if (Get(ReadSecrets(), ApiKeyName) is { Length: > 0 } stored)
+            JsonObject secrets = ReadSecrets();
+            values.Add(Get(secrets, ApiKeyName));
+            values.Add(Get(secrets, EmbeddingApiKeyName));
+            foreach (ModelKind kind in Kinds)
             {
-                values.Add(stored);
+                foreach (ModelMode mode in Modes)
+                {
+                    // Read as stored (not through the profile), so that a key left by a hand edit is masked too.
+                    values.Add(Get(secrets, ProfileSection(kind, mode), ProfileApiKeyEntry));
+                }
             }
         }
         catch (AzureOpenAISettingsStoreException)
@@ -234,12 +220,16 @@ public sealed partial class AzureOpenAISettingsStore
             // An unreadable file gives no key to the labs either.
         }
 
-        if (TryGetEnvironment(_environment(), ApiKeyName, out string? environmentKey) && !string.IsNullOrWhiteSpace(environmentKey))
+        IReadOnlyDictionary<string, string> environment = _environment();
+        foreach (string name in new[] { ApiKeyName, EmbeddingApiKeyName })
         {
-            values.Add(environmentKey.Trim());
+            if (TryGetEnvironment(environment, name, out string? environmentKey) && !string.IsNullOrWhiteSpace(environmentKey))
+            {
+                values.Add(environmentKey.Trim());
+            }
         }
 
-        return values;
+        return values.OfType<string>().Where(value => value.Length > 0).Distinct(StringComparer.Ordinal).ToList();
     }
 
     internal static string? ValidateEndpoint(string endpoint)
@@ -294,6 +284,24 @@ public sealed partial class AzureOpenAISettingsStore
             : new SettingStatus(null, labDefault, SettingSource.LabDefault, variable);
     }
 
+    private ApiKeyStatus ResolveApiKey(string name, JsonObject secrets, IReadOnlyDictionary<string, string> environment)
+    {
+        string? storedKey = Get(secrets, name);
+        bool keyInEnvironment = TryGetEnvironment(environment, name, out string? environmentKey);
+        return new ApiKeyStatus(
+            Stored: !string.IsNullOrWhiteSpace(storedKey),
+            Source: keyInEnvironment ? SettingSource.Environment
+                : !string.IsNullOrWhiteSpace(storedKey) ? SettingSource.Dashboard
+                : SettingSource.Missing,
+            EnvironmentValueEmpty: keyInEnvironment && string.IsNullOrWhiteSpace(environmentKey),
+            EnvironmentVariable: EnvironmentVariableName(name),
+            Hint: KeyHint(keyInEnvironment ? environmentKey : storedKey));
+    }
+
+    /// <summary>Same rule as the labs: a non-empty key in effect means API key authentication, otherwise Microsoft Entra ID.</summary>
+    private static bool UsesApiKey(ApiKeyStatus apiKey) =>
+        apiKey.Source == SettingSource.Environment ? !apiKey.EnvironmentValueEmpty : apiKey.Stored;
+
     /// <summary>The first real (non-placeholder) value found in the appsettings.json of the labs.</summary>
     private string? LabDefault(string name)
     {
@@ -318,14 +326,26 @@ public sealed partial class AzureOpenAISettingsStore
         return null;
     }
 
-    private async Task UpdateAsync(Action<JsonObject> change)
+    private Task UpdateAsync(Action<JsonObject> change) => TryUpdateAsync(secrets =>
+    {
+        change(secrets);
+        return true;
+    });
+
+    /// <summary>Reads, changes and writes the file under the lock; nothing is written when <paramref name="change"/> returns false.</summary>
+    private async Task<bool> TryUpdateAsync(Func<JsonObject, bool> change)
     {
         await _gate.WaitAsync();
         try
         {
             JsonObject secrets = ReadSecrets();
-            change(secrets);
+            if (!change(secrets))
+            {
+                return false;
+            }
+
             Write(secrets);
+            return true;
         }
         finally
         {

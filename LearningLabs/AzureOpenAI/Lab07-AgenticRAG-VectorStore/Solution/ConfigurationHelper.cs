@@ -36,6 +36,12 @@ public static class ConfigurationHelper
         EnsureConfigured(settings.ChatDeploymentName, "AzureOpenAI:ChatDeploymentName");
         EnsureConfigured(settings.EmbeddingDeploymentName, "AzureOpenAI:EmbeddingDeploymentName");
 
+        // Optional: checked only when it is set (otherwise the embeddings use the resource of the chat deployment)
+        if (!string.IsNullOrWhiteSpace(settings.EmbeddingEndpoint))
+        {
+            EnsureConfigured(settings.EmbeddingEndpoint, "AzureOpenAI:EmbeddingEndpoint");
+        }
+
         return settings;
     }
 

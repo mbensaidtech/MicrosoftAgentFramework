@@ -31,6 +31,12 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Chat deployment: {settings.ChatDeploymentName}");
 Console.WriteLine($"Embedding deployment: {settings.EmbeddingDeploymentName}");
+if (!string.IsNullOrWhiteSpace(settings.EmbeddingEndpoint))
+{
+    // Optional: the embedding deployment is on its own resource (see EmbeddingResource.cs and the README)
+    string embeddingAuthentication = string.IsNullOrWhiteSpace(settings.EmbeddingAPIKey) ? "Microsoft Entra ID" : "API key";
+    Console.WriteLine($"Embedding endpoint: {settings.EmbeddingEndpoint} ({embeddingAuthentication})");
+}
 
 // TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
 // Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
@@ -49,7 +55,8 @@ Console.WriteLine($"Embedding deployment: {settings.EmbeddingDeploymentName}");
 // ChatClient chatClient = ...
 
 // TODO 4: Get an embedding generator for the embedding deployment
-// Hint: client.GetEmbeddingClient(settings.EmbeddingDeploymentName).AsIEmbeddingGenerator()
+// Hint: client.ForEmbeddings(settings).GetEmbeddingClient(settings.EmbeddingDeploymentName).AsIEmbeddingGenerator()
+// (ForEmbeddings, in EmbeddingResource.cs, returns the same client, or a client for AzureOpenAI:EmbeddingEndpoint when it is set)
 // IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator = ...
 
 // TODO 5: Create the in-memory vector store with the embedding generator (it turns the text of the records into vectors)

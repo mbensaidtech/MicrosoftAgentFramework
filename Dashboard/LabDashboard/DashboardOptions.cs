@@ -1,3 +1,5 @@
+using LabDashboard.TrainerModels;
+
 namespace LabDashboard;
 
 public sealed class DashboardOptions
@@ -20,6 +22,44 @@ public sealed class DashboardOptions
 
     /// <summary>Reporting to the trainer's admin dashboard (see <see cref="ReportingOptions"/>). Disabled unless a server URL is set.</summary>
     public ReportingOptions Reporting { get; set; } = new();
+
+    /// <summary>Retrieval of the trainer's AI model configuration (see <see cref="TrainerModelsOptions"/>).</summary>
+    public TrainerModelsOptions TrainerModels { get; set; } = new();
+}
+
+/// <summary>
+/// Section <c>Dashboard:TrainerModels</c>. The trainer configuration is retrieved with the admin dashboard URL and API key of
+/// <see cref="ReportingOptions"/>; this section only holds what is specific to it. Project configuration only (appsettings*.json,
+/// environment variables), read once at startup: no request of the browser can read or change it.
+/// </summary>
+public sealed class TrainerModelsOptions
+{
+    /// <summary>The simulated trainer configuration (development and tests). Off by default.</summary>
+    public TrainerModelsMockOptions Mock { get; set; } = new();
+}
+
+/// <summary>
+/// Section <c>Dashboard:TrainerModels:Mock</c>: a simulated trainer configuration, so that the whole flow can be built and tested before the
+/// Admin Dashboard route exists. When enabled it replaces the trainer source entirely (even without an admin URL or API key) and never calls
+/// the network. Its values are obviously fake (<c>*.trainer-mock.invalid</c> hosts, keys starting with <c>mock-</c>): a lab run with them
+/// fails to connect. An unknown error kind below stops the dashboard at startup (configuration binding error), rather than being ignored.
+/// </summary>
+public sealed class TrainerModelsMockOptions
+{
+    /// <summary>Off by default and in the committed appsettings.json. Environment variable: <c>Dashboard__TrainerModels__Mock__Enabled=true</c>.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>The 5-character code (alphabet <c>ABCDEFGHJKMNPQRSTUVWXYZ23456789</c>) that unlocks the simulated configuration. Not a secret: the mock protects nothing. Any other value falls back to the default.</summary>
+    public string? Code { get; set; } = MockTrainerConfiguration.DefaultCode;
+
+    /// <summary>False: the simulated trainer provides only the LLM, no embedding profile.</summary>
+    public bool ProvideEmbedding { get; set; } = true;
+
+    /// <summary>An error kind that "retrieve" returns instead of the sealed configuration (<c>network</c>, <c>unauthorized</c>…). Empty: success.</summary>
+    public TrainerConfigurationErrorKind? RetrieveError { get; set; }
+
+    /// <summary>An error kind that "unlock" returns whatever the code. Empty: the code decides (a wrong code gives <c>invalidCode</c>).</summary>
+    public TrainerConfigurationErrorKind? UnlockError { get; set; }
 }
 
 /// <summary>

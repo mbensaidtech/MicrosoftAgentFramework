@@ -44,6 +44,7 @@ The Lab Bench dashboard gets a **Settings** form where the learner enters, once,
 
 - **v1.0** (2026-09-27) — Initial release. Tasks T1..T7 implemented directly (no Jira, "no ticket" override).
 - **v1.0.1** (2026-09-27) — Found during implementation: static files are now served with `Cache-Control: no-cache` (a browser kept the pre-update page and scripts); lab list overflow at phone width fixed (appeared with the second lab).
+- **Superseded in part** (2026-10-26) — The *Azure OpenAI* form became the **AI models** tab of [specs/dashboard-model-configuration](../dashboard-model-configuration/spec.md): the LLM and the embedding model, each with the trainer's configuration or my configuration. The store, the shared user-secrets file and the masking of this spec are unchanged; the `/api/settings/azure-openai` routes are kept for compatibility and act on my LLM configuration.
 
 ---
 

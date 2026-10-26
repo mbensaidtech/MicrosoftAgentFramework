@@ -58,7 +58,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 |---|---|---|
 | Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab15, with Lab06 server and client; MultiAgentSystem Lab01), in the order of the [learning path](#learning-path) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
-| Configuration | `appsettings.json`, user secrets or environment variables | The same, plus an **Azure OpenAI settings** form |
+| Configuration | `appsettings.json`, user secrets or environment variables | The same, plus the **AI models** settings: the trainer's configuration (access code) or your own, for the LLM and the embedding model |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
 | Interactive labs (`Console.ReadLine`) | Supported (keyboard) | Supported for labs declared interactive (Lab09): an input box asks for each value |
 | Best for | Every lab, debugging, IDE workflow | Getting started, quick feedback on the migrated labs |
@@ -73,9 +73,16 @@ Each lab reads its settings from these sources (the last one wins):
 2. **User secrets** shared by all migrated labs (id `microsoft-agent-framework-learninglabs`, stored outside the repository)
 3. **Environment variables** `AzureOpenAI__*`
 
+#### Where do I get these values?
+
+Two sources, for the LLM (every lab) and the embedding model (Lab07) independently:
+
+- **In a workshop: the trainer's configuration.** The trainer e-mails you an **invitation code** and announces an **access code**. In the dashboard, paste the invitation code in *Join the workshop*, then in **AI models** tick *Use the trainer's configuration*, click **Unlock** and type the access code: the endpoints, deployments and keys are saved for you, without ever being displayed (see [step 4 of Option B](#4-configure-the-ai-models-from-the-dashboard)).
+- **Your own Azure OpenAI resource.** In the [Azure portal](https://portal.azure.com), open the resource, then *Resource Management → **Keys and Endpoint***: the **endpoint** (`https://<resource>.openai.azure.com/`) and **KEY 1** (the API key, optional with Microsoft Entra ID). The **deployment** is the name you gave the model deployment in [Azure AI Foundry](https://ai.azure.com) (*Deployments*), not the model name. Lab07 also needs an embedding deployment (for example of `text-embedding-3-small`), on the same resource or on another one.
+
 Pick one method:
 
-- **Dashboard form**, no terminal needed — see [step 4 of Option B](#4-configure-azure-openai-from-the-dashboard).
+- **Dashboard AI models settings**, no terminal needed — see [step 4 of Option B](#4-configure-the-ai-models-from-the-dashboard).
 - **User secrets** (recommended for the API key), from any migrated lab project folder:
   ```bash
   cd LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start
@@ -180,15 +187,14 @@ Click a lab in the list. Its page has five tabs:
 | **About** | What you will learn, the lab folder, the NuGet packages, the equivalent `dotnet` commands, and the checks used to judge a run |
 | **Solution** | The solution files that differ from the exercise, behind a *"Try it yourself first"* gate |
 
-#### 4. Configure Azure OpenAI from the dashboard
+#### 4. Configure the AI models from the dashboard
 
-Click **Azure OpenAI** in the top bar and fill in:
+Click the **Azure OpenAI** status in the top bar: the **AI models** tab has one card for the **LLM** (every lab) and one for the **embedding model** (Lab07). For each one, choose:
 
-- **Endpoint** — e.g. `https://my-resource.openai.azure.com/`
-- **Chat deployment** — the deployment name in your resource (not the model name)
-- **API key** — optional; leave it empty to use Microsoft Entra ID (`az login`). Once saved, the key is never displayed again (*"•••• stored — leave empty to keep it"*); **Remove API key** deletes it.
+- **Trainer configuration** (in a workshop, once you joined it with the trainer's invitation code): the card shows the trainer's configuration, without any code. Tick **Use the trainer's configuration** in the cards you want, click **Unlock** and type the **access code** announced by the trainer (5 characters; `k7qx-9` works too). The keys are opened by the dashboard on your machine and saved at once; they are never displayed.
+- **My configuration**: your own Azure OpenAI deployment — **Endpoint** (e.g. `https://my-resource.openai.azure.com/`), **Deployment** (the deployment name, not the model name) and an optional **API key** (empty: Microsoft Entra ID with `az login`). The embedding model uses *the same resource as the LLM* (only its deployment) or *its own resource*. Click the card's **Save**; once saved, a key is never displayed again (`••••` and its last 4 characters) and **Remove** deletes it.
 
-Click **Save**. The values are written to the shared user secrets (outside the repository) and are used by the **next run, from the dashboard and from `dotnet run` alike**. The form shows where each value comes from and warns when an `AzureOpenAI__*` environment variable overrides it.
+Switching a card back and forth never loses your own values. Everything is written to the shared user secrets (outside the repository) and used by the **next run, from the dashboard and from `dotnet run` alike**. Each field shows where its value comes from and warns when an `AzureOpenAI__*` environment variable overrides it.
 
 #### 5. Run the lab
 
@@ -231,7 +237,7 @@ More details (architecture, HTTP API, security, registering a new lab, tests): [
 #### Optional: report your progress to the trainer's admin dashboard
 
 In a workshop, the trainer hosts the **Admin Dashboard** (a separate Next.js + MongoDB application, kept in its own repository). Its URL is already set in the project (`Dashboard:Reporting:ServerUrl` in `Dashboard/LabDashboard/appsettings.json`).
-At the first launch, choose **Join the workshop**, enter a username and the **workshop key** given by the trainer, and your Lab Bench reports which labs you run and finish, plus a **Help / Je suis bloqué** button that the trainer sees in real time. Reporting also needs the admin **API key** given by the trainer (`LABS_ADMIN_API_KEY` or the git-ignored `Dashboard/LabDashboard/appsettings.Local.json`): without it, reporting stays off. See [Reporting to the admin dashboard](Dashboard/README.md#reporting-to-the-admin-dashboard).
+At the first launch, choose **Join the workshop**, enter a username and the **invitation code** e-mailed by the trainer (it carries the admin API key and the workshop key), and your Lab Bench reports which labs you run and finish, plus a **Help / Je suis bloqué** button that the trainer sees in real time. The trainer creates the code with `dotnet run --project Dashboard/LabDashboard -- invitation`. See [Reporting to the admin dashboard](Dashboard/README.md#reporting-to-the-admin-dashboard).
 Choose **Work on my own** and nothing is ever reported; in any case, never your code, your API key or your console output.
 The API contract between the two applications is described in [specs/admin-dashboard-progress-tracking/spec.md](specs/admin-dashboard-progress-tracking/spec.md).
 
@@ -539,6 +545,8 @@ Instead of editing each `appsettings.json` file in every lab, you can set enviro
 | `AzureOpenAI__ChatDeploymentName` | Your chat model deployment name | `gpt-4o` |
 | `AzureOpenAI__APIKey` | Optional API key (if unset, `DefaultAzureCredential` is used) | `<your-api-key>` |
 | `AzureOpenAI__EmbeddingDeploymentName` | Your embedding model deployment (Lab07+) | `text-embedding-3-small` |
+| `AzureOpenAI__EmbeddingEndpoint` | Optional (Lab07): another Azure OpenAI resource for the embeddings; unset, Lab07 uses the endpoint of the chat deployment | `https://my-embedding-resource.openai.azure.com/` |
+| `AzureOpenAI__EmbeddingAPIKey` | Optional (Lab07), with `EmbeddingEndpoint`: its API key (unset: Microsoft Entra ID, never the chat key) | `<your-embedding-api-key>` |
 | `MongoDB__ConnectionString` | Optional MongoDB connection string (Lab05, Lab12): their `appsettings.json` already target their own containers (27017 / 27018), a variable overrides both | `mongodb://localhost:27017` |
 
 ### Linux / macOS
@@ -609,7 +617,7 @@ echo $env:AzureOpenAI__Endpoint
 >
 > Migrated labs also read **user secrets** (shared id `microsoft-agent-framework-learninglabs`), the recommended place for the API key during local development:
 > `dotnet user-secrets set "AzureOpenAI:APIKey" "<your-api-key>"` (run from any migrated lab project folder),
-> or, without a terminal, the **Azure OpenAI settings** of the [Lab Bench dashboard](Dashboard/README.md#azure-openai-settings), which write the same file.
+> or, without a terminal, the **AI models** settings of the [Lab Bench dashboard](Dashboard/README.md#ai-models-settings), which write the same file.
 
 ---
 

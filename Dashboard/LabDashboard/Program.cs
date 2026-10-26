@@ -11,8 +11,16 @@ using LabDashboard.Journey;
 using LabDashboard.Reporting;
 using LabDashboard.Reset;
 using LabDashboard.Settings;
+using LabDashboard.TrainerModels;
 using Markdig;
 using Microsoft.Extensions.Configuration.Json;
+
+// Trainer tool (Business Rule 23): `dotnet run --project Dashboard/LabDashboard -- invitation` prints an invitation code and exits,
+// before anything of the dashboard is configured or started.
+if (args is [InvitationCommand.Name, .. string[] commandArguments])
+{
+    return InvitationCommand.Run(commandArguments, InvitationCommand.ReadHidden, Console.Out, Console.Error);
+}
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +61,12 @@ builder.Services.AddSingleton(services => new ReportingOutbox(
     services.GetRequiredService<ILogger<ReportingOutbox>>()));
 builder.Services.AddSingleton<ReportingClient>();
 builder.Services.AddHostedService(services => services.GetRequiredService<ReportingClient>());
+
+// Trainer AI model configuration (overview, "retrieve", then "unlock" with the trainer's code) from the admin dashboard (contract v1), with the
+// admin URL and API key of the reporting and the identity's dev token: nothing is called before the candidate joined the workshop. The simulated
+// configuration replaces it when enabled in the project configuration (Dashboard:TrainerModels:Mock); never from the browser.
+builder.Services.AddSingleton<TrainerConfigurationService>();
+builder.Services.AddSingleton<TrainerUnlockFlow>();
 
 WebApplication app = builder.Build();
 ReportingClient reporting = app.Services.GetRequiredService<ReportingClient>();
@@ -253,7 +267,103 @@ api.MapDelete("/settings/azure-openai/api-key", async (AzureOpenAISettingsStore 
     }
 });
 
-// Reporting to the admin dashboard: identity, status and help requests. The workshop key and the dev token are never returned.
+// AI models (LLM = "chat", embedding): per kind a custom profile, a trainer profile and the mode that selects the one the labs use.
+// Keys are write-only: only "stored" and their last 4 characters are returned. Trainer profiles are written by the trainer flow only, never by a route.
+api.MapGet("/settings/models", (AzureOpenAISettingsStore settings) => settings.GetModelStatus());
+
+api.MapPut("/settings/models/{kind}/custom", async (string kind, ModelProfileUpdate update, AzureOpenAISettingsStore settings) =>
+{
+    if (!AzureOpenAISettingsStore.TryParseKind(kind, out ModelKind modelKind))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        IReadOnlyDictionary<string, string> errors = await settings.SaveCustomProfileAsync(modelKind, update);
+        return errors.Count > 0 ? Results.BadRequest(new { errors }) : ModelSettingsChanged(modelKind, settings, reporting);
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        return SettingsStoreError(ex, settings);
+    }
+});
+
+api.MapDelete("/settings/models/{kind}/custom/api-key", async (string kind, AzureOpenAISettingsStore settings) =>
+{
+    if (!AzureOpenAISettingsStore.TryParseKind(kind, out ModelKind modelKind))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        await settings.RemoveCustomApiKeyAsync(modelKind);
+        return ModelSettingsChanged(modelKind, settings, reporting);
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        return SettingsStoreError(ex, settings);
+    }
+});
+
+api.MapPut("/settings/models/{kind}/mode", async (string kind, ModelModeUpdate update, AzureOpenAISettingsStore settings) =>
+{
+    if (!AzureOpenAISettingsStore.TryParseKind(kind, out ModelKind modelKind))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        ModelModeOutcome outcome = await settings.SwitchModeAsync(modelKind, update.Mode);
+        return outcome.Error switch
+        {
+            null => ModelSettingsChanged(modelKind, settings, reporting),
+            "invalid" => Results.BadRequest(new { errors = new Dictionary<string, string> { ["mode"] = "invalid" } }),
+            // The profile to switch to is incomplete (the UI opens what is missing) or of an unsupported provider: nothing was written.
+            _ => Results.Conflict(new { error = outcome.Error, missing = outcome.Missing }),
+        };
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        return SettingsStoreError(ex, settings);
+    }
+});
+
+// The trainer's AI model configurations (Business Rules 13–20): the overview, read without any code (when the AI models tab opens or on Refresh);
+// Unlock for the ticked kinds (one envelope held by this server); the access code, used for this one request and never returned; cancel.
+// On success the keys of the ticked kinds are saved in the user secrets and those kinds switch to trainer mode: the answer only says "stored".
+// The code and the unlock run to completion even if the page goes away, so that an envelope the admin released is never lost half-way.
+api.MapGet("/trainer-models", (TrainerUnlockFlow flow, CancellationToken cancellationToken) => flow.GetOverviewAsync(cancellationToken));
+
+api.MapPost("/trainer-models/unlock", async (TrainerUnlockRequest request, TrainerUnlockFlow flow) =>
+    ParseKinds(request.Kinds) is { } kinds
+        ? Results.Ok(await flow.StartAsync(kinds))
+        : Results.BadRequest(new { errors = new Dictionary<string, string> { ["kinds"] = "invalid" } }));
+
+api.MapPost("/trainer-models/code", async (TrainerCodeRequest request, TrainerUnlockFlow flow, AzureOpenAISettingsStore settings) =>
+{
+    try
+    {
+        TrainerUnlockView view = await flow.SubmitCodeAsync(request.Code);
+        if (view.Status == TrainerUnlockView.Unlocked && view.Kinds.Contains(ModelKind.Chat))
+        {
+            reporting.ReportSettingsChanged(settings.GetStatus());
+        }
+
+        return Results.Ok(view);
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        return SettingsStoreError(ex, settings);
+    }
+});
+
+api.MapPost("/trainer-models/cancel", async (TrainerUnlockFlow flow) => Results.Ok(await flow.CancelAsync()));
+
+// Reporting to the admin dashboard: identity, status and help requests. The workshop key, the admin API key and the dev token are never returned;
+// the key field also takes the trainer's invitation code (Business Rule 21), which stores the admin API key too.
 api.MapGet("/reporting/status", () => reporting.GetStatus());
 
 api.MapPost("/identity", (ReportingSettingsUpdate update) => ApplyReportingSettingsAsync(update, reporting, settingsStore: app.Services.GetRequiredService<AzureOpenAISettingsStore>()));
@@ -314,6 +424,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
     app.Logger.LogInformation("Lab dashboard running on http://127.0.0.1:{Port} (Ctrl+C to stop)", options.Port));
 
 app.Run();
+return 0;
 
 static async Task<IResult> ApplyReportingSettingsAsync(ReportingSettingsUpdate update, ReportingClient reporting, AzureOpenAISettingsStore settingsStore)
 {
@@ -327,6 +438,39 @@ static async Task<IResult> ApplyReportingSettingsAsync(ReportingSettingsUpdate u
         // The workshop key lives in the same user-secrets file as the Azure OpenAI settings.
         return SettingsStoreError(ex, settingsStore);
     }
+}
+
+// The reporting keeps sending only the authentication mode of the LLM: an embedding change does not report anything.
+static IResult ModelSettingsChanged(ModelKind kind, AzureOpenAISettingsStore settings, ReportingClient reporting)
+{
+    if (kind == ModelKind.Chat)
+    {
+        reporting.ReportSettingsChanged(settings.GetStatus());
+    }
+
+    return Results.Ok(settings.GetModelStatus());
+}
+
+// The kinds ticked before Unlock: one or two distinct values among "chat" and "embedding".
+static IReadOnlyList<ModelKind>? ParseKinds(IReadOnlyList<string>? values)
+{
+    if (values is not { Count: 1 or 2 })
+    {
+        return null;
+    }
+
+    List<ModelKind> kinds = [];
+    foreach (string value in values)
+    {
+        if (!AzureOpenAISettingsStore.TryParseKind(value, out ModelKind kind) || kinds.Contains(kind))
+        {
+            return null;
+        }
+
+        kinds.Add(kind);
+    }
+
+    return kinds;
 }
 
 // The store refuses to overwrite a file it cannot parse: the user fixes or deletes it (the path is shown in the form).
@@ -388,6 +532,18 @@ internal sealed record RunRequest(RunTarget Target);
 internal sealed record InputRequest(string? Text);
 
 internal sealed record HelpRequest(string? LabId, string? Message);
+
+internal sealed record TrainerUnlockRequest(IReadOnlyList<string>? Kinds);
+
+/// <summary>The access code typed by the candidate: never printed (a record prints every property by default).</summary>
+internal sealed record TrainerCodeRequest(string? Code)
+{
+    private bool PrintMembers(System.Text.StringBuilder builder)
+    {
+        builder.Append($"Code = {(Code is null ? "none" : "set")}");
+        return true;
+    }
+}
 
 internal sealed record SourceFile(string Path, string Content);
 

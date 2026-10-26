@@ -51,7 +51,7 @@ To configure them without a terminal, use the **Azure OpenAI settings** (see bel
 | Cancel / timeout | kills the whole process tree |
 | Interactive labs (`Console.ReadLine`) | labs with `"interactive": true` keep stdin open: an input box under the output shows *Waiting for input #n* exactly when the program reads, sends the line, echoes it, and **End input** closes stdin (`ReadLine` returns `null`). Waiting does not count against the lab timeout — see [Interactive labs](#interactive-labs) |
 | Labs run in pairs (companion) | a lab can declare a `companion` project (the reference solution of another lab): a server started before the lab and stopped after it, or a client run against the lab once it is ready. Its output is shown as `companion` lines — see [Labs run in pairs](#labs-run-in-pairs-companion) |
-| Azure OpenAI settings | top-bar button (status: *API key* / *Microsoft Entra ID* / *Not configured*) opening a form for the endpoint, the chat deployment and the API key shared by every migrated lab — see [Azure OpenAI settings](#azure-openai-settings) |
+| AI models | top-bar button (status of the LLM: *API key* / *Microsoft Entra ID* / *Not configured*) opening the **AI models** settings: the LLM and the embedding model, each with the **trainer's configuration** (unlocked with the access code announced by the trainer) or **my configuration** (an Azure OpenAI form), shared by every migrated lab — see [AI models settings](#ai-models-settings) |
 | Reset exercises | **Reset exercises…** under the lab list, **Reset this exercise…** in the History tab (shown once the exercise was started): one exercise, several or all back to *Not started* (their runs and their `_StartCompleted/` folder), after confirmations proportional to the risk — see [Reset exercises](#reset-exercises) |
 | Journey | a column left of the lab list: overall progress, the state of every exercise, XP, rank, milestones, distinctions and the next mission, recomputed from the local history and refreshed by itself — see [Journey](#journey) |
 
@@ -69,7 +69,10 @@ LabDashboard (ASP.NET Core minimal API, 127.0.0.1 only)
    ├─ OutputAnalyzer  checks, token usage, build diagnostics
    ├─ RunHistoryStore JSON file, atomic writes
    ├─ LabResetService reset of exercises (runs + _StartCompleted), single-use confirmations
-   └─ LearningJourney states, XP, rank, milestones, distinctions (computed from the history, read-only)
+   ├─ LearningJourney states, XP, rank, milestones, distinctions (computed from the history, read-only)
+   ├─ AzureOpenAISettingsStore  AI models: profiles and modes in the shared user secrets
+   ├─ TrainerUnlockFlow → TrainerConfigurationService → admin dashboard (contract v1) or mock
+   └─ ReportingClient progress and help requests to the admin dashboard (outbox, background loop)
    ▼
 dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
                               └─ LabInputHook (startup hook, interactive labs only)
@@ -88,12 +91,18 @@ dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
 | `POST /api/runs/{runId}/cancel` | cancel a run |
 | `POST /api/labs/reset/preview` `{ "labIds": [...] }` | what a reset would delete (runs per target, `_StartCompleted/` files, size and source files, `blocked` reason) and, unless a lab is blocked, a single-use `confirmationId` valid 10 minutes, plus a 5-character `code` for several labs. **Deletes nothing** (400 `labIds`: `required` / `unknown`) |
 | `POST /api/labs/reset` `{ "confirmationId", "names"?, "code"? }` | reset the labs of that confirmation (`names`: the folder name of the lab when there is one; `code`: when there are several, names not needed): per-lab result `reset` / `nothingToReset` / `failed` (runs and files removed, `verified`, error). 400 `names` / `code` (`mismatch`), 409 `running` / `busy`, 410 `expired` (unknown, expired or already used) / `tooManyAttempts` (3rd wrong code) — a refused request deletes nothing |
-| `GET /api/settings/azure-openai` | Azure OpenAI settings: values, effective source of each one, authentication mode — **never the API key** |
-| `PUT /api/settings/azure-openai` `{ "endpoint", "chatDeploymentName", "apiKey" }` | save (400 with field errors; empty endpoint/deployment removes the value, empty key keeps the stored key) |
-| `DELETE /api/settings/azure-openai/api-key` | remove the stored API key |
-| `GET /api/reporting/status` | reporting to the admin dashboard: enabled, state (`disabled` / `registering` / `connected` / `offline` / `rejected`), server host, username, `userId`, outbox size, help request — **never the workshop key nor the dev token** |
-| `POST /api/identity` `{ "username", "serverUrl"?, "workshopKey"? }` | first launch: creates the identity (`userId`) and registers it (400 with field errors) |
-| `PUT /api/reporting/settings` `{ "username"?, "serverUrl"?, "workshopKey"? }` | change the username, the server URL or the workshop key (write-only); an empty field keeps the value |
+| `GET /api/settings/models` | the AI models: per kind (`chat` = the LLM, `embedding`) the mode (`custom` / `trainer`), the custom and trainer profiles (a key is only `stored` + its last 4 characters; a trainer profile also has its `configId`, `configName`, `configUpdatedAt` and the date of the last unlock) and what the labs use (`active`), each value with its source — **never a key** |
+| `PUT /api/settings/models/{kind}/custom` `{ "provider", "endpoint", "deployment", "apiKey", "sameResourceAsLlm"? }` | save my configuration of a kind; applied at once in custom mode (400 with field errors; `unsupportedProvider` for anything but `azure-openai`; an empty key keeps the stored key) |
+| `DELETE /api/settings/models/{kind}/custom/api-key` | remove the key of my configuration (Microsoft Entra ID) |
+| `PUT /api/settings/models/{kind}/mode` `{ "mode": "custom" \| "trainer" }` | select the profile the labs use for a kind (409 `profileIncomplete` with `missing`, or `unsupportedProvider`: nothing written) |
+| `GET /api/settings/azure-openai` · `PUT` · `DELETE …/api-key` | the former single form, kept for compatibility (no longer used by the page): `GET` gives what the labs use for the LLM, `PUT` and `DELETE` change my LLM configuration |
+| `GET /api/trainer-models` | the trainer's configurations, read without any code (one call to the admin dashboard, when the AI models tab opens or on Refresh): per kind the default (`state` `applicable` / `notApplicable` / `unusable` / `none`, `reason`, `warnings`, `updatedSinceUnlock`), or the `error` that prevents reading them; `simulated` when the mock answers; the unlock under way (`unlock`) |
+| `POST /api/trainer-models/unlock` `{ "kinds": ["chat", "embedding"] }` | start an unlock for the ticked kinds: the dashboard server fetches **one** envelope and holds it (at most one, 10 minutes at most); answers `codeRequired` (code length and alphabet, attempts, expiry) or `idle` with the `error` (400 `kinds`: one or two distinct kinds) |
+| `POST /api/trainer-models/code` `{ "code" }` | open the held envelope with the access code: `unlocked` (the keys of the ticked kinds are saved, those kinds switch to trainer mode, the new `models` status), or the error (`invalidCode` with `attemptsLeft`, `envelopeExpired` with its `reason`, `rateLimited`…). A code out of format is refused without any call. The code is never returned, stored or logged |
+| `POST /api/trainer-models/cancel` | drop the held envelope (the page also calls it when the settings dialog closes) |
+| `GET /api/reporting/status` | reporting to the admin dashboard: enabled, state (`disabled` / `registering` / `connected` / `offline` / `rejected`), server host, username, `userId`, outbox size, help request, whether the workshop key and the admin API key are configured and where from (`environment` / `dashboard` / `appsettings` / `missing`) — **never the workshop key, the admin API key nor the dev token** |
+| `POST /api/identity` `{ "username", "workshopKey"? }` | first launch: creates the identity (`userId`) and registers it (400 with field errors). `workshopKey` takes a plain workshop key or the trainer's **invitation code** (`LB1.…`: 400 `invalid` / `unsupportedVersion`) |
+| `PUT /api/reporting/settings` `{ "username"?, "workshopKey"? }` | change the username, the workshop key or paste a new invitation code (write-only); an empty field keeps the value |
 | `GET /api/help` · `POST /api/help` `{ "labId"?, "message"? }` · `POST /api/help/cancel` · `POST /api/help/dismiss` | the help request of the developer: read, send ("Help / Je suis bloqué", 409 `active` while one is active), cancel ("I'm unblocked"), hide a closed one |
 
 ## Security
@@ -106,25 +115,98 @@ It runs processes, so it is locked down to a local, single-user tool:
 - requests with a non-local `Host` header are rejected (DNS rebinding);
 - `POST` requests need the `X-Lab-Dashboard: 1` header and a same-origin `Origin` (CSRF: a web page cannot trigger a run);
 - no CORS, no authentication secrets, no cloud dependency. The README is rendered with raw HTML disabled;
-- the Azure OpenAI API key is **write-only**: the API never returns it (only "stored: yes/no"), the form clears it after saving,
-  it is never logged, and any occurrence of it in a run output (live stream, result, history, copied output) is replaced by `••••`;
+- every API key of the AI models (custom and trainer profiles, both kinds) is **write-only**: the API never returns it (only "stored" and its
+  last 4 characters), the form clears it after saving, it is never logged, and any occurrence of it in a run output (live stream, result,
+  history, copied output) is replaced by `••••`;
+- the trainer's keys are opened **in the dashboard server only** (never in the browser), with the access code the candidate types: the code
+  is used for one request and never stored, logged or returned; only an HMAC proof leaves the machine. The envelope held between Unlock and
+  the code cannot be opened without the code and the server's one-time unlock key, and is dropped at success, cancel or expiry;
+- the admin API key and the workshop key (typed, or carried by the trainer's invitation code) are never displayed back, logged or reported;
 - a reset of exercises only deletes the history of the selected labs and their `<lab folder>/_StartCompleted` (fixed name, never a path from the request), after a confirmation the server checks itself (see [Reset exercises](#reset-exercises)).
 
-## Azure OpenAI settings
+<a id="azure-openai-settings"></a>
 
-One configuration for every migrated lab, entered once in the dashboard.
+## AI models settings
+
+The labs use two models, configured separately in the **AI models** tab of the settings (full specification: [specs/dashboard-model-configuration/spec.md](../specs/dashboard-model-configuration/spec.md)):
+
+| Model | Used by | Entries the labs read |
+|---|---|---|
+| **LLM** (`chat`) | every lab | `AzureOpenAI:Endpoint`, `AzureOpenAI:ChatDeploymentName`, `AzureOpenAI:APIKey` (absent: Microsoft Entra ID) |
+| **Embedding model** (`embedding`) | Lab07 | `AzureOpenAI:EmbeddingDeploymentName`; on its own resource also `AzureOpenAI:EmbeddingEndpoint` and `AzureOpenAI:EmbeddingAPIKey` (absent: Microsoft Entra ID, **never** the key of the LLM on another endpoint) |
+
+Each card has a mode switch:
+
+- **My configuration**: the candidate's own Azure OpenAI deployment — provider (Azure OpenAI only), endpoint, deployment, optional key. The embedding model uses *the same resource as the LLM in use* (only its deployment is entered) or *its own resource*.
+- **Trainer configuration**: the trainer's configuration, read from the admin dashboard and unlocked with the access code the trainer announces — see [The trainer's configuration](#the-trainers-configuration).
+
+Both profiles of each model are kept: switching mode never loses one, and switching back to *My configuration* restores the values typed before.
 
 | Question | Answer |
 |---|---|
 | Where is it stored? | In the **shared user secrets** of the labs (`UserSecretsId` = `microsoft-agent-framework-learninglabs`, read from the lab projects): `~/.microsoft/usersecrets/microsoft-agent-framework-learninglabs/secrets.json` (macOS/Linux) or `%APPDATA%\Microsoft\UserSecrets\microsoft-agent-framework-learninglabs\secrets.json` (Windows). **Outside the repository**; created private to the user (`600`/`700`) on macOS/Linux. |
-| How do the labs get it? | Unchanged: their `ConfigurationHelper` reads `appsettings.json` → user secrets → environment variables. So the values apply to runs from the dashboard **and** to `dotnet run` in a terminal, without restarting anything. |
-| What is written? | Only `AzureOpenAI:Endpoint`, `AzureOpenAI:ChatDeploymentName` and `AzureOpenAI:APIKey`, in the flat format of `dotnet user-secrets set` (`dotnet user-secrets list` shows them). Other entries of the file are kept; a file that is not valid JSON is never overwritten. |
-| What wins? | `appsettings.json` of the lab < these settings < `AzureOpenAI__*` environment variables of the dashboard process. A value already set on the computer (`AzureOpenAI__*` variable) is read and shown in the form, read-only, with a *Set on this computer* badge (the API key only as its last 4 characters, the rest is never sent to the browser); otherwise the developer edits it in the form. |
-| A value is missing? | No endpoint or deployment anywhere: the lab stops with *"'AzureOpenAI:Endpoint' is not configured"* and the run result links to the settings. No API key: the labs use **Microsoft Entra ID** (`az login` + *Cognitive Services OpenAI User* role). |
+| What is written? | The selected profile of each model goes to the active `AzureOpenAI:*` entries above, the only ones the labs read. The profiles and the modes live next to them under `LabBench:Models:{Chat\|Embedding}:{Mode\|Custom:*\|Trainer:*}` (a trainer profile also keeps the id, name and `updatedAt` of the trainer configuration and the date of the last unlock), ignored by the labs. Flat format of `dotnet user-secrets set`; other entries of the file are kept; a file that is not valid JSON is never overwritten. |
+| A configuration already exists? | It becomes *My configuration* of the LLM (an `EmbeddingDeploymentName` becomes that of the embedding model, on the LLM's resource), in custom mode, without any write: the labs keep working. |
+| How do the labs get it? | Unchanged: their `ConfigurationHelper` reads `appsettings.json` → user secrets → environment variables. The values apply to runs from the dashboard **and** to `dotnet run` in a terminal, without restarting anything. |
+| What wins? | `appsettings.json` of the lab < these settings < `AzureOpenAI__*` environment variables of the dashboard process (including `AzureOpenAI__EmbeddingEndpoint` and `AzureOpenAI__EmbeddingAPIKey`). A value set on the computer is shown in the field, read-only, with a *Set on this computer* badge (a key only as its last 4 characters). |
+| A value is missing? | No endpoint or deployment anywhere: the lab stops with *"'AzureOpenAI:Endpoint' is not configured"* and the run result links to the settings. No API key: Microsoft Entra ID (`az login` + *Cognitive Services OpenAI User* role). |
 | API version? | Not needed: the labs use the Azure OpenAI **v1** API (`…/openai/v1/`), which has no `api-version`. |
 
-The CLI remains fully equivalent: `dotnet user-secrets set "AzureOpenAI:APIKey" "<key>"` from any migrated lab folder writes the same file.
-Other lab settings are not managed by the form: for example the optional Hugging Face token of Lab04 is set with `dotnet user-secrets set "MCPServers:HuggingFace:BearerToken" "<token>"` (same file), and the embedding deployment of Lab07 with `dotnet user-secrets set "AzureOpenAI:EmbeddingDeploymentName" "<deployment>"` (or in its `appsettings.json`). The form keeps these entries, and only the Azure OpenAI API key is masked in the run output — Lab04 never prints its token.
+The CLI remains fully equivalent: `dotnet user-secrets set "AzureOpenAI:APIKey" "<key>"` from any migrated lab folder writes the same file; in custom mode, a value set this way is *My configuration*.
+Other lab settings are not managed here: for example the optional Hugging Face token of Lab04 is set with `dotnet user-secrets set "MCPServers:HuggingFace:BearerToken" "<token>"` (same file). The dashboard keeps these entries; only the keys of the AI models are masked in the run output — Lab04 never prints its token.
+
+### The trainer's configuration
+
+1. **Review, without any code.** When the AI models tab opens (or on **Refresh**, never polled), the dashboard reads the trainer's configurations from the admin dashboard. Each card shows the trainer's default for its model: name, provider, deployment, endpoint host, *key provided*; whether it can be used (the labs only call Azure OpenAI; a configuration whose key cannot be read is *not usable: tell the trainer*); the warning *Lab07 expects 1536 dimensions*; and *Updated by the trainer since your last unlock*.
+2. **Unlock.** The candidate ticks **Use the trainer's configuration** in the cards to take and clicks **Unlock**: the dashboard server fetches one sealed envelope and holds it (one at most, 10 minutes at most; dropped on **Cancel**, when the dialog closes, or at its expiry).
+3. **Access code.** The candidate types the code announced by the trainer: 5 characters of `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no 0, O, 1, I or L), upper-cased as typed, `k7qx-9` works. The dashboard server derives a proof from it (the code never leaves the machine), the admin dashboard releases a one-time unlock key, and the server opens the envelope: the keys of the ticked models are saved at once and those models switch to *Trainer configuration*. *My configuration* is never touched.
+
+It needs the admin dashboard URL (HTTPS), the admin API key (carried by the trainer's [invitation code](#invitation-code)) and the workshop identity (the candidate joined the workshop): otherwise the tab says what is missing and leads to the *Workshop* tab.
+What the candidate sees on a refusal (Business Rule 20 of the spec): a wrong code gives the attempts left (3 per envelope; after the last one, the next code starts with a new envelope); an expired envelope is replaced and the code tried once more without asking again; too many wrong codes or unlocks give the wait time, and nothing is tried before; a configuration changed by the trainer asks for a new review; an archived account, a closed workshop, an access code that expired or changed each have their message. Nothing is ever written on a refusal.
+
+### Integration layer
+
+Everything that depends on the admin dashboard stays behind one integration point (`TrainerModels/`), so that the page and the storage never depend on it:
+
+| Piece | Role |
+|---|---|
+| `TrainerConfigurationService` | the integration point: overview, retrieve, unlock. Chooses its adapters at startup; reads the admin API key and the identity at each call (an invitation or joining the workshop applies without a restart) |
+| `AdminModelConfigsClient`, `AdminModelConfigs` | the admin API (contract v1): routes, headers, answers, error bodies, rate limits, `Retry-After` |
+| `AdminEnvelopeDecryptor` | the envelope protocol: validation before any derivation, PBKDF2 → HMAC proof → unlock key → HKDF → AES-256-GCM, plaintext validation, one retry for `expired` / `unknown` / `keyRotated`, buffers wiped |
+| `MockTrainerConfiguration` | a simulated trainer, for development and tests: fake values (`*.trainer-mock.invalid`, keys starting with `mock-`), no network call |
+| `TrainerUnlockFlow` | the flow of the page: one held envelope, the code, the profiles saved for the ticked models |
+
+The adapters, in this order: the **mock** when `Dashboard:TrainerModels:Mock:Enabled` is set; otherwise *not configured* when `Dashboard:Reporting:ServerUrl` is absent or not HTTPS (`http://` only for `localhost`); otherwise the **admin dashboard** adapter.
+The mock is project configuration only, never reachable from the browser, and the tab shows *Simulated trainer configuration* while it answers:
+
+| Setting (`Dashboard:TrainerModels:Mock`) | Default |
+|---|---|
+| `Enabled` | `false` |
+| `Code` — the code that unlocks the simulated configuration (not a secret) | `K7QX9` |
+| `ProvideEmbedding` — `false`: the simulated trainer provides the LLM only | `true` |
+| `RetrieveError`, `UnlockError` — an error kind to simulate (`network`, `unauthorized`, `rateLimited`, `notFound`…) | none |
+
+To try the whole flow without touching your own user secrets, run a second dashboard with a temporary home folder (macOS/Linux; on Windows set `APPDATA` instead of `HOME`), no reporting and its own data folder:
+
+```bash
+cd Dashboard/LabDashboard && dotnet build
+HOME=$(mktemp -d) Dashboard__Port=5091 Dashboard__DataDirectory=$(mktemp -d) Dashboard__Reporting__ServerUrl= \
+  Dashboard__TrainerModels__Mock__Enabled=true dotnet bin/Debug/net10.0/LabDashboard.dll
+```
+
+#### What depends on the admin dashboard contract
+
+The dashboard implements the **Admin API contract v1** (`Lab Bench Admin — AI model configurations (local dashboard API)` 1.0.0, amended on 2026-10-26), summarized in the [spec](../specs/dashboard-model-configuration/spec.md#admin-api-contract-v1). A change of the contract only changes these points:
+
+| Point | Where |
+|---|---|
+| Routes: `GET /api/v1/model-configs` (overview), `?sealed=1` (envelope), `POST /api/v1/model-configs/unlock` (body exactly `{ envelopeId, proof }`) | `AdminModelConfigsContract` |
+| Headers: `X-API-Key` and `Authorization: Bearer <dev token>`; `devId` = the `userId` of the identity, lower-case | `AdminModelConfigsClient` |
+| Answers and errors: `configs`, `defaults`, `sealedConfigIds`, `unsealedConfigs`, `sealedUnavailableReason`; `{ error, message, details }`; limits 30 GET / 5 envelopes / 20 unlocks per minute | `AdminModelConfigs` (parser), `AdminModelConfigsClient` |
+| Envelope protocol: version 1, AES-256-GCM, PBKDF2-HMAC-SHA256 (600,000 to 10,000,000 iterations, 16-byte salt), the labels `labs-admin/model-unlock/v1` and `labs-admin/model-envelope/v1`, the official test vector | `AdminEnvelopeDecryptor` (tests: `AdminEnvelopeDecryptorTests`) |
+| Plaintext `{ v, envelopeId, configs: { <id>: { apiKey } } }`; `settings.endpoint` / `settings.deployment` of the default configuration of each kind | `AdminEnvelopeDecryptor` |
+
+Status: on 2026-10-26 the routes are not deployed on the hosted admin dashboard yet: the tab then says *The trainer configuration is not available on this server yet*, and *My configuration* works as usual. The tests use the official test vector and an in-process fake of the admin dashboard (`FakeModelConfigServer`).
 
 ## Interactive labs
 
@@ -195,7 +277,7 @@ It refreshes when a run starts or ends, after a reset, when the page comes back 
 
 ## Reporting to the admin dashboard
 
-Optional. During a workshop, the trainer runs the **Admin Dashboard** (a separate application in its own repository, hosted on the web) and gives every developer its URL and a **workshop key**.
+Optional. During a workshop, the trainer runs the **Admin Dashboard** (a separate application in its own repository, hosted on the web) and e-mails every developer an **invitation code** (or, as before, a plain workshop key).
 Once the developer joined, the local dashboard reports their progress to it, and the **Help / Je suis bloqué** button lets them raise a hand that the trainer sees at once.
 
 ### First launch: join the workshop, or work on your own
@@ -204,16 +286,29 @@ The first time the dashboard opens, a welcome dialog offers two choices:
 
 | Choice | What the developer enters | Result |
 |---|---|---|
-| **Join the workshop** | a **username** (2–32 characters, letters, digits, `.`, `_`, `-`; not necessarily a real name) and the **workshop key** given by the trainer (hidden when already configured). The admin dashboard URL is shown, not asked: it is fixed in the project configuration | the dashboard generates a stable `userId`, registers on the server and starts reporting |
+| **Join the workshop** | a **username** (2–32 characters, letters, digits, `.`, `_`, `-`; not necessarily a real name) and the **invitation code** e-mailed by the trainer, or a plain workshop key (the field is hidden when both the workshop key and the admin API key are already configured). The admin dashboard URL is shown, not asked: it is fixed in the project configuration | the dashboard generates a stable `userId`, registers on the server and starts reporting |
 | **Work on my own** | nothing | nothing is ever sent: no status pill, no Help button, no network call. The choice is remembered (`Dashboard/.data/standalone`) and the dialog does not come back |
 
-Both can be changed later in the *Trainer dashboard* section of the settings: a developer working alone joins the workshop by entering a username and the key; a username can be changed at any time.
+Both can be changed later in the *Workshop* tab of the settings: a developer working alone joins the workshop by entering a username and the invitation code (or the key); a username can be changed at any time, and a new invitation code can be pasted there too.
 Nothing has to be typed on the command line by the developer.
 
 ### Configure it (trainer)
 
 The admin dashboard URL is **fixed in the project**: `Dashboard:Reporting:ServerUrl` in `LabDashboard/appsettings.json` (committed, so every developer gets it; `Dashboard__Reporting__ServerUrl` overrides it for a local test). It is not shown to developers and can never be changed in the UI; when it is empty, only *Work on my own* is offered.
-The workshop key is entered by each developer in the UI; a trainer who prefers to distribute it as a command can use:
+#### Invitation code
+
+The trainer sends **one invitation code** by e-mail: it carries the admin API key and the workshop key, so that a developer joins without editing any file nor restarting anything. Its format is `LB1.` followed by the base64url (no padding) of the UTF-8 JSON `{"apiKey":"…","workshopKey":"…"}`, 1,024 characters at most. The trainer creates it with:
+
+```bash
+dotnet run --project Dashboard/LabDashboard -- invitation
+```
+
+The command asks for the admin API key and the workshop key without echoing them (or reads them, one per line, from a pipe), prints the code alone on the standard output, and exits: it starts no dashboard, calls no network, writes nothing to disk, never takes the keys as arguments (they would stay in the shell history) and refuses empty values or values with whitespace.
+The code is as sensitive as the two keys: e-mail it to the participants, never post it in a public channel.
+
+Pasted in *Join the workshop* or in the *Workshop* tab, the code stores the admin API key as `Dashboard:Reporting:ApiKey` and the workshop key as `Dashboard:Reporting:WorkshopKey` in the shared user-secrets file, in one write; reporting and the trainer's AI model configurations use them at once. A malformed code is refused on the field (`invalid`), and so is a code of another version (`LB2.…`: `unsupportedVersion`, update the repository); nothing is stored then. A plain workshop key, without the prefix, still works as before.
+
+The workshop key can also be distributed as a command:
 
 ```bash
 cd Dashboard/LabDashboard
@@ -222,32 +317,36 @@ dotnet user-secrets set "Dashboard:Reporting:WorkshopKey" "<key given by the tra
 
 The admin API also requires a shared **API key**: the dashboard sends it as the `X-API-Key` header on every `/api/v1/*` request (all but `/api/v1/health`), never in the URL.
 It comes **on top of** the workshop key (sent as `X-Workshop-Key` at registration) and of the dev token (`Authorization: Bearer`), never instead of them: the API key alone is rejected everywhere.
-It is project configuration, not something developers type, and it is never shown in the UI nor written to the logs:
+It normally comes with the [invitation code](#invitation-code); it is never shown in the UI (only *configured* and where from) nor written to the logs. It is resolved at each pass of the reporting loop, in this order:
+
+1. `LABS_ADMIN_API_KEY` (environment variable, for a local test);
+2. the shared user-secrets file (`Dashboard:Reporting:ApiKey`, written by an invitation code);
+3. `appsettings.Local.json` (git-ignored) or `appsettings.json`:
 
 ```json
 // Dashboard/LabDashboard/appsettings.Local.json — git-ignored, next to appsettings.json
 { "Dashboard": { "Reporting": { "ApiKey": "<API key of the admin dashboard>" } } }
 ```
 
-`LABS_ADMIN_API_KEY` (environment variable) overrides it for a local test. Without a key, reporting stays off: one warning is logged and the status pill says *API key missing*.
-A key refused by the server (`401 invalidApiKey`) stops reporting at once, without retrying (30 failures per minute block the machine on the server side), until the dashboard is restarted with a valid key.
+Without a key, reporting stays off: one warning is logged and the status pill says *API key missing*; pasting an invitation code starts it without a restart.
+A key refused by the server (`401 invalidApiKey`) stops reporting at once, without retrying (30 failures per minute block the machine on the server side), until a new invitation code is pasted in the settings (or the dashboard is restarted with a valid key).
 
 | Setting (`Dashboard:Reporting`) | Where | Default |
 |---|---|---|
 | `ServerUrl` | `appsettings.json` (fixed by the project; `Dashboard__Reporting__ServerUrl` overrides it for a local test). Never editable in the UI | `https://labs-admin-dash.vercel.app` (the hosted admin dashboard) |
-| `ApiKey` | `LABS_ADMIN_API_KEY` > `appsettings.Local.json` (git-ignored). Sent as `X-API-Key`; never editable nor displayed in the UI | none (reporting off) |
+| `ApiKey` | `LABS_ADMIN_API_KEY` > the shared user-secrets file (`Dashboard:Reporting:ApiKey`, written by an invitation code) > `appsettings.Local.json` (git-ignored) / `appsettings.json`. Sent as `X-API-Key`; never displayed in the UI | none (reporting off) |
 | `WorkshopKey` | `Dashboard__Reporting__WorkshopKey` > the shared user-secrets file (`Dashboard:Reporting:WorkshopKey`, written by the UI, same file as the Azure OpenAI settings) > `appsettings.json` | none |
 | `HeartbeatSeconds`, `FlushIntervalSeconds`, `RequestTimeoutSeconds` | `appsettings.json` | 60, 5, 10 |
 
 When the developer joins, the dashboard generates a stable **`userId`** (UUID), registers the pair on the server and stores the identity and the **dev token** returned by the server in `Dashboard/.data/identity.json` (git-ignored, private to the user).
-The top bar shows a status pill: green *Reporting* (connected), amber *offline, retrying* (events are kept and sent later), red *rejected* (wrong workshop key or identity: check the settings; API key missing or invalid: fix the project configuration and restart).
+The top bar shows a status pill: green *Reporting* (connected), amber *offline, retrying* (events are kept and sent later), red *rejected* (wrong workshop key or identity: check the settings; API key missing or refused: paste the trainer's invitation code in the *Workshop* tab).
 
 ### What is sent, what is not
 
 | Sent (`POST /api/v1/events`, `userId` + `username` in every request) | Never sent |
 |---|---|
 | `catalog.synced` (the labs of `labs.json`), `progress.snapshot` (state of each lab computed from the local history: not started / in progress / completed, run counts, last result, tokens reported) | source files, the solution, the run output |
-| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, tokens reported), `solution.viewed` | the Azure OpenAI endpoint, deployment or **API key**; the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
+| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, tokens reported), `solution.viewed` | the AI models (endpoints, deployments, **API keys**, trainer configurations, access code); the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
 | `settings.changed` (`authMode` only: `apiKey` / `entraId` / `notConfigured`), `heartbeat` every 60 s (`browserConnected`, `activeRunId`) | real name, e-mail, machine name, paths (only the platform, e.g. `macOS`, and the dashboard version) |
 | help requests (`POST /api/v1/help-requests`: lab, optional message) and their cancellation | typed input of interactive labs |
 
@@ -255,7 +354,7 @@ The top bar shows a status pill: green *Reporting* (connected), amber *offline, 
 
 - Reporting **never delays or fails a run**: the runner only enqueues; a background loop sends batches (100 events at most) every `FlushIntervalSeconds`.
 - Server down: events wait in `Dashboard/.data/outbox.json` (500 at most, the oldest are dropped; the next `progress.snapshot` restores a consistent state) and are sent, in order, when it is back (exponential backoff 5 s → 60 s; `Retry-After` honoured on every route; `503 unavailable` retried with backoff).
-- A refused API key (`401 invalidApiKey`) or workshop key (`401 invalidWorkshopKey`) stops all requests instead of retrying: until a restart for the API key, until a new key is entered in the settings for the workshop key.
+- A refused API key (`401 invalidApiKey`) or workshop key (`401 invalidWorkshopKey`) stops all requests instead of retrying, until a new invitation code (or, for the workshop key, a new key) is entered in the settings.
 - Each event has a unique id: a batch sent twice (lost answer) is ignored by the server, never applied twice.
 - A dev token refused by the server triggers one new registration with the workshop key.
 - While a help request is active, its status is read back every 10 s: *waiting for the trainer* → *taken into account* → *resolved* (with the trainer's note), or *cancelled* by the developer ("I'm unblocked").
@@ -317,11 +416,14 @@ the reporting: identity file (creation, permissions, validation), outbox (order,
 the companions: end-to-end runs of throwaway server and client projects (a server ready before the lab and stopped after it, a lab that is a server checked with its client, a lab or a companion server that exits before it is ready);
 the reset of exercises, in a temporary repository (preview counts and source files, the name for one lab and the code only for several, single use, expiry, three wrong codes, a running lab, a symbolic link never followed, a catalog project inside `_StartCompleted`, a folder that cannot be deleted keeping its runs, `Start/`, `Solution/` and the other labs byte-for-byte unchanged, the snapshot sent only when joined, and a reset lab that builds and runs again);
 the journey (states with Solution-only and cancelled runs, *to resume*, partial XP, both bonuses, persistence, rank thresholds, milestones and distinctions, next mission order, an empty catalog);
+the AI models (an existing configuration taken over without a write, both profiles kept across mode switches, the embedding on the LLM's resource or its own, refused incomplete profiles and providers, the trainer configuration identity, keys never in a status) and the trainer flow, against an in-process fake of the admin dashboard and the official test vector: the envelope protocol (the vector opened with the code however it is typed, every tampering failing on the tag, unsupported parameters refused before any derivation, the exact unlock body), the retry and refusal rules, one envelope held per unlock, the keys saved for the ticked models only, the custom profiles untouched, the code and the keys never in an answer or a log, and the mock;
+the invitation code (format, every refusal, the trainer's command called directly and as `dotnet LabDashboard.dll invitation`) and the admin API key it brings, used by the reporting and the trainer flow without a restart;
 and end-to-end runs of a throwaway project answering three `ReadLine` calls (non-ASCII text, masked secret), closing the input, timing out without an answer, and running unchanged when the lab is not interactive.
 
 ## Limitations
 
 - Token usage is only what the exercise prints; model calls whose usage is not printed are not counted. No cost estimate.
+- AI models: Azure OpenAI only (the labs only call Azure OpenAI); the trainer's configuration needs the model configuration routes of the admin dashboard, not deployed on the hosted one yet (the tab says so, *My configuration* works).
 - Reporting: a help request clicked while the admin server is down is kept in memory only (it is sent when the server answers, but lost if the dashboard is restarted before); copying `identity.json` to another machine makes both report as the same developer.
 - One run at a time (the labs share `CommonUtilities`, parallel builds would conflict). A companion is part of the run, not a second run.
 - Interactive labs must be declared `"interactive": true`; `Console.ReadKey` is not supported (see [Interactive labs](#interactive-labs)).
