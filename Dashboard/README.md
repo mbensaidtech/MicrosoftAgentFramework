@@ -365,6 +365,67 @@ The top bar shows a status pill: green *Reporting* (connected), amber *offline, 
 
 Delete `Dashboard/.data/identity.json` (and `outbox.json`, and `standalone` if present): the next launch shows the welcome dialog again and a developer who joins appears as a **new** developer on the admin (the trainer can archive the old one). To change only the username, use the settings.
 
+## Reference catalog on the admin dashboard
+
+The admin dashboard shows the labs of a **reference catalog**: its overview, matrix, TV screen and analytics list exactly those labs, in that order, with those titles.
+The GitHub Action **Publish lab catalog** (`.github/workflows/publish-lab-catalog.yml`) publishes it from `LabDashboard/labs.json` with `.github/scripts/publish-lab-catalog.sh` (`PUT /api/catalog` on the admin dashboard).
+The participants' dashboards still send `catalog.synced`: the admin only uses it to know which labs each participant has on their computer.
+
+| Event | What the workflow does |
+|---|---|
+| Push to `main` that changes `labs.json`, the script or the workflow | builds, validates and publishes the catalog of the pushed commit |
+| Pull request that changes the same files | validates only (`--dry-run`), no secret used |
+| **Run workflow** (by hand) | publishes again from `main`; with *dry_run* ticked, or from another branch, validates only |
+
+What is sent: the labs in the order of `labs.json` (the order of the array is the display order) with `id`, `number`, `track`, `title`, `level`, `interactive`, `summary` and their translations (`track`, `title`, `level`, `summary`); never the paths, projects, checks, objectives nor timeouts.
+The source names the repository, the branch, the commit and the date of the commit: the admin refuses (`409 conflict`) a catalog from a commit older than the one published, so runs finishing out of order never bring an old catalog back. To go back, commit a revert.
+
+Before sending, the script applies the server's rules and fails with one message per problem: ids matching `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` and unique ignoring case, 1 to 200 labs, `number` (16 characters at most), `track` (64), `title` (200) and `level` (32) not empty once trimmed, `summary` 2,000 at most, the same limits in the translations, 256 KB at most.
+
+| Answer | Meaning |
+|---|---|
+| `201 published` | a new reference catalog |
+| `200 unchanged` | the labs are identical to the published catalog (a re-run, or a commit that does not change them) |
+| `400 validation` | refused: one line per problem |
+| `401 unauthorized` | wrong token: check the secret. Never retried, 10 refusals a minute block the IP |
+| `409 conflict` | a catalog from a more recent commit is published |
+| `503 unavailable` | publishing is not configured on the admin dashboard (its publish token is missing) |
+
+The status, the version, the number of labs and the commit are written to the summary of the run.
+
+> **Never rename the `id` of a lab.** The progress recorded by the participants is attached to it: a renamed id is a new lab on the admin, without its history. The workflow warns when an id of the previous commit is gone. To change what is shown, change `title`, `number` or `summary`.
+
+### Settings (repository owner)
+
+In **Settings → Secrets and variables → Actions** of the repository:
+
+| Kind | Name | Value |
+|---|---|---|
+| Variable | `ADMIN_DASHBOARD_URL` | `https://labs-admin-dash.vercel.app` (no trailing `/`) |
+| Secret | `CATALOG_PUBLISH_TOKEN` | the catalog publish token of the admin dashboard, 64 hexadecimal characters. A dedicated token: neither the admin API key nor an invitation code |
+
+While one of them is missing, a push validates the catalog, publishes nothing and says why in a notice; the run succeeds.
+
+### Publish again by hand
+
+**Actions** tab → **Publish lab catalog** → **Run workflow**, branch `main`, *dry_run* unticked. Useful once the settings are in place, or when the admin dashboard lost its catalog; on an unchanged catalog it answers `200 unchanged`.
+
+### Check, or publish, from a computer
+
+The script needs bash, `jq`, `curl` and `git`.
+
+```bash
+bash .github/scripts/publish-lab-catalog.sh --dry-run                        # build, validate and print the payload: nothing sent, no setting needed
+bash .github/scripts/publish-lab-catalog.sh --dry-run --file /tmp/labs.json  # the same for another file (tests)
+
+export ADMIN_DASHBOARD_URL=https://labs-admin-dash.vercel.app
+read -rs CATALOG_PUBLISH_TOKEN && export CATALOG_PUBLISH_TOKEN              # typed without echo, not kept in the history
+bash .github/scripts/publish-lab-catalog.sh --check   # the published catalog: version, labCount, publishedAt, source commit, ids
+bash .github/scripts/publish-lab-catalog.sh           # publish the current commit
+```
+
+A local publication announces the current branch and commit: run it from an up-to-date `main`. It is refused when `labs.json` has uncommitted changes, since the commit announced would not match the content sent.
+
 ## Add a lab
 
 No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureopenai-lab02`, `azureopenai-lab03`, `azureopenai-lab08` or, for an interactive lab, `azureopenai-lab09` for complete examples), then add its id to the catalog test (`LabCatalogTests`):
@@ -387,6 +448,8 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
   }
 }
 ```
+
+Once merged into `main`, the lab is published to the admin dashboard (see [Reference catalog on the admin dashboard](#reference-catalog-on-the-admin-dashboard)); its `id` must never change afterwards.
 
 `pattern` is a .NET regular expression evaluated (multiline) on the standard output of the run.
 Write each check so that it fails on the delivered exercise (`Start`) and passes on the `Solution`. To check the token usage of one scenario only,

@@ -1,0 +1,83 @@
+# Publishes Dashboard/LabDashboard/labs.json as the reference lab catalog of the admin dashboard.
+# Settings (Settings → Secrets and variables → Actions): variable ADMIN_DASHBOARD_URL, secret CATALOG_PUBLISH_TOKEN.
+name: Publish lab catalog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dashboard/LabDashboard/labs.json
+      - .github/scripts/publish-lab-catalog.sh
+      - .github/workflows/publish-lab-catalog.yml
+  pull_request:
+    paths:
+      - Dashboard/LabDashboard/labs.json
+      - .github/scripts/publish-lab-catalog.sh
+      - .github/workflows/publish-lab-catalog.yml
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate only, publish nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Pull requests: validation only, no secret. A separate job, so that it never waits in (or cancels a pending run of) the publish group.
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Validate the catalog (dry run)
+        run: bash .github/scripts/publish-lab-catalog.sh --dry-run
+
+  publish:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: publish-lab-catalog
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      # Secrets cannot be read in an `if:`: the decision is made here.
+      - name: Decide whether to publish
+        id: mode
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          ADMIN_DASHBOARD_URL: ${{ vars.ADMIN_DASHBOARD_URL }}
+          CATALOG_PUBLISH_TOKEN: ${{ secrets.CATALOG_PUBLISH_TOKEN }}
+        run: |
+          publish=false
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run requested: nothing is published."
+          elif [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::notice::The catalog is published from main only, not from $GITHUB_REF: dry run instead."
+          elif [ -z "$ADMIN_DASHBOARD_URL" ] || [ -z "$CATALOG_PUBLISH_TOKEN" ]; then
+            echo "::notice::Catalog not published: set the ADMIN_DASHBOARD_URL variable and the CATALOG_PUBLISH_TOKEN secret (Settings → Secrets and variables → Actions). Dry run instead."
+          else
+            publish=true
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Validate the catalog (dry run)
+        if: steps.mode.outputs.publish != 'true'
+        run: bash .github/scripts/publish-lab-catalog.sh --dry-run
+
+      - name: Publish the catalog
+        if: steps.mode.outputs.publish == 'true'
+        env:
+          ADMIN_DASHBOARD_URL: ${{ vars.ADMIN_DASHBOARD_URL }}
+          CATALOG_PUBLISH_TOKEN: ${{ secrets.CATALOG_PUBLISH_TOKEN }}
+        run: bash .github/scripts/publish-lab-catalog.sh
