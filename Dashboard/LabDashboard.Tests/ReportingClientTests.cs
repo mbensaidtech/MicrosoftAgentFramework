@@ -637,6 +637,95 @@ public sealed class ReportingClientTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Without_an_admin_api_key_a_plain_workshop_key_is_refused_on_the_field_and_nothing_is_stored()
+    {
+        // The code copied from the admin's Workshops page (XXXX-XXXX) is a workshop key alone: the admin API would refuse every call.
+        FakeAdminServer server = await StartServerAsync();
+        Context fresh = CreateClient(server.Url, workshopKey: "", apiKey: null, createIdentity: false);
+
+        IReadOnlyDictionary<string, string> errors = await fresh.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", "K7QX-9MPA"));
+        await fresh.Client.TickAsync(Token);
+
+        Assert.Equal("apiKeyRequired", Assert.Single(errors).Value);
+        Assert.Null(fresh.Identity.Current);
+        Assert.False(File.Exists(SecretsFile));
+        Assert.Empty(server.Requests);
+
+        // Already joined (the workshop key comes from the environment here): a new plain key is refused too, a new username is not.
+        Context joined = CreateClient(server.Url, apiKey: null);
+        Assert.Equal("apiKeyRequired", (await joined.Client.ApplySettingsAsync(new ReportingSettingsUpdate(null, "K7QX-9MPA")))["workshopKey"]);
+        Assert.Empty(await joined.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", null)));
+
+        // The invitation made from that same code joins, and the code reaches the admin exactly as the trainer copied it.
+        Assert.Empty(await fresh.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", InvitationCode.Create(FakeAdminServer.ApiKey, "K7QX-9MPA"))));
+        await fresh.Client.TickAsync(Token);
+        AdminRequest register = Assert.Single(server.RequestsTo("/api/v1/devs/register"));
+        Assert.Equal((FakeAdminServer.ApiKey, "K7QX-9MPA"), (register.ApiKey, register.WorkshopKey));
+    }
+
+    [Theory]
+    [InlineData("environment")]
+    [InlineData("dashboard")]
+    [InlineData("appsettings")]
+    public async Task A_plain_workshop_key_joins_when_the_admin_api_key_is_configured_whatever_its_source(string source)
+    {
+        FakeAdminServer server = await StartServerAsync();
+        if (source == "dashboard")
+        {
+            // The admin API key of an earlier invitation, in the shared user secrets.
+            AzureOpenAISettingsStore secrets = new(SecretsFile, "test", [], () => new Dictionary<string, string>());
+            await secrets.SetEntryAsync(ReportingClient.WorkshopKeySection, ReportingClient.ApiKeyName, FakeAdminServer.ApiKey);
+        }
+
+        Context ctx = CreateClient(server.Url, workshopKey: "", createIdentity: false,
+            apiKey: source == "environment" ? FakeAdminServer.ApiKey : null,
+            configuredApiKey: source == "appsettings" ? FakeAdminServer.ApiKey : null);
+
+        Assert.Empty(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", FakeAdminServer.WorkshopKey)));
+        await ctx.Client.TickAsync(Token);
+
+        ReportingStatus status = ctx.Client.GetStatus();
+        Assert.Equal(("connected", source), (status.State, status.ApiKeySource));
+        AdminRequest register = Assert.Single(server.RequestsTo("/api/v1/devs/register"));
+        Assert.Equal((FakeAdminServer.ApiKey, FakeAdminServer.WorkshopKey), (register.ApiKey, register.WorkshopKey));
+    }
+
+    [Theory]
+    [InlineData("QP8G\n9YQ2", "QP8G9YQ2")] // copied by hand from the code shown in boxes
+    [InlineData(" qp8g-9yq2 ", "qp8g-9yq2")]
+    [InlineData("QP8G 9YQ2", "QP8G9YQ2")]
+    [InlineData("\tQP8G-9YQ2\r\n", "QP8G-9YQ2")]
+    public async Task A_workshop_key_pasted_with_blanks_is_accepted_and_sent_without_them(string pasted, string sent)
+    {
+        // Like the admin server, only the blanks are removed: case and dashes travel as typed, the server normalizes them.
+        FakeAdminServer server = await StartServerAsync();
+        Context ctx = CreateClient(server.Url, workshopKey: "", createIdentity: false);
+
+        Assert.Empty(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", pasted)));
+        await ctx.Client.TickAsync(Token);
+
+        Assert.Equal(sent, Assert.Single(server.RequestsTo("/api/v1/devs/register")).WorkshopKey);
+        AzureOpenAISettingsStore secrets = new(SecretsFile, "test", [], () => new Dictionary<string, string>());
+        Assert.Equal(sent, secrets.GetEntry(ReportingClient.WorkshopKeySection, ReportingClient.WorkshopKeyName));
+    }
+
+    [Theory]
+    [InlineData("QP8G-9YQ2é")]
+    [InlineData("QP8G​9YQ2")] // a zero-width space is not a blank: it would stay in the header
+    public async Task A_workshop_key_with_anything_but_visible_ascii_once_its_blanks_are_removed_is_refused(string pasted)
+    {
+        FakeAdminServer server = await StartServerAsync();
+        Context ctx = CreateClient(server.Url, workshopKey: "", createIdentity: false);
+
+        Assert.Equal("invalid", Assert.Single(await ctx.Client.ApplySettingsAsync(new ReportingSettingsUpdate("jane", pasted))).Value);
+        await ctx.Client.TickAsync(Token);
+
+        Assert.Null(ctx.Identity.Current);
+        Assert.False(File.Exists(SecretsFile));
+        Assert.Empty(server.Requests);
+    }
+
+    [Fact]
     public async Task A_plain_workshop_key_still_works_as_before_and_the_environment_variable_still_wins_over_an_invitation()
     {
         FakeAdminServer server = await StartServerAsync();

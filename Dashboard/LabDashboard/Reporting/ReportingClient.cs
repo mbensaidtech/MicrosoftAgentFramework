@@ -324,7 +324,8 @@ public sealed class ReportingClient : BackgroundService
     {
         Dictionary<string, string> errors = [];
         string? username = Normalize(update.Username);
-        string? workshopKey = Normalize(update.WorkshopKey);
+        // Blanks in a key are copy artifacts (a code shown in boxes, a line wrapped by a mail client): removed, as the admin server does.
+        string? workshopKey = Normalize(update.WorkshopKey) is { } typed ? string.Concat(typed.Where(c => !char.IsWhiteSpace(c))) : null;
         Invitation? invitation = null;
         DevIdentity? current = _identity.Current;
 
@@ -348,9 +349,10 @@ public sealed class ReportingClient : BackgroundService
 
             workshopKey = invitation?.WorkshopKey;
         }
-        else if (workshopKey is not null && workshopKey.Any(char.IsWhiteSpace))
+        else if (workshopKey is not null && InvitationCode.ValidateKey(workshopKey) is not null)
         {
-            errors["workshopKey"] = "invalid";
+            // Without its blanks, a workshop key must be visible ASCII: it travels in the X-Workshop-Key header.
+            errors["workshopKey"] = InvitationCode.InvalidError;
         }
 
         // Joining a workshop needs the configured server and a key it accepts (entered now, or already configured).
@@ -365,6 +367,13 @@ public sealed class ReportingClient : BackgroundService
             {
                 errors["workshopKey"] = "required";
             }
+        }
+
+        // The admin API refuses every call without its API key: a workshop key alone (the code shown on the admin's Workshops page) would
+        // join, then stop at once on apiKeyMissing. Without a key configured on this computer, only an invitation code can join.
+        if (!errors.ContainsKey("workshopKey") && invitation is null && (workshopKey is not null || current is null) && ApiKey().Key is null)
+        {
+            errors["workshopKey"] = "apiKeyRequired";
         }
 
         if (errors.Count > 0)

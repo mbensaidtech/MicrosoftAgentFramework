@@ -101,7 +101,7 @@ dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
 | `POST /api/trainer-models/code` `{ "code" }` | open the held envelope with the access code: `unlocked` (the keys of the ticked kinds are saved, those kinds switch to trainer mode, the new `models` status), or the error (`invalidCode` with `attemptsLeft`, `envelopeExpired` with its `reason`, `rateLimited`…). A code out of format is refused without any call. The code is never returned, stored or logged |
 | `POST /api/trainer-models/cancel` | drop the held envelope (the page also calls it when the settings dialog closes) |
 | `GET /api/reporting/status` | reporting to the admin dashboard: enabled, state (`disabled` / `registering` / `connected` / `offline` / `rejected`), server host, username, `userId`, outbox size, help request, whether the workshop key and the admin API key are configured and where from (`environment` / `dashboard` / `appsettings` / `missing`) — **never the workshop key, the admin API key nor the dev token** |
-| `POST /api/identity` `{ "username", "workshopKey"? }` | first launch: creates the identity (`userId`) and registers it (400 with field errors). `workshopKey` takes a plain workshop key or the trainer's **invitation code** (`LB1.…`: 400 `invalid` / `unsupportedVersion`) |
+| `POST /api/identity` `{ "username", "workshopKey"? }` | first launch: creates the identity (`userId`) and registers it (400 with field errors). `workshopKey` takes the trainer's **invitation code** (`LB1.…`: 400 `invalid` / `unsupportedVersion`) or a plain workshop key (400 `apiKeyRequired` when no admin API key is configured) |
 | `PUT /api/reporting/settings` `{ "username"?, "workshopKey"? }` | change the username, the workshop key or paste a new invitation code (write-only); an empty field keeps the value |
 | `GET /api/help` · `POST /api/help` `{ "labId"?, "message"? }` · `POST /api/help/cancel` · `POST /api/help/dismiss` | the help request of the developer: read, send ("Help / Je suis bloqué", 409 `active` while one is active), cancel ("I'm unblocked"), hide a closed one |
 
@@ -286,7 +286,7 @@ The first time the dashboard opens, a welcome dialog offers two choices:
 
 | Choice | What the developer enters | Result |
 |---|---|---|
-| **Join the workshop** | a **username** (2–32 characters, letters, digits, `.`, `_`, `-`; not necessarily a real name) and the **invitation code** e-mailed by the trainer, or a plain workshop key (the field is hidden when both the workshop key and the admin API key are already configured). The admin dashboard URL is shown, not asked: it is fixed in the project configuration | the dashboard generates a stable `userId`, registers on the server and starts reporting |
+| **Join the workshop** | a **username** (2–32 characters, letters, digits, `.`, `_`, `-`; not necessarily a real name) and the **invitation code** e-mailed by the trainer, or a plain workshop key when the admin API key is already configured (the field is hidden when both the workshop key and the admin API key are already configured). The admin dashboard URL is shown, not asked: it is fixed in the project configuration | the dashboard generates a stable `userId`, registers on the server and starts reporting |
 | **Work on my own** | nothing | nothing is ever sent: no status pill, no Help button, no network call. The choice is remembered (`Dashboard/.data/standalone`) and the dialog does not come back |
 
 Both can be changed later in the *Workshop* tab of the settings: a developer working alone joins the workshop by entering a username and the invitation code (or the key); a username can be changed at any time, and a new invitation code can be pasted there too.
@@ -304,9 +304,11 @@ dotnet run --project Dashboard/LabDashboard -- invitation
 ```
 
 The command asks for the admin API key and the workshop key without echoing them (or reads them, one per line, from a pipe), prints the code alone on the standard output, and exits: it starts no dashboard, calls no network, writes nothing to disk, never takes the keys as arguments (they would stay in the shell history) and refuses empty values or values with whitespace.
+The workshop key to give it is the code of the workshop on the admin dashboard's **Workshops** page (`XXXX-XXXX`, copied as is: the admin ignores case, dashes and spaces).
+That code alone does not let a developer join: the admin API refuses every call without its API key, so send the invitation code, not the admin's *Copy student instructions* text.
 The code is as sensitive as the two keys: e-mail it to the participants, never post it in a public channel.
 
-Pasted in *Join the workshop* or in the *Workshop* tab, the code stores the admin API key as `Dashboard:Reporting:ApiKey` and the workshop key as `Dashboard:Reporting:WorkshopKey` in the shared user-secrets file, in one write; reporting and the trainer's AI model configurations use them at once. A malformed code is refused on the field (`invalid`), and so is a code of another version (`LB2.…`: `unsupportedVersion`, update the repository); nothing is stored then. A plain workshop key, without the prefix, still works as before.
+Pasted in *Join the workshop* or in the *Workshop* tab, the code stores the admin API key as `Dashboard:Reporting:ApiKey` and the workshop key as `Dashboard:Reporting:WorkshopKey` in the shared user-secrets file, in one write; reporting and the trainer's AI model configurations use them at once. A malformed code is refused on the field (`invalid`), and so is a code of another version (`LB2.…`: `unsupportedVersion`, update the repository); nothing is stored then. A plain workshop key, without the prefix, works only when the admin API key is already configured on this computer (`LABS_ADMIN_API_KEY`, `appsettings.Local.json` or an earlier invitation); otherwise it is refused on the field (`apiKeyRequired`) and nothing is stored, rather than joining a reporting that would stop at once on *API key missing*. Like the admin server, the dashboard removes every blank of a plain workshop key (spaces, tabs, line breaks of a code copied by hand from the admin's boxes) before checking and storing it: `QP8G 9YQ2` is stored and sent as `QP8G9YQ2`; case and dashes are kept, the server normalizes them. What remains must be visible ASCII, otherwise the key is refused (`invalid`).
 
 The workshop key can also be distributed as a command:
 
@@ -328,7 +330,7 @@ It normally comes with the [invitation code](#invitation-code); it is never show
 { "Dashboard": { "Reporting": { "ApiKey": "<API key of the admin dashboard>" } } }
 ```
 
-Without a key, reporting stays off: one warning is logged and the status pill says *API key missing*; pasting an invitation code starts it without a restart.
+Without a key, reporting stays off and the dashboard says so: the welcome dialog shows a warning before anything is typed (only the invitation code can join), one warning is logged once joined, and the status pill reads *Reporting · API key missing* (its tooltip: nothing is reported, paste the invitation code in Settings → Workshop); pasting an invitation code starts it without a restart.
 A key refused by the server (`401 invalidApiKey`) stops reporting at once, without retrying (30 failures per minute block the machine on the server side), until a new invitation code is pasted in the settings (or the dashboard is restarted with a valid key).
 
 | Setting (`Dashboard:Reporting`) | Where | Default |
@@ -339,7 +341,7 @@ A key refused by the server (`401 invalidApiKey`) stops reporting at once, witho
 | `HeartbeatSeconds`, `FlushIntervalSeconds`, `RequestTimeoutSeconds` | `appsettings.json` | 60, 5, 10 |
 
 When the developer joins, the dashboard generates a stable **`userId`** (UUID), registers the pair on the server and stores the identity and the **dev token** returned by the server in `Dashboard/.data/identity.json` (git-ignored, private to the user).
-The top bar shows a status pill: green *Reporting* (connected), amber *offline, retrying* (events are kept and sent later), red *rejected* (wrong workshop key or identity: check the settings; API key missing or refused: paste the trainer's invitation code in the *Workshop* tab).
+The top bar shows a status pill: green *Reporting* (connected), amber *offline, retrying* (events are kept and sent later), red *rejected* (wrong identity: check the settings). A key problem is named on the pill itself: *API key missing*, *API key refused* (paste the trainer's invitation code in the *Workshop* tab) or *workshop key refused*. Clicking the pill opens the *Workshop* tab.
 
 ### What is sent, what is not
 

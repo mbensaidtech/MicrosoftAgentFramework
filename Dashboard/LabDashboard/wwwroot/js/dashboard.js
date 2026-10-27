@@ -1831,9 +1831,13 @@ function renderReporting() {
     const kind = status.state;
     chip.className = `status-chip reporting-chip ${kind}`;
     document.getElementById("reporting-dot").className = `status-dot ${kind === "connected" ? "ok" : kind === "rejected" ? "ko" : "warn"}`;
-    document.getElementById("reporting-state").textContent = t(`reporting.${kind}`);
+    // A missing or refused key is named on the chip itself, not only in its tooltip: it is a setting to fix, not a server problem.
+    const rejectedLabel = `reporting.rejected.${status.lastError}`;
+    document.getElementById("reporting-state").textContent = kind === "rejected" && t(rejectedLabel) !== rejectedLabel ? t(rejectedLabel) : t(`reporting.${kind}`);
     const params = { host: status.serverHost, username: status.username ?? "—", count: status.outboxCount, reason: reportingErrorText(status.lastError) };
-    chip.title = kind === "rejected" ? t("reporting.chipTitleRejected", params)
+    // A missing key is a local setting: the admin dashboard was never called, so it did not reject anything.
+    chip.title = kind === "rejected" && status.lastError === "apiKeyMissing" ? t("reporting.chipTitleApiKeyMissing", params)
+      : kind === "rejected" ? t("reporting.chipTitleRejected", params)
       : kind === "connected" ? t("reporting.chipTitle", params)
       : kind === "registering" ? t("reporting.chipTitleRegistering", params)
       : t("reporting.chipTitleOffline", params);
@@ -1909,6 +1913,8 @@ function openWelcome() {
   document.getElementById("welcome-server").textContent = status.serverUrl ? t("welcome.server", { url: status.serverUrl }) : "";
   document.getElementById("welcome-no-server").hidden = !!status.serverUrl;
   dialog.querySelector('[type="submit"]').hidden = !status.serverUrl;
+  // Without the admin API key on this computer, only the trainer's invitation code can join: said before anything is typed.
+  document.getElementById("welcome-no-api-key").hidden = !status.serverUrl || status.apiKeyConfigured;
   // The field takes the trainer's invitation code too: shown until both the workshop key and the admin API key are configured.
   document.getElementById("wel-key-field").hidden = status.workshopKeyConfigured && status.apiKeyConfigured;
   if (!dialog.open) dialog.showModal();
