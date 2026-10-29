@@ -17,12 +17,15 @@ using static AgenticRAG.RagConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [1, 2], [1, 3], [1, 4] or [1, 2, 3, 4] to run specific scenarios.
-// Scenario 1 fills the vector store: the other scenarios need it (the store is in memory, it starts empty).
-HashSet<int> scenariosToRun = [1, 2, 3, 4];
+// dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
+// dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
+// dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
+// dotnet run -- --scenarios all       -> every scenario, implemented or not
+// dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
-bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
 #region Setup: Configuration, client, embedding generator and vector store
 
@@ -94,6 +97,7 @@ if (ShouldRunScenario(1))
 #endregion
 
 #region Scenario 2: Semantic search - without an agent
+// Requires scenario 1: it fills the vector store, which is in memory and starts empty at each run.
 
 if (ShouldRunScenario(2))
 {
@@ -116,6 +120,7 @@ if (ShouldRunScenario(2))
 #endregion
 
 #region Scenario 3: Agentic RAG - the agent decides when to search the FAQ (function tool)
+// Requires scenario 1: it fills the vector store, which is in memory and starts empty at each run.
 
 if (ShouldRunScenario(3))
 {
@@ -150,6 +155,7 @@ if (ShouldRunScenario(3))
 #endregion
 
 #region Scenario 4: RAG with TextSearchProvider - the FAQ is searched before every model call (context provider)
+// Requires scenario 1: it fills the vector store, which is in memory and starts empty at each run.
 
 if (ShouldRunScenario(4))
 {

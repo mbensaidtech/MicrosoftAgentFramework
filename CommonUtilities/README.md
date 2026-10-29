@@ -70,6 +70,28 @@ Endpoints that already end with `/openai/v1` are returned unchanged.
 
 Shows a loading animation while an async operation runs: `await agent.RunAsync("...").WithSpinner("Running agent");`
 
+### ScenarioSelection / LabScenarios
+
+Chooses the scenarios a lab runs from its command line. Every migrated lab starts with:
+
+```csharp
+ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
+bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
+```
+
+| Command | Runs |
+|---------|------|
+| `dotnet run` | The implemented scenarios: the code of their `#region Scenario N: …` block, and of the setup before the first scenario, is no longer the delivered code (comments and layout do not count) |
+| `dotnet run -- --scenarios 2` / `--scenarios 1,3` | Those scenarios (and the ones they require: `// Requires scenario N` in their block), implemented or not |
+| `dotnet run -- --scenarios all` | Every scenario |
+| `dotnet run -- --list-scenarios` | Nothing: lists the scenarios and their state |
+
+`ShouldRun` prints the selection once (`>>> Scenarios to run: …`) and a line when a scenario starts (`>>> Running scenario N: Title`).
+The rules themselves are in `LabScenarios.cs`, a file without dependency that the Lab Bench dashboard compiles too: the dashboard reads the
+same scenarios, applies the same default and runs the lab with the same option (`-- --scenarios 1,3`).
+The delivered code is known from `exercise-fingerprints.json` in the folder of the lab: fingerprints of the code of the exercise as delivered
+(regenerated with `dotnet run -- exercise-fingerprints` in `Dashboard/LabDashboard`).
+
 ## Project Reference
 
 Each lab references this project in its `.csproj` file:

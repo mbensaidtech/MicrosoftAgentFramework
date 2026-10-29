@@ -115,7 +115,7 @@ The program reads two optional command-line switches, already in place at the to
 - `--stdio`: the program is **only** the stdio MCP server (TODO 7 and 8). Scenarios 2 and 3 start it that way, and so do MCP Inspector or VS Code. In this mode, `Console.SetOut(Console.Error)` sends everything the lab prints to stderr: **stdout carries the MCP messages and nothing else**.
 - `--http`: the program runs scenario 1, then keeps the HTTP server running until `Ctrl+C` (TODO 12).
 
-Without switch, it runs the scenarios selected in `scenariosToRun`.
+Without switch, it runs the implemented scenarios, or those you choose with `--scenarios` (see below).
 
 ---
 
@@ -207,7 +207,7 @@ dotnet run
 
 Run from the project folder: ASP.NET Core reads the `Logging` settings from the `appsettings.json` of the current folder (from another folder, you see its information logs, which is harmless).
 
-To run only one scenario, edit `scenariosToRun` at the top of `Program.cs` (for example `[2]`).
+To run only one scenario: `dotnet run -- --scenarios 2` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ### Step 5 (optional): Use the server from MCP Inspector or VS Code
 
@@ -432,7 +432,7 @@ The following files should be modified:
 | Tools found by reflection (`GetMethods` + `AIFunctionFactory.Create(method, target)`) | The three tools listed explicitly, with snake_case names (Lab 03, scenario 1) |
 | `ModelContextProtocol.AspNetCore` 0.5.0-preview.1 (Solution only: the Start did not compile) | `ModelContextProtocol.AspNetCore` 2.2.0 in Start **and** Solution |
 | `Microsoft.NET.Sdk.Web` (Solution) / `Microsoft.Extensions.Hosting` (Start) | `Microsoft.NET.Sdk` + `ModelContextProtocol.AspNetCore`, which brings ASP.NET Core |
-| `enum Scenario` and one scenario per run, each one blocking (`app.Run()`) | `scenariosToRun`; each scenario starts its server, calls it and stops it; `--http` / `--stdio` to keep a server for other hosts |
+| `enum Scenario` and one scenario per run, each one blocking (`app.Run()`) | Scenario selection (`dotnet run -- --scenarios 2`); each scenario starts its server, calls it and stops it; `--http` / `--stdio` to keep a server for other hosts |
 | `MapMcp` served Streamable HTTP **and** SSE (`.../sse`) | Streamable HTTP only, stateless by default; legacy SSE disabled (`EnableLegacySse`) |
 | `app.UseHttpsRedirection()` | Removed: the server listens on `http://localhost` only, there is no HTTPS endpoint to redirect to |
 | The stdio server printed its configuration and titles on **stdout** (8 lines before the first MCP message) | `Console.SetOut(Console.Error)` in `--stdio` mode: stdout carries MCP messages only |

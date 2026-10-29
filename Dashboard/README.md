@@ -40,7 +40,8 @@ To configure them without a terminal, use the **Azure OpenAI settings** (see bel
 |---|---|
 | Lab list, progress, last result | `labs.json` (catalog) + local history |
 | Instructions | the lab `README.md`, rendered to HTML on the server (Markdig, raw HTML disabled) |
-| Run the exercise (`Start`) or the reference (`Solution`) | `dotnet build <project> -nologo -v minimal`, then `dotnet run --project <project> --no-build` — the exact commands a developer types |
+| Run the exercise (`Start`) or the reference (`Solution`) | `dotnet build <project> -nologo -v minimal`, then `dotnet run --project <project> --no-build -- --scenarios <ticked>` — the exact commands a developer types |
+| Scenario selection | the **Scenarios** list of the Run tab, read from the `Program.cs` of the project (`#region Scenario N: Title`): *Not implemented* while its code, or the setup before it, is still the code delivered with the exercise (comments do not count), the last result of each scenario, the scenario it requires (`// Requires scenario N`). By default the implemented scenarios not passed yet are ticked; **Select implemented** / **Clear**. Only the ticked scenarios run (`-- --scenarios 1,3`, the option of the CLI) and only their checks are evaluated, each on the output of its own scenario; each scenario gets its status, its checks and the error raised while it ran. Same rules as `dotnet run` — see [Scenario selection](#scenario-selection) |
 | Live logs | stdout/stderr read as they are produced and pushed to the browser with Server-Sent Events |
 | Progress indicator | lines the program overwrites with `\r` (the `ConsoleSpinner` of CommonUtilities) are shown as a live status line instead of flooding the log |
 | Passed / Failed | build succeeded **and** exit code 0 **and** every check of the lab matched the output |
@@ -62,11 +63,13 @@ Browser (HTML + CSS + JS, no framework, no CDN)
    │  fetch /api/...            EventSource /api/runs/{id}/events
    ▼
 LabDashboard (ASP.NET Core minimal API, 127.0.0.1 only)
-   ├─ LabCatalog      whitelist of labs and projects (labs.json)
+   ├─ LabCatalog      whitelist of labs and projects (labs.json), scenarios of a project (Program.cs)
+   │   └─ LabScenarios  scenario rules shared with the labs (CommonUtilities/LabScenarios.cs, compiled by both)
    ├─ LabRunner       one run at a time: build → run → checks
    │   └─ ProcessRunner + ConsoleStreamDecoder   (no shell, terminal semantics)
    │   └─ RunInput + InputSignalParser          (stdin of interactive labs)
-   ├─ OutputAnalyzer  checks, token usage, build diagnostics
+   ├─ OutputAnalyzer  checks, scenario results, token usage, build diagnostics
+   ├─ ExerciseProgress completion of an exercise (every scenario passed, across runs)
    ├─ RunHistoryStore JSON file, atomic writes
    ├─ LabResetService reset of exercises (runs + _StartCompleted), single-use confirmations
    ├─ LearningJourney states, XP, rank, milestones, distinctions (computed from the history, read-only)
@@ -84,7 +87,8 @@ dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
 | `GET /api/labs/{id}?lang=fr` | details: README (HTML, `README.fr.md` when present), objectives, packages, commands, checks, history |
 | `GET /api/labs/{id}/solution` | solution files that differ from the exercise |
 | `GET /api/journey` | the journey: per lab `state` (`notStarted` / `inProgress` / `completed` / `toResume`), `running`, attempts, best checks, XP and XP still within reach; totals, `rank` (and next rank), `milestones`, `badges`, `next` mission. Read-only, recomputed on every call |
-| `POST /api/labs/{id}/runs` `{ "target": "start" \| "solution" }` | start a run (409 if one is in progress) |
+| `GET /api/labs/{id}/scenarios` | per project (`start`, `solution`), the scenarios read now from its `Program.cs`: `number`, `title`, `implemented` (its code and the setup are no longer the delivered ones), `setupImplemented`, `requires`, and `last` (`status` `passed` / `failed`, `runId`, `startedAt`) when it already ran |
+| `POST /api/labs/{id}/runs` `{ "target": "start" \| "solution", "scenarios"?: [1, 3] }` | start a run (409 if one is in progress) of the given scenarios and the scenarios they require; without `scenarios`, the implemented ones. 400 `scenarios`: `unknown` (a number the program does not have), `required` (empty list), `noneImplemented` (no `scenarios` and nothing implemented). Answers `runId` and the `scenarios` that run |
 | `GET /api/runs/{runId}/events` | Server-Sent Events: `phase`, `output` (streams `stdout`, `stderr`, `system`, `stdin`), `progress`, `input-request`, `input-sent`, `input-closed`, `result` (replayed from the start on reconnection) |
 | `POST /api/runs/{runId}/input` `{ "text": "…" }` | send one line to an interactive run (400 `newline` / `tooLong`; 409 `notInteractive`, `notAccepting` (build or exited), `closed`, `tooManyPending`) |
 | `POST /api/runs/{runId}/input/close` | close the standard input of an interactive run |
@@ -348,7 +352,7 @@ The top bar shows a status pill: green *Reporting* (connected), amber *offline, 
 | Sent (`POST /api/v1/events`, `userId` + `username` in every request) | Never sent |
 |---|---|
 | `catalog.synced` (the labs of `labs.json`), `progress.snapshot` (state of each lab computed from the local history: not started / in progress / completed, run counts, last result, tokens reported) | source files, the solution, the run output |
-| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, tokens reported), `solution.viewed` | the AI models (endpoints, deployments, **API keys**, trainer configurations, access code); the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
+| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, the scenarios run and their result, tokens reported; a run limited to some scenarios does not complete the exercise on the admin dashboard, the `progress.snapshot` that follows does), `solution.viewed` | the AI models (endpoints, deployments, **API keys**, trainer configurations, access code); the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
 | `settings.changed` (`authMode` only: `apiKey` / `entraId` / `notConfigured`), `heartbeat` every 60 s (`browserConnected`, `activeRunId`) | real name, e-mail, machine name, paths (only the platform, e.g. `macOS`, and the dashboard version) |
 | help requests (`POST /api/v1/help-requests`: lab, optional message) and their cancellation | typed input of interactive labs |
 
@@ -426,6 +430,34 @@ bash .github/scripts/publish-lab-catalog.sh           # publish the current comm
 
 A local publication announces the current branch and commit: run it from an up-to-date `main`. It is refused when `labs.json` has uncommitted changes, since the commit announced would not match the content sent.
 
+## Scenario selection
+
+The rules are in **one file**, `CommonUtilities/LabScenarios.cs`, compiled by the labs (through `CommonUtilities`) and by the dashboard
+(`<Compile Include="..\..\CommonUtilities\LabScenarios.cs" Link=... />` in `LabDashboard.csproj`): there is no second implementation.
+
+- **Scenarios** are the `#region Scenario N: Title` blocks of the `Program.cs` next to the project. `N` is the identifier everywhere: `ShouldRunScenario(N)`,
+  `--scenarios N`, the `=== Scenario N: … ===` header, the check ids `scenarioN-…`, the API.
+- **Implemented**: the code of the block, and the code before the first scenario (the setup), are no longer the code delivered with the exercise.
+  The code is compared without its comments and white space (removing a TODO, re-indenting changes nothing; writing code does) with the
+  fingerprints of the delivered exercise, `<lab folder>/exercise-fingerprints.json`. A block whose delivered code is already the solution's
+  (Lab13: the client calls are provided) depends on the setup only. Never run by default; a scenario asked for explicitly runs anyway.
+  After changing a Start or a Solution, regenerate the fingerprints from the exercises as delivered: `dotnet run -- exercise-fingerprints`
+  (in `Dashboard/LabDashboard`); the catalog test fails while they are out of date.
+- **Requires**: a `// Requires scenario N` comment in a block; asking for the block also runs scenario N.
+- **Lab side**: `ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);` then `ShouldRunScenario(n) => scenarioSelection.ShouldRun(n)`.
+  It reads `--scenarios 1,3` / `--scenario 2` / `--scenarios all` / `--scenarios implemented` / `--list-scenarios` (the other arguments are left to the lab),
+  prints `>>> Scenarios to run: …` and, when a scenario starts, `>>> Running scenario N: Title`.
+- **Dashboard side**: the run request is checked against the same `Program.cs` (`LabScenarios.Plan`) and passed as `-- --scenarios 1,3`. The `>>>` lines of
+  the lab output tell which scenarios started: an error (exit code, timeout) is attached to the scenario that was running, the next ones are *Not run*.
+  These lines are removed from the output before the checks and the token usage are computed.
+- **Checks**: a check belongs to the scenario of its id (`scenario2-usage`: scenario 2) or to the scenarios listed in its `"scenarios"` field; it is evaluated only
+  when they all ran. A check of one scenario (by its id) reads **the output of that scenario only**, from its `>>> Running scenario N` line to the next one
+  (an output without these lines, from a program written before the selection, is split on the `=== Scenario N` headers); a check that lists its scenarios
+  or names none reads the whole output, the output of a companion client included. A check of no scenario (`config`) belongs to the whole run: when it
+  fails, every scenario that ran fails.
+- **Progress**: an exercise is *Completed* once every scenario passed in a Start run (`ExerciseProgress`), in one run or across several — the lab list, the journey
+  and the progress sent to the admin dashboard use this rule. A run recorded before the scenario selection completes it when it passed, as before.
+
 ## Add a lab
 
 No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureopenai-lab02`, `azureopenai-lab03`, `azureopenai-lab08` or, for an interactive lab, `azureopenai-lab09` for complete examples), then add its id to the catalog test (`LabCatalogTests`):
@@ -441,7 +473,7 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
   "timeoutSeconds": 180,
   "interactive": false,              // true when the program reads Console.ReadLine
   "expectations": [
-    { "id": "scenario1", "description": "Scenario 1 answered", "pattern": "^=== Scenario 1:[^\\n]*===\\n\\S" }
+    { "id": "scenario1", "description": "Scenario 1 - the agent answered with the capital of France", "pattern": "(?i)\\bParis\\b" }
   ],
   "translations": {
     "fr": { "title": "...", "summary": "...", "level": "Débutant", "objectives": ["..."], "checks": { "scenario1": "Scénario 1 : réponse reçue" } }
@@ -449,11 +481,28 @@ No code change is needed: add an entry to `LabDashboard/labs.json` (see `azureop
 }
 ```
 
+Write each scenario of `Program.cs` (Start and Solution) as a `#region Scenario N: Title` block, add `// Requires scenario N` when a scenario needs another
+one in the same run, then generate the fingerprints of the delivered exercise: `dotnet run -- exercise-fingerprints` (the catalog test checks that every
+Start scenario counts as not implemented and every Solution scenario as implemented). A check made on the output of several scenarios, or on the output of a
+companion, declares its scenarios: `"scenarios": [1, 2]` (see the `comparison-*` checks of `azureopenai-lab08`, and the companion checks of `azureopenai-lab06-server`).
+
 Once merged into `main`, the lab is published to the admin dashboard (see [Reference catalog on the admin dashboard](#reference-catalog-on-the-admin-dashboard)); its `id` must never change afterwards.
 
-`pattern` is a .NET regular expression evaluated (multiline) on the standard output of the run.
-Write each check so that it fails on the delivered exercise (`Start`) and passes on the `Solution`. To check the token usage of one scenario only,
-stop at the next header: `(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\s*\d+`.
+`pattern` is a .NET regular expression evaluated (multiline) on the standard output of its scenario (see [Scenario selection](#scenario-selection)).
+Write each check so that it fails on the delivered exercise (`Start`) and passes on the `Solution`, and so that it judges **what the scenario does, never how
+it presents it**:
+
+- check data that only a working implementation can produce (a value a tool returns, an id it generates, a fact of the knowledge base, a backreference
+  to a value printed twice), or the lines of a helper the exercise **provides** (`WriteRestaurant`, `WriteToolCalls`, `WriteHotels`, the `[Skill]`, `[Memory]`,
+  `[Delegation]` loggers...): they show that the typed object or the call exists. When the result is only visible through text the learner writes, make the
+  exercise display it with a provided helper (as `WriteHotels` for the hotels parsed back from CSV in Lab08);
+- never require the `=== Scenario N` header, a separator, a title, a label or a question the learner writes in the scenario block: no `^Agent: `, no
+  `Deserialized response:`; when the learner writes a decision (Multi-Agent Lab01: sent / held back), match its meaning (`\bsent\b`, `\b(?:held|human)\b`),
+  case-insensitive, never the exact sentence;
+- no scoping is needed: the token usage of a scenario is `(?i)input tokens:?\s*\d+` (its wording is the one convention kept: the dashboard reads it).
+
+`OutputAnalyzerTests` checks this for every lab: each check passes on the real output of the Solution **and** on the same output without the texts
+written by the Write calls of the scenario blocks (`WithoutPresentation`), fails on the delivered exercise and on known wrong implementations.
 For labs with tools, check data that only a tool can produce (a value of the tool's data set, an id generated by the tool, a line written by a middleware), not only the presence of an answer.
 For labs that call a remote agent, check what only the remote tools can give (a signed key accepted, a tampered one rejected, see `azureopenai-lab06-client`).
 For labs with memory or sessions, check what only the history can give (a name given in an earlier turn), and use a backreference to check that a value printed twice is the same (e.g. the key of a restored session, see `azureopenai-lab05`).
@@ -479,6 +528,8 @@ and the masking of the API key, including an end-to-end run of a throwaway proje
 the interactive input: signal parsing (split signals, mixed stderr), numbering, type-ahead, validation, end of input, the paused lab timeout,
 the reporting: identity file (creation, permissions, validation), outbox (order, cap, persistence), progress snapshot, and the client against an in-process fake of the admin API (registration with the workshop key, `X-API-Key` on every `/api/v1` route but health (header only, from the configuration or `LABS_ADMIN_API_KEY`), missing or refused API key stopping without retry, refused workshop key, the API key never in logs, status or local files, batches of 100 in order, wrong key, `Retry-After`, lost answer, re-registration on a rejected token, server down then back, help request sent / acknowledged / resolved / cancelled / adopted, settings changes, and a real run against a server that never answers — same verdict, no delay),
 the companions: end-to-end runs of throwaway server and client projects (a server ready before the lab and stopped after it, a lab that is a server checked with its client, a lab or a companion server that exits before it is ready);
+the scenario selection (the reading of `Program.cs`, the code delivered or written in a scenario or in the setup (comments and layout ignored), the fingerprints of every catalog lab up to date, required scenarios, the command-line option and its round trip, the checks and the error attached to each scenario, completion across partial runs, every catalog lab with the same scenarios in Start and Solution, all to implement in Start, and an end-to-end run of a throwaway lab using the real `ScenarioSelection`, limited to one scenario, then with a scenario that throws);
+the checks of every lab judged on what the scenario does: each on the output of its own scenario, passing on the real Solution output without its presentation (no header, title, label or separator written by the scenario blocks), failing on the delivered exercise and on known wrong implementations (Lab01 included, from a real run);
 the reset of exercises, in a temporary repository (preview counts and source files, the name for one lab and the code only for several, single use, expiry, three wrong codes, a running lab, a symbolic link never followed, a catalog project inside `_StartCompleted`, a folder that cannot be deleted keeping its runs, `Start/`, `Solution/` and the other labs byte-for-byte unchanged, the snapshot sent only when joined, and a reset lab that builds and runs again);
 the journey (states with Solution-only and cancelled runs, *to resume*, partial XP, both bonuses, persistence, rank thresholds, milestones and distinctions, next mission order, an empty catalog);
 the AI models (an existing configuration taken over without a write, both profiles kept across mode switches, the embedding on the LLM's resource or its own, refused incomplete profiles and providers, the trainer configuration identity, keys never in a status) and the trainer flow, against an in-process fake of the admin dashboard and the official test vector: the envelope protocol (the vector opened with the code however it is typed, every tampering failing on the tag, unsupported parameters refused before any derivation, the exact unlock body), the retry and refusal rules, one envelope held per unlock, the keys saved for the ticked models only, the custom profiles untouched, the code and the keys never in an answer or a log, and the mock;
@@ -491,5 +542,7 @@ and end-to-end runs of a throwaway project answering three `ReadLine` calls (non
 - AI models: Azure OpenAI only (the labs only call Azure OpenAI); the trainer's configuration needs the model configuration routes of the admin dashboard (contract v1) and an access code created by the trainer.
 - Reporting: a help request clicked while the admin server is down is kept in memory only (it is sent when the server answers, but lost if the dashboard is restarted before); copying `identity.json` to another machine makes both report as the same developer.
 - One run at a time (the labs share `CommonUtilities`, parallel builds would conflict). A companion is part of the run, not a second run.
+- A scenario is *implemented* as soon as its code differs from the delivered one: a scenario the learner started but did not finish runs by default, and its checks tell what is missing.
+- The scenario titles come from `Program.cs` and are shown in English.
 - Interactive labs must be declared `"interactive": true`; `Console.ReadKey` is not supported (see [Interactive labs](#interactive-labs)).
 - Colors of `ColoredConsole` are lost: .NET does not emit them when the output is redirected.

@@ -133,7 +133,7 @@ TODO 1 to 3 are the same as in Lab 01.
 | **TODO 8** | Create the CSV tool and the agent | • `AITool getAllHotelsAsCsv = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsCsv, "get_all_hotels");` <br> • `AIAgent csvAgent = chatClient.AsAIAgent(instructions: $"""..."""`, `name: "HotelCsvAgent", tools: [getAllHotelsAsCsv]);` with these instructions (an interpolated raw string literal, `{HotelCsv.Header}` on its own line): <br> `You are a hotel data assistant. Call get_all_hotels to get the hotels as CSV, then answer with every hotel that matches the request, in the requested order.` <br> `Answer ONLY in CSV, with exactly this header line and then one line per hotel, with the same columns and values as the tool result:` <br> `{HotelCsv.Header}` <br> `No explanation, no markdown, no code fences.` |
 | **TODO 9** | Run the agent | • `csvResponse = await csvAgent.RunAsync(question).WithSpinner("Running agent");` — the non-generic `RunAsync`: the answer is text |
 | **TODO 10** | Display the tool calls and the raw answer | • `WriteToolCalls(csvResponse);` <br> • `ColoredConsole.WritePrimaryLogLine("Agent answer (CSV):");` <br> • `ColoredConsole.WriteSecondaryLogLine(csvResponse.Text);` |
-| **TODO 11** | Parse the CSV back into hotels | • `try { List<Hotel> csvHotels = HotelCsv.Deserialize(csvResponse.Text); ColoredConsole.WritePrimaryLogLine($"Parsed back {csvHotels.Count} hotels from the CSV answer"); }` <br> • `catch (FormatException ex) { ColoredConsole.WriteErrorLine($"The answer is not the expected CSV: {ex.Message}"); }` <br> • No schema guarantees the format: the instructions are a request, not a guarantee |
+| **TODO 11** | Parse the CSV back into hotels | • `try { List<Hotel> csvHotels = HotelCsv.Deserialize(csvResponse.Text); WriteHotels(csvHotels, "Hotels parsed back from the CSV answer"); }` — the same display as scenario 1: only hotels parsed back into `Hotel` objects can be listed <br> • `catch (FormatException ex) { ColoredConsole.WriteErrorLine($"The answer is not the expected CSV: {ex.Message}"); }` <br> • No schema guarantees the format: the instructions are a request, not a guarantee |
 | **TODO 12** | Display token usage | • `WriteTokenUsage(csvResponse, "Token Usage (CSV):");` |
 
 ---
@@ -160,7 +160,7 @@ cd Solution
 dotnet run
 ```
 
-To run only one scenario, edit `scenariosToRun` at the top of `Program.cs` (for example `[2]`). The comparison at the end needs both.
+To run only one scenario: `dotnet run -- --scenarios 2` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). The comparison at the end needs both.
 
 ## What the model receives and produces
 
@@ -253,7 +253,9 @@ Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating
 Backpacker Hostel,Bangkok,1,25,USD,40,false,true,3.8
 Budget Stay Express,Chicago,2,35,USD,60,false,true,3.5
 ...
-Parsed back 43 hotels from the CSV answer
+Hotels parsed back from the CSV answer: 43
+  Backpacker Hostel (Bangkok) - 25 USD/night - stars: 1 - rating: 3.8
+  ...
 ----------------------------------------
 Token Usage (CSV):
   Input tokens: 1xxx
@@ -283,7 +285,7 @@ The sizes of the tool results are exact (same data every time). The token counts
 | The dashboard check *cheapest hotel first* fails (scenario 1 or 2) while the other checks pass | Expected from time to time: the model did not sort the list perfectly (for example `Budget Stay Express` 35 USD before `Backpacker Hostel` 25 USD). Your code is not at fault: run again |
 | `The answer is not the expected CSV: ...` in scenario 2 | Expected from time to time: the format is only described in the instructions (code fences are tolerated, a changed header or a missing column is not). Run again, or tighten the instructions |
 | `JsonException` when reading `jsonResponse.Result` | The JSON answer does not match `Hotel` (a required property is missing): with `gpt-4o-mini` this is rare; a truncated answer (`MaxOutputTokens` too low) also causes it |
-| The comparison is not displayed | Both scenarios must run: set `scenariosToRun = [1, 2]` |
+| The comparison is not displayed | Both scenarios must run: `dotnet run -- --scenarios 1,2` |
 | Fewer than 43 hotels | The model skipped some: the question asks for all of them, but nothing forces the model to be exhaustive |
 
 ## Provided Files

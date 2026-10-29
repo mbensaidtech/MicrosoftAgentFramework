@@ -597,3 +597,39 @@ details.fig:not([open]) > summary { border-bottom: 0; }
   .reset-code { font-size: 24px; letter-spacing: .3em; text-indent: .3em; }
   #reset-code-input { max-width: none; }
 }
+
+/* ---------- Scenarios: what the next run executes (Run tab), and the results grouped by scenario ---------- */
+.scenarios { margin: 0; padding: 10px 16px 12px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.scenarios-head { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.scenarios-title { font: 600 12px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--txt2); }
+.scenarios-count { font-size: 11.5px; color: var(--txt3); }
+.scenario-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.scenario { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.scenario.selected { background: var(--accbg); border-color: color-mix(in srgb, var(--acc) 22%, transparent); }
+.scenario label { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 0; cursor: pointer; font-size: 13px; color: var(--txt); }
+.scenario input[type="checkbox"] { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--acc); cursor: pointer; }
+.scenario input[type="checkbox"]:disabled { cursor: not-allowed; }
+.scenario input[type="checkbox"]:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.scenario.todo .scenario-title { color: var(--txt2); }
+.scenario-num { flex: none; width: 1.6em; text-align: right; font-size: 12px; color: var(--txt3); }
+.scenario-title { min-width: 0; overflow-wrap: anywhere; }
+.scenario-badges { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.scenario-requires { font-size: 11.5px; color: var(--txt3); }
+.scenarios-hint { margin-top: 8px; }
+.scenarios-hint.warn { color: var(--warn); }
+.pill.todo, .pill.notRun { color: var(--warn); background: var(--warnbg); border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
+.pill.notRun::before { opacity: .5; }
+
+.checks li.check-group { justify-content: space-between; align-items: center; padding: 10px 16px 4px; font: 600 12px var(--sans); color: var(--txt2); }
+.checks li.check-group:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--line); }
+.checks li.muted { color: var(--txt3); }
+.checks li.scenario-error { padding-top: 2px; }
+.checks li.scenario-error .errors { padding: 0; max-height: 180px; }
+.checks li.scenario-skipped { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 12px; }
+.history-scope { display: block; font-size: 11.5px; color: var(--txt3); }
+
+@media (max-width: 760px) {
+  .scenarios { padding: 10px 12px 12px; }
+  .scenario label { flex-basis: 100%; }
+  .scenario-badges { padding-left: 25px; }
+}

@@ -3,6 +3,7 @@ using System.Net.ServerSentEvents;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using CommonUtilities;
 using LabDashboard;
 using LabDashboard.Catalog;
 using LabDashboard.Execution;
@@ -45,10 +46,19 @@ builder.Services.ConfigureHttpJsonOptions(json =>
     json.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
     json.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
-builder.Services.AddSingleton(options);
-builder.Services.AddSingleton(LabCatalog.Load(
+LabCatalog labCatalog = LabCatalog.Load(
     Path.Combine(builder.Environment.ContentRootPath, "labs.json"),
-    Path.Combine(builder.Environment.ContentRootPath, options.RepositoryRoot)));
+    Path.Combine(builder.Environment.ContentRootPath, options.RepositoryRoot));
+
+// Lab author tool: `dotnet run -- exercise-fingerprints` (from Dashboard/LabDashboard, on the exercises as delivered) writes the
+// fingerprints that tell an implemented scenario from a delivered one, then exits.
+if (args is [ExerciseFingerprints.Name, ..])
+{
+    return ExerciseFingerprints.Run(labCatalog, Console.Out);
+}
+
+builder.Services.AddSingleton(options);
+builder.Services.AddSingleton(labCatalog);
 builder.Services.AddSingleton<RunHistoryStore>();
 builder.Services.AddSingleton(services => AzureOpenAISettingsStore.ForCatalog(services.GetRequiredService<LabCatalog>()));
 builder.Services.AddSingleton<LabRunner>();
@@ -140,6 +150,7 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
         {
             ["start"] = $"cd {lab.Path}/{Path.GetDirectoryName(lab.StartProject)} && dotnet run",
             ["solution"] = $"cd {lab.Path}/{Path.GetDirectoryName(lab.SolutionProject)} && dotnet run",
+            ["scenarios"] = $"dotnet run -- {LabScenarios.ScenariosOption} 1,3      dotnet run -- {LabScenarios.ListOption}",
         },
         runs.FirstOrDefault(),
         runs.Select(r => r with { Log = [] }).ToList()));
@@ -160,6 +171,36 @@ api.MapGet("/labs/{id}/solution", (string id, LabCatalog catalog) =>
     return Results.Ok(SolutionFiles(catalog, lab));
 });
 
+// The scenarios of the exercise and of the solution, read now from their Program.cs (the learner edits the exercise meanwhile):
+// state (implemented: its code, and the setup, are no longer the delivered ones), the scenarios each one requires, and the last result
+// of each one on that project.
+api.MapGet("/labs/{id}/scenarios", (string id, LabCatalog catalog, RunHistoryStore history) =>
+{
+    if (catalog.Find(id) is not { } lab)
+    {
+        return Results.NotFound();
+    }
+
+    IReadOnlyList<RunRecord> runs = history.ForLab(lab.Id);
+    return Results.Ok(Enum.GetValues<RunTarget>().ToDictionary(
+        target => JsonNamingPolicy.CamelCase.ConvertName(target.ToString()),
+        target =>
+        {
+            IReadOnlyDictionary<int, (ScenarioStatus Status, RunRecord Run)> last = ExerciseProgress.LastScenarioResults(runs, target);
+            return catalog.Scenarios(lab, target).Select(scenario => new
+            {
+                scenario.Number,
+                scenario.Title,
+                scenario.Implemented,
+                scenario.SetupImplemented,
+                scenario.Requires,
+                Last = last.TryGetValue(scenario.Number, out var result)
+                    ? new { result.Status, result.Run.RunId, result.Run.StartedAt }
+                    : null,
+            });
+        }));
+});
+
 api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalog, LabRunner runner) =>
 {
     if (catalog.Find(id) is not { } lab)
@@ -167,8 +208,27 @@ api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalo
         return Results.NotFound();
     }
 
-    return runner.TryStart(lab, request.Target, out LabRun run)
-        ? Results.Accepted($"/api/runs/{run.Id}/events", new { runId = run.Id })
+    // The selection is checked against the Program.cs of the project, with the rules of the labs: the scenarios asked for and the
+    // scenarios they require; without "scenarios", the implemented ones (as `dotnet run` without option). The program receives the
+    // resulting list (`-- --scenarios 1,3`), so that what runs is exactly what was checked here.
+    IReadOnlyList<LabScenario> scenarios = catalog.Scenarios(lab, request.Target);
+    ScenarioRun? selection = null;
+    if (scenarios.Count > 0 || request.Scenarios is not null)
+    {
+        ScenarioPlan plan = LabScenarios.Plan(scenarios, new ScenarioRequest(request.Scenarios));
+        string? error = plan.Unknown.Count > 0 || (scenarios.Count == 0 && plan.Selected.Count > 0) ? "unknown"
+            : plan.Selected.Count == 0 ? request.Scenarios is null ? "noneImplemented" : "required"
+            : null;
+        if (error is not null)
+        {
+            return Results.BadRequest(new { errors = new Dictionary<string, string> { ["scenarios"] = error } });
+        }
+
+        selection = new ScenarioRun(scenarios, plan.Selected);
+    }
+
+    return runner.TryStart(lab, request.Target, out LabRun run, selection)
+        ? Results.Accepted($"/api/runs/{run.Id}/events", new { runId = run.Id, scenarios = selection?.Selected })
         : Results.Conflict(new { error = $"A run is already in progress ({run.Lab.Title}, {run.Target}).", runId = run.Id });
 });
 
@@ -527,7 +587,8 @@ static IReadOnlyList<SourceFile> SolutionFiles(LabCatalog catalog, LabDefinition
         .ToList();
 }
 
-internal sealed record RunRequest(RunTarget Target);
+/// <summary>A run of the exercise or the solution; <see cref="Scenarios"/>: the scenario numbers to run (null: the implemented ones).</summary>
+internal sealed record RunRequest(RunTarget Target, IReadOnlyList<int>? Scenarios = null);
 
 internal sealed record InputRequest(string? Text);
 
@@ -583,8 +644,8 @@ internal sealed record LabSummary(
         RunRecord? lastStart = runs.FirstOrDefault(r => r.Target == RunTarget.Start);
         RunRecord? lastSolution = runs.FirstOrDefault(r => r.Target == RunTarget.Solution);
 
-        // Progress of the exercise itself (Start project): completed once it passed all the checks.
-        string progress = runs.Any(r => r.Target == RunTarget.Start && r.Status == RunStatus.Passed) ? "completed"
+        // Progress of the exercise itself (Start project): completed once every scenario passed (ExerciseProgress).
+        string progress = ExerciseProgress.CompletingRun(runs) is not null ? "completed"
             : lastStart is not null ? "inProgress"
             : "notStarted";
 

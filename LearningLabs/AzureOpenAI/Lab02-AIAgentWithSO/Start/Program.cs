@@ -16,11 +16,15 @@ using static AIAgentWithSO.RestaurantConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3], [4] or [1, 2, 3, 4] to run specific scenarios
-HashSet<int> scenariosToRun = [1, 2, 3, 4];
+// dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
+// dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
+// dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
+// dotnet run -- --scenarios all       -> every scenario, implemented or not
+// dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
-bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
 #region Setup: Configuration and Client Initialization
 

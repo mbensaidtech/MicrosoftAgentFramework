@@ -38,12 +38,12 @@ public static class ProgressSnapshot
         labs = catalog.Labs.Select(lab => ForLab(lab.Id, history.ForLab(lab.Id))),
     }, JsonOptions)!;
 
-    /// <summary>Same completion rule as the local UI (LabSummary): the exercise is completed once a Start run passed every check.</summary>
+    /// <summary>Same completion rule as the local UI (<see cref="ExerciseProgress"/>): completed once every scenario passed.</summary>
     public static LabProgressSnapshot ForLab(string labId, IReadOnlyList<RunRecord> runs)
     {
         // History is newest first.
         RunRecord[] startRuns = runs.Where(r => r.Target == RunTarget.Start).ToArray();
-        RunRecord? firstPassed = startRuns.LastOrDefault(r => r.Status == RunStatus.Passed);
+        RunRecord? firstPassed = ExerciseProgress.CompletingRun(runs);
         RunRecord? last = runs.FirstOrDefault();
 
         string state = firstPassed is not null ? "completed" : startRuns.Length > 0 ? "inProgress" : "notStarted";

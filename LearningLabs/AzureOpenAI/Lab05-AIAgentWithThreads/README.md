@@ -105,7 +105,7 @@ This starts a MongoDB 8.0 container named `lab05-mongodb`, reachable from your c
 - See what the agent stored: `docker exec lab05-mongodb mongosh AIAgentSessions --quiet --eval "db.chat_history.find({}, {_id: 0, SessionId: 1, Role: 1, MessageText: 1})"`
 - Stop MongoDB: `docker compose down` (add `-v` to also delete the stored conversations)
 
-Scenarios 1 and 2 do not need MongoDB. To skip scenario 3, set `scenariosToRun` to `[1, 2]` at the top of `Program.cs`.
+Scenarios 1 and 2 do not need MongoDB. To skip scenario 3: `dotnet run -- --scenarios 1,2`.
 
 ### Step 3: Look at the provided files
 
@@ -196,7 +196,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (for example `[1, 2]` without MongoDB).
+To run only some scenarios: `dotnet run -- --scenarios 1,2` without MongoDB ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## How sessions and chat history work
 
@@ -345,7 +345,7 @@ Answers vary from one run to another; the keys are new at each run.
 | `401 Unauthorized` with an API key | Check the key (user secret `AzureOpenAI:APIKey`) and that it belongs to the resource of the endpoint |
 | `401` / `403` with Entra ID | Run `az login` and make sure your identity has the **Cognitive Services OpenAI User** role on the resource |
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
-| `MongoDB is not reachable ...` | Start MongoDB (`docker compose up -d` in `MongoDB/`), check `docker ps`, or skip scenario 3 with `scenariosToRun = [1, 2]` |
+| `MongoDB is not reachable ...` | Start MongoDB (`docker compose up -d` in `MongoDB/`), check `docker ps`, or skip scenario 3 with `dotnet run -- --scenarios 1,2` |
 | `docker compose up` fails with *port is already allocated* | Another MongoDB already uses port 27017: stop it, or point `MongoDb:ConnectionString` to it |
 | The follow-up answer does not know the city or the name | Pass the **restored** session to `RunAsync` (TODO 9, 22), and restore it with the agent that has the same provider |
 | `NullReferenceException` on `GetService<...>()!` | The agent has no provider of this type: check `ChatHistoryProvider = ...` in `ChatClientAgentOptions` (TODO 10, 17) |

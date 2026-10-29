@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using CommonUtilities;
 
 namespace LabDashboard.Catalog;
 
@@ -11,7 +12,21 @@ public enum RunTarget
 }
 
 /// <summary>A check run against the standard output of a lab run (multiline regular expression).</summary>
-public sealed record LabExpectation(string Id, string Description, string Pattern);
+public sealed partial record LabExpectation(string Id, string Description, string Pattern)
+{
+    /// <summary>
+    /// The scenarios the check needs, when its id does not say it (<c>scenario2-usage</c> is a check of scenario 2):
+    /// for example a comparison of scenarios 1 and 2, or a server check made on the output of a companion.
+    /// </summary>
+    public IReadOnlyList<int>? Scenarios { get; init; }
+
+    /// <summary>The scenarios the check needs: evaluated only when they all ran. None: a check of the whole run (the configuration).</summary>
+    public IReadOnlyList<int> ScenarioNumbers() =>
+        Scenarios ?? (ScenarioId().Match(Id) is { Success: true } match ? [int.Parse(match.Groups["number"].Value)] : []);
+
+    [GeneratedRegex(@"^scenario(?<number>\d+)(?:-|$)")]
+    private static partial Regex ScenarioId();
+}
 
 /// <summary>Optional translation of the lab texts shown by the dashboard (keyed by language code, e.g. "fr").</summary>
 public sealed record LabTranslation
@@ -112,6 +127,16 @@ public sealed partial class LabCatalog
     public string ProjectPath(LabDefinition lab, RunTarget target) => Resolve(System.IO.Path.Combine(lab.Path, lab.ProjectFor(target)));
 
     public string? CompanionProjectPath(LabDefinition lab) => lab.Companion is null ? null : Resolve(lab.Companion.Project);
+
+    /// <summary>The Program.cs of a project, which declares its scenarios.</summary>
+    public string ProgramPath(LabDefinition lab, RunTarget target) =>
+        System.IO.Path.Combine(System.IO.Path.GetDirectoryName(ProjectPath(lab, target))!, "Program.cs");
+
+    /// <summary>
+    /// The scenarios of a project, read now from its Program.cs (the learner edits the exercise while the dashboard runs) and compared
+    /// with the delivered exercise: the same rules as the lab itself (<see cref="LabScenarios"/>). None for a program without scenario regions.
+    /// </summary>
+    public IReadOnlyList<LabScenario> Scenarios(LabDefinition lab, RunTarget target) => LabScenarios.ReadFile(ProgramPath(lab, target));
 
     public string ReadmePath(LabDefinition lab) => Resolve(System.IO.Path.Combine(lab.Path, lab.Readme));
 

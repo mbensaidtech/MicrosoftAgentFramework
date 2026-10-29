@@ -181,7 +181,7 @@ Scenario 1 is **interactive**: when `Please reply Y to approve, or anything else
 
 In the dashboard, an input box appears under the output when the program waits: type `Y` there. The dashboard checks of scenario 1 expect the deletion to be approved.
 
-To run only one scenario, edit `scenariosToRun` at the top of `Program.cs` (for example `[2]`).
+To run only one scenario: `dotnet run -- --scenarios 2` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## How the approval flow works
 

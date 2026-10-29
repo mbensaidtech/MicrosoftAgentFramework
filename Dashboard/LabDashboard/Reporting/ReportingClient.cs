@@ -303,6 +303,9 @@ public sealed class ReportingClient : BackgroundService
             runDurationMs = record.RunDurationMs,
             exitCode = record.ExitCode,
             checks = record.Checks.Select(c => new { id = c.Id, passed = c.Passed }),
+            // Every scenario of the lab and its result (skipped: not selected): a run limited to some scenarios does not complete the
+            // exercise on the server, the progress.snapshot that follows does. Absent for a run without scenario selection.
+            scenarios = record.Scenarios?.Select(s => new { number = s.Number, status = s.Status }),
             totalTokens = record.TokenUsage?.Total,
         });
         Report("progress.snapshot", null, ProgressSnapshot.Progress(_catalog, _history));

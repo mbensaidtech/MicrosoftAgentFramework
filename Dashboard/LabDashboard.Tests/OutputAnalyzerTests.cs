@@ -5,6 +5,48 @@ namespace LabDashboard.Tests;
 
 public class OutputAnalyzerTests
 {
+    /// <summary>
+    /// Evaluates the checks as on a real run: the outputs recorded here come from the labs before the scenario selection, which now
+    /// prints a line when each scenario starts (<see cref="WithMarkers"/>); the checks of a scenario only see its output.
+    /// </summary>
+    private static IReadOnlyList<ExpectationResult> Evaluate(IEnumerable<LabExpectation> expectations, IReadOnlyList<string> output) =>
+        OutputAnalyzer.EvaluateExpectations(expectations, WithMarkers(output));
+
+    /// <summary>
+    /// A recorded output with the line the scenario selection prints when a scenario starts: first statement of the block, before its
+    /// divider (the divider nearest to the "=== Scenario N" header), or right before the header when there is no divider.
+    /// </summary>
+    internal static string[] WithMarkers(IReadOnlyList<string> output)
+    {
+        if (output.Any(line => line.StartsWith(CommonUtilities.LabScenarios.MarkerPrefix, StringComparison.Ordinal)))
+        {
+            return [.. output];
+        }
+
+        List<string> lines = [.. output];
+        for (int i = lines.Count - 1; i >= 0; i--)
+        {
+            System.Text.RegularExpressions.Match header = System.Text.RegularExpressions.Regex.Match(lines[i], @"^=== Scenario (\d+):");
+            if (!header.Success)
+            {
+                continue;
+            }
+
+            int start = i;
+            for (int j = i - 1; j >= 0 && !System.Text.RegularExpressions.Regex.IsMatch(lines[j], @"^=== Scenario \d+:"); j--)
+            {
+                if (System.Text.RegularExpressions.Regex.IsMatch(lines[j], "^-{10,}$"))
+                {
+                    start = j > 0 && lines[j - 1].Length == 0 ? j - 1 : j;
+                    break;
+                }
+            }
+
+            lines.Insert(start, $"{CommonUtilities.LabScenarios.MarkerPrefix}{header.Groups[1].Value}: recorded");
+        }
+
+        return [.. lines];
+    }
     private static readonly string[] Lab01Output =
     [
         "Endpoint: https://example.openai.azure.com/",
@@ -32,6 +74,167 @@ public class OutputAnalyzerTests
             [new TokenUsageReport("Scenario 4 · Token Usage", 56, 29, 0, 85), new TokenUsageReport("Scenario 5 · Token Usage (streaming)", 38, 120, null, 158)],
             usage.Reports);
         Assert.Equal((94L, 149L, 0L, 243L), (usage.Input!.Value, usage.Output!.Value, usage.Reasoning!.Value, usage.Total!.Value));
+    }
+
+    // Standard output of the Lab01 solution (real run, with the lines of the scenario selection), as decoded by the dashboard (spinner lines removed).
+    private static readonly string[] Lab01SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        ">>> Scenarios to run: 1, 2, 3, 4, 5, 6 (the implemented ones)",
+        ">>> Running scenario 1: Basic Agent - Simple prompt with default settings",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "",
+        "",
+        "=== Scenario 1: Basic Agent ===",
+        "The capital of France is Paris.",
+        ">>> Running scenario 2: Agent with Instructions - Custom behavior and identity",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "",
+        "",
+        "=== Scenario 2: Agent with Instructions (GeographyAgent) ===",
+        "The surface area of France is approximately 551,695 square kilometers (213,011 square miles). This figure includes metropolitan France (mainland France in Europe) but does not account for overseas territories. When including these territories, the total area is larger.",
+        ">>> Running scenario 3: Using ChatMessages - Fine-grained control with message roles",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "",
+        "",
+        "=== Scenario 3: Using ChatMessages ===",
+        "- Belgium",
+        "- Luxembourg",
+        "- Germany",
+        "- Switzerland",
+        "- Italy",
+        "- Spain",
+        "- Monaco",
+        "- Andorra",
+        "- Brazil (via overseas territory, Guiana)",
+        "- Suriname (via overseas territory, Guiana)",
+        ">>> Running scenario 4: Get consumed tokens from the agent response",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "",
+        "",
+        "=== Scenario 4: Get consumed tokens from the agent response ===",
+        "- White",
+        "- Gray",
+        "- Yellow",
+        "- Orange",
+        "- Green",
+        "- Pink",
+        "- Purple",
+        "- Red",
+        "- Beige",
+        "- Gold",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 56",
+        "  Output tokens: 29",
+        "  Reasoning tokens (included in output): 0",
+        "  Total tokens: 85",
+        ">>> Running scenario 5: Streaming - Display the response while it is generated",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Streaming ===",
+        "As the early morning sun bathed the Seine River in golden light, Clara stood on the Pont Alexandre III, captivated by the shimmering reflections. She wandered through the cobblestone streets of Montmartre, where enchanting street musicians filled the air with melodies as artists painted their dreams on canvases. With a warm croissant in hand, she climbed to the Sacré-Cœur, pausing to catch a breath and admire the breathtaking view of the city sprawled below. As the Eiffel Tower sparkled to life at dusk, Clara whispered a promise to return, her heart forever entwined with the magic of Paris.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (streaming):",
+        "  Input tokens: 38",
+        "  Output tokens: 123",
+        "  Total tokens: 161",
+        ">>> Running scenario 6: Responses API - The same agent on the API that Microsoft recommends",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "",
+        "",
+        "=== Scenario 6: Responses API ===",
+        "Italy has a total surface area of approximately 301,340 square kilometers (116,347 square miles). This includes its mainland and the islands of Sicily and Sardinia. If you have any more questions about Italy or geography in general, feel free to ask!",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Response id (stored by the service): resp_01175645f19f9df4006ae27b961d1481949a862274d21e65a8",
+        "Token Usage (Responses API):",
+        "  Input tokens: 41",
+        "  Output tokens: 53",
+        "  Total tokens: 94",
+    ];
+
+    // Standard output of the Lab01 exercise as delivered, every scenario asked for (`--scenarios all`): only what the Start already prints.
+    private static readonly string[] Lab01StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        ">>> Scenarios to run: 1, 2, 3, 4, 5, 6 (--scenarios all)",
+        ">>> Scenarios not implemented yet (code unchanged since the exercise was delivered), run anyway: 1, 2, 3, 4, 5, 6",
+        ">>> Running scenario 1: Basic Agent - Simple prompt with default settings",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: Basic Agent ===",
+        ">>> Running scenario 2: Agent with Instructions - Custom behavior and identity",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Agent with Instructions ===",
+        ">>> Running scenario 3: Using ChatMessages - Fine-grained control with message roles",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Using ChatMessages ===",
+        ">>> Running scenario 4: Get consumed tokens from the agent response",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Get consumed tokens from the agent response ===",
+        ">>> Running scenario 5: Streaming - Display the response while it is generated",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Streaming ===",
+        "",
+        ">>> Running scenario 6: Responses API - The same agent on the API that Microsoft recommends",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 6: Responses API ===",
+    ];
+
+    [Fact]
+    public void Every_lab01_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab01 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab01")!;
+
+        Assert.All(Evaluate(lab01.Expectations, Lab01SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], Evaluate(lab01.Expectations, Lab01StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Lab01_checks_fail_when_the_agent_answers_something_else()
+    {
+        LabDefinition lab01 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab01")!;
+        // Every scenario printed something, but not the answer to its question (an error message, another question, the prompt).
+        string[] output =
+        [
+            ">>> Running scenario 1: Basic Agent", "I cannot answer that.",
+            ">>> Running scenario 2: Agent with Instructions", "What would you like to know about France?",
+            ">>> Running scenario 3: Using ChatMessages", "France is a country in Europe.",
+            ">>> Running scenario 5: Streaming", "Tell me a four-sentence story.",
+            ">>> Running scenario 6: Responses API", "Hello, what is the surface area of Italy?",
+        ];
+
+        Assert.Empty(Evaluate(lab01.Expectations, output).Where(r => r.Passed));
     }
 
     // Standard output of the Lab02 solution, as decoded by the dashboard (spinner lines removed).
@@ -129,10 +332,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab02 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab02")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab02.Expectations, Lab02SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab02.Expectations, Lab02SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab02.Expectations, Lab02StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab02.Expectations, Lab02StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -141,7 +344,7 @@ public class OutputAnalyzerTests
         LabDefinition lab02 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab02")!;
         string[] output = [.. Lab02SolutionOutput.Where((_, index) => index is < 12 or > 15)]; // scenario 1 usage removed
 
-        ExpectationResult scenario1Usage = OutputAnalyzer.EvaluateExpectations(lab02.Expectations, output).Single(r => r.Id == "scenario1-usage");
+        ExpectationResult scenario1Usage = Evaluate(lab02.Expectations, output).Single(r => r.Id == "scenario1-usage");
         Assert.False(scenario1Usage.Passed);
     }
 
@@ -247,10 +450,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab03 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab03")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab03.Expectations, Lab03SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab03.Expectations, Lab03SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab03.Expectations, Lab03StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab03.Expectations, Lab03StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -273,7 +476,7 @@ public class OutputAnalyzerTests
             "Innovation Lab has been booked.",
         ];
 
-        Assert.Empty(OutputAnalyzer.EvaluateExpectations(lab03.Expectations, output).Where(r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal)));
+        Assert.Empty(Evaluate(lab03.Expectations, output).Where(r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -363,10 +566,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab04 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab04")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab04.Expectations, Lab04SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab04.Expectations, Lab04SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab04.Expectations, Lab04StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab04.Expectations, Lab04StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -390,7 +593,7 @@ public class OutputAnalyzerTests
             "Found 0 models: ",
         ];
 
-        Assert.Empty(OutputAnalyzer.EvaluateExpectations(lab04.Expectations, output).Where(r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal)));
+        Assert.Empty(Evaluate(lab04.Expectations, output).Where(r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -546,10 +749,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab05 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab05")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab05.Expectations, Lab05SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab05.Expectations, Lab05SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab05.Expectations, Lab05StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab05.Expectations, Lab05StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -593,7 +796,7 @@ public class OutputAnalyzerTests
             "Agent: Which city do you mean? What is your name?",
         ];
 
-        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab05.Expectations, output), r => r.Passed);
+        Assert.DoesNotContain(Evaluate(lab05.Expectations, output), r => r.Passed);
     }
 
     [Fact]
@@ -853,8 +1056,8 @@ public class OutputAnalyzerTests
             ? (Lab06ClientSolutionOutput, Lab06ClientStartOutput)
             : (Lab06ServerSolutionOutput, Lab06ServerStartOutput);
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab.Expectations, solution), r => Assert.True(r.Passed, r.Id));
-        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab.Expectations, start).Where(r => r.Passed).Select(r => r.Id));
+        Assert.All(Evaluate(lab.Expectations, solution), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], Evaluate(lab.Expectations, start).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -869,7 +1072,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario1-card", "scenario1-valid", "scenario1-tampered", "scenario3-tool", "scenario3-key"],
-            OutputAnalyzer.EvaluateExpectations(lab.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+            Evaluate(lab.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
     }
 
     // Scenario 4 against a server without session store (real run): same contextId, but the agent generated a new key.
@@ -903,8 +1106,8 @@ public class OutputAnalyzerTests
             .TakeWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal)), .. Lab06Scenario4WithoutSessionStore.SkipWhile(line => !line.StartsWith("=== Scenario 4:", StringComparison.Ordinal))];
 
         // The context id is the same on both turns: only the answer tells whether the server kept the conversation
-        Assert.Equal(["scenario4-remembered"], OutputAnalyzer.EvaluateExpectations(client.Expectations, clientOutput).Where(r => !r.Passed).Select(r => r.Id));
-        Assert.Equal(["session-store", "conversation"], OutputAnalyzer.EvaluateExpectations(server.Expectations, serverOutput).Where(r => !r.Passed).Select(r => r.Id));
+        Assert.Equal(["scenario4-remembered"], Evaluate(client.Expectations, clientOutput).Where(r => !r.Passed).Select(r => r.Id));
+        Assert.Equal(["session-store", "conversation"], Evaluate(server.Expectations, serverOutput).Where(r => !r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1009,10 +1212,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab07 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab07")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab07.Expectations, Lab07SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab07.Expectations, Lab07SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab07.Expectations, Lab07StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab07.Expectations, Lab07StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1041,7 +1244,7 @@ public class OutputAnalyzerTests
             "Agent: Refunds usually take a couple of weeks.",
         ];
 
-        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab07.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+        Assert.DoesNotContain(Evaluate(lab07.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1089,7 +1292,9 @@ public class OutputAnalyzerTests
         "Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating",
         "Backpacker Hostel,Bangkok,1,25,USD,40,false,true,3.8",
         "Budget Stay Express,Chicago,2,35,USD,60,false,true,3.5",
-        "Parsed back 43 hotels from the CSV answer",
+        "Hotels parsed back from the CSV answer: 43",
+        "  Backpacker Hostel (Bangkok) - 25 USD/night - stars: 1 - rating: 3.8",
+        "  Budget Stay Express (Chicago) - 35 USD/night - stars: 2 - rating: 3.5",
         "",
         "-------------------------------------------------------------------------------",
         "",
@@ -1131,10 +1336,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab08 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab08")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab08.Expectations, Lab08SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab08.Expectations, Lab08SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab08.Expectations, Lab08StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab08.Expectations, Lab08StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1166,7 +1371,7 @@ public class OutputAnalyzerTests
             "Total tokens                2119      5082         +140%",
         ];
 
-        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab08.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+        Assert.DoesNotContain(Evaluate(lab08.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1283,10 +1488,10 @@ public class OutputAnalyzerTests
         LabDefinition lab09 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab09")!;
 
         Assert.True(lab09.Interactive);
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab09.Expectations, Lab09SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab09.Expectations, Lab09SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab09.Expectations, Lab09StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab09.Expectations, Lab09StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1329,7 +1534,7 @@ public class OutputAnalyzerTests
             "Agent: I will call you back at ada.lovelace@example.com about EMP001.",
         ];
 
-        Assert.DoesNotContain(OutputAnalyzer.EvaluateExpectations(lab09.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
+        Assert.DoesNotContain(Evaluate(lab09.Expectations, output), r => r.Passed && !r.Id.EndsWith("-usage", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1453,10 +1658,10 @@ public class OutputAnalyzerTests
 
         Assert.False(lab10.Interactive);
         Assert.Null(lab10.Companion);
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab10.Expectations, Lab10SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab10.Expectations, Lab10SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab10.Expectations, Lab10StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab10.Expectations, Lab10StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1489,7 +1694,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario1-server", "scenario1-tool"],
-            OutputAnalyzer.EvaluateExpectations(lab10.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab10.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1798,10 +2003,10 @@ public class OutputAnalyzerTests
 
         Assert.False(lab11.Interactive);
         Assert.Null(lab11.Companion);
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab11.Expectations, Lab11SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab11.Expectations, Lab11SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab11.Expectations, Lab11StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab11.Expectations, Lab11StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1835,7 +2040,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["config", "scenario1-answer", "scenario1-usage", "scenario2-answer", "scenario2-usage"],
-            OutputAnalyzer.EvaluateExpectations(lab11.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab11.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1893,7 +2098,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["config", "scenario1-request", "scenario1-header", "scenario1-response", "scenario1-answer", "scenario1-usage", "scenario2-tools", "scenario2-usage"],
-            OutputAnalyzer.EvaluateExpectations(lab11.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab11.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -1931,7 +2136,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario3-spans", "scenario3-usage"],
-            OutputAnalyzer.EvaluateExpectations(lab11.Expectations, output).Where(r => r.Id.StartsWith("scenario3", StringComparison.Ordinal) && r.Passed).Select(r => r.Id));
+            Evaluate(lab11.Expectations, output).Where(r => r.Id.StartsWith("scenario3", StringComparison.Ordinal) && r.Passed).Select(r => r.Id));
     }
 
     // Standard output of the Lab12 solution (real run), with "I work remotely on Fridays." then an empty line typed in the chat
@@ -2037,10 +2242,10 @@ public class OutputAnalyzerTests
 
         Assert.True(lab12.Interactive);
         Assert.Null(lab12.Companion);
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab12.Expectations, Lab12SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab12.Expectations, Lab12SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, Lab12StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab12.Expectations, Lab12StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2071,7 +2276,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["config", "scenario1-usage"],
-            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2114,7 +2319,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["config", "scenario1-extracted", "scenario1-stored", "scenario1-usage"],
-            OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab12.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Theory]
@@ -2141,7 +2346,7 @@ public class OutputAnalyzerTests
             "  Input tokens: 119",
         ];
 
-        Assert.Equal(expected, OutputAnalyzer.EvaluateExpectations(lab12.Expectations, output).Single(r => r.Id == "scenario1-recall").Passed);
+        Assert.Equal(expected, Evaluate(lab12.Expectations, output).Single(r => r.Id == "scenario1-recall").Passed);
     }
 
     [Fact]
@@ -2249,10 +2454,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab01")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab.Expectations, MultiAgentLab01SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab.Expectations, MultiAgentLab01SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config"],
-            OutputAnalyzer.EvaluateExpectations(lab.Expectations, MultiAgentLab01StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab.Expectations, MultiAgentLab01StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2285,7 +2490,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario1-answer"],
-            OutputAnalyzer.EvaluateExpectations(lab.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2403,10 +2608,10 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab13 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab13")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab13.Expectations, Lab13SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.All(Evaluate(lab13.Expectations, Lab13SolutionOutput), r => Assert.True(r.Passed, r.Id));
         Assert.Equal(
             ["config", "api-started"],
-            OutputAnalyzer.EvaluateExpectations(lab13.Expectations, Lab13StartOutput).Where(r => r.Passed).Select(r => r.Id));
+            Evaluate(lab13.Expectations, Lab13StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2423,7 +2628,7 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario1-unauthorized", "scenario1-validation", "scenario4-isolated"],
-            OutputAnalyzer.EvaluateExpectations(lab13.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+            Evaluate(lab13.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
     }
 
     // Standard output of the Lab14 solution (real run).
@@ -2533,8 +2738,8 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab14 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab14")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab14.Expectations, Lab14SolutionOutput), r => Assert.True(r.Passed, r.Id));
-        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab14.Expectations, Lab14StartOutput).Where(r => r.Passed).Select(r => r.Id));
+        Assert.All(Evaluate(lab14.Expectations, Lab14SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], Evaluate(lab14.Expectations, Lab14StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2563,7 +2768,7 @@ public class OutputAnalyzerTests
         string[] concerned = ["scenario1-tool", "scenario1-expected", "scenario1-custom", "scenario1-summary", "scenario3-comparison", "scenario3-regression"];
         Assert.Equal(
             concerned,
-            OutputAnalyzer.EvaluateExpectations(lab14.Expectations, output).Where(r => concerned.Contains(r.Id) && !r.Passed).Select(r => r.Id));
+            Evaluate(lab14.Expectations, output).Where(r => concerned.Contains(r.Id) && !r.Passed).Select(r => r.Id));
     }
 
     // Standard output of the Lab15 solution (real run).
@@ -2643,8 +2848,8 @@ public class OutputAnalyzerTests
     {
         LabDefinition lab15 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab15")!;
 
-        Assert.All(OutputAnalyzer.EvaluateExpectations(lab15.Expectations, Lab15SolutionOutput), r => Assert.True(r.Passed, r.Id));
-        Assert.Equal(["config"], OutputAnalyzer.EvaluateExpectations(lab15.Expectations, Lab15StartOutput).Where(r => r.Passed).Select(r => r.Id));
+        Assert.All(Evaluate(lab15.Expectations, Lab15SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(["config"], Evaluate(lab15.Expectations, Lab15StartOutput).Where(r => r.Passed).Select(r => r.Id));
     }
 
     [Fact]
@@ -2662,6 +2867,93 @@ public class OutputAnalyzerTests
 
         Assert.Equal(
             ["scenario1-load", "scenario1-resource", "scenario3-rejected"],
-            OutputAnalyzer.EvaluateExpectations(lab15.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+            Evaluate(lab15.Expectations, output).Where(r => !r.Passed).Select(r => r.Id));
+    }
+
+
+    private static readonly Dictionary<string, string[]> SolutionOutputs = new()
+    {
+        ["azureopenai-lab01"] = Lab01SolutionOutput,
+        ["azureopenai-lab02"] = Lab02SolutionOutput,
+        ["azureopenai-lab03"] = Lab03SolutionOutput,
+        ["azureopenai-lab04"] = Lab04SolutionOutput,
+        ["azureopenai-lab05"] = Lab05SolutionOutput,
+        ["azureopenai-lab06-client"] = Lab06ClientSolutionOutput,
+        ["azureopenai-lab06-server"] = Lab06ServerSolutionOutput,
+        ["azureopenai-lab07"] = Lab07SolutionOutput,
+        ["azureopenai-lab08"] = Lab08SolutionOutput,
+        ["azureopenai-lab09"] = Lab09SolutionOutput,
+        ["azureopenai-lab10"] = Lab10SolutionOutput,
+        ["azureopenai-lab11"] = Lab11SolutionOutput,
+        ["azureopenai-lab12"] = Lab12SolutionOutput,
+        ["azureopenai-lab13"] = Lab13SolutionOutput,
+        ["azureopenai-lab14"] = Lab14SolutionOutput,
+        ["azureopenai-lab15"] = Lab15SolutionOutput,
+        ["multiagent-lab01"] = MultiAgentLab01SolutionOutput,
+    };
+
+    public static TheoryData<string> CatalogLabs() => [.. LabCatalogTests.LoadRealCatalog().Labs.Select(lab => lab.Id)];
+
+    /// <summary>
+    /// The checks judge what a scenario does, not how it presents it: they still pass when the solution prints none of the texts written
+    /// in its scenario blocks (headers, titles, labels, questions, separators), as when a learner writes them differently or not at all.
+    /// Only the token usage lines keep their wording: "Input tokens: N" is the convention the dashboard reads.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(CatalogLabs))]
+    public void Every_check_passes_on_the_solution_output_without_its_presentation(string labId)
+    {
+        LabCatalog catalog = LabCatalogTests.LoadRealCatalog();
+        LabDefinition lab = catalog.Find(labId)!;
+        string[] output = WithoutPresentation(WithMarkers(SolutionOutputs[labId]), File.ReadAllText(catalog.ProgramPath(lab, RunTarget.Solution)));
+
+        Assert.All(OutputAnalyzer.EvaluateExpectations(lab.Expectations, output), r => Assert.True(r.Passed, r.Id));
+    }
+
+    /// <summary>
+    /// The output without the texts the scenario blocks of <paramref name="program"/> write themselves: the fixed parts of the string
+    /// literals of their Write calls that read as text (a space or a final colon), removed from every line printed in a scenario,
+    /// then the lines left empty. Data the blocks only pass on (a prompt, a tool description) stays: provided code prints it.
+    /// </summary>
+    internal static string[] WithoutPresentation(IReadOnlyList<string> output, string program)
+    {
+        IEnumerable<string> writeCalls = System.Text.RegularExpressions.Regex.Matches(program, @"(?ms)^\s*#region Scenario \d+:.*?^\s*#endregion\b")
+            .SelectMany(region => region.Value.Split('\n'))
+            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal))
+            .Select(line => System.Text.RegularExpressions.Regex.Match(line, @"\bWrite\w*\((.*)$"))
+            .Where(call => call.Success)
+            .Select(call => call.Groups[1].Value);
+        string[] texts = writeCalls
+            .SelectMany(call => System.Text.RegularExpressions.Regex.Matches(call, @"\$?@?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value))
+            .SelectMany(literal => System.Text.RegularExpressions.Regex.Split(literal, @"\{[^{}]*\}|\\n"))
+            .Select(text => text.Replace("\\\"", "\"").Trim())
+            .Where(text => text.Length >= 4 && text.Any(char.IsLetter) && (text.Contains(' ') || text.EndsWith(':')))
+            .Where(text => !System.Text.RegularExpressions.Regex.IsMatch(text, @"(?i)\btokens?\b|token usage"))
+            .Distinct()
+            .OrderByDescending(text => text.Length)
+            .ToArray();
+
+        List<string> result = [];
+        bool inScenario = false;
+        bool companion = false;
+        foreach (string line in output)
+        {
+            inScenario |= CommonUtilities.LabScenarios.TryParseMarker(line, out _);
+            // The output of a companion client follows the lab's, from its own configuration line: the reference solution, kept as is.
+            companion |= inScenario && line.StartsWith("Endpoint:", StringComparison.Ordinal);
+            if (!inScenario || companion || CommonUtilities.LabScenarios.IsSelectionLine(line))
+            {
+                result.Add(line);
+                continue;
+            }
+
+            string kept = texts.Aggregate(line, (current, text) => current.Replace(text, "", StringComparison.Ordinal));
+            if (!string.IsNullOrWhiteSpace(kept) && !System.Text.RegularExpressions.Regex.IsMatch(kept, @"^\s*-{10,}\s*$"))
+            {
+                result.Add(kept);
+            }
+        }
+
+        return [.. result];
     }
 }

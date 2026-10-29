@@ -215,7 +215,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (for example `[3]`).
+To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## How skills work
 

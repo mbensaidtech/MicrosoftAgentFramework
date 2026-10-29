@@ -16,11 +16,16 @@ using static AIAgentWithThreads.SessionConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3] or [1, 2, 3] to run specific scenarios (scenario 3 needs MongoDB, see the README)
-HashSet<int> scenariosToRun = [1, 2, 3];
+// dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
+// dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
+// dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
+// dotnet run -- --scenarios all       -> every scenario, implemented or not
+// dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+// Scenario 3 needs MongoDB (see the README).
+ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
-bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
 // The same agent and the same conversation in every scenario: only where the chat history is kept, and how much of it, changes.
 const string AgentName = "GlobalAgent";

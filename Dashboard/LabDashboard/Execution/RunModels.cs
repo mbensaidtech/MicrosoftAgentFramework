@@ -19,6 +19,31 @@ public sealed record LogLine(string Stream, string Text)
 
 public sealed record ExpectationResult(string Id, string Description, bool Passed);
 
+public enum ScenarioStatus
+{
+    Passed,
+    Failed,
+
+    /// <summary>Selected, but the program stopped (or was stopped) before it started.</summary>
+    NotRun,
+
+    /// <summary>Not selected for this run.</summary>
+    Skipped
+}
+
+/// <summary>
+/// The result of one scenario of the program in a run: its status, the ids of its checks evaluated in the run,
+/// and the errors of the run when the program stopped during this scenario.
+/// </summary>
+public sealed record ScenarioResult(int Number, string Title, ScenarioStatus Status)
+{
+    public IReadOnlyList<string> Checks { get; init; } = [];
+    public IReadOnlyList<string> Errors { get; init; } = [];
+}
+
+/// <summary>The scenarios of the program when the run started, and those it runs (passed to the program with --scenarios).</summary>
+public sealed record ScenarioRun(IReadOnlyList<CommonUtilities.LabScenario> Scenarios, IReadOnlyList<int> Selected);
+
 /// <summary>One token usage block printed by the exercise (e.g. "Token Usage:" followed by the counts).</summary>
 public sealed record TokenUsageReport(string Label, long? Input, long? Output, long? Reasoning, long? Total);
 
@@ -48,6 +73,12 @@ public sealed record RunRecord
     public long? RunDurationMs { get; init; }
     public int? ExitCode { get; init; }
     public IReadOnlyList<ExpectationResult> Checks { get; init; } = [];
+
+    /// <summary>
+    /// Every scenario of the program, selected or not (<see cref="ScenarioStatus.Skipped"/>). Null for a run without a scenario
+    /// selection (a run made before the selection existed, or a lab without scenarios): every check was evaluated.
+    /// </summary>
+    public IReadOnlyList<ScenarioResult>? Scenarios { get; init; }
     public TokenUsageSummary? TokenUsage { get; init; }
     public IReadOnlyList<string> Errors { get; init; } = [];
     public IReadOnlyList<string> BuildWarnings { get; init; } = [];

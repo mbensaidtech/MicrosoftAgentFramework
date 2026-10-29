@@ -166,7 +166,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (for example `[5]`).
+To run only some scenarios: `dotnet run -- --scenarios 5` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## Key Concepts
 
@@ -299,7 +299,7 @@ Answers vary from one run to another.
 | `401 Unauthorized` with an API key | Check the key (user secret `AzureOpenAI:APIKey`) and that it belongs to the resource of the endpoint |
 | `401` / `403` with Entra ID | Run `az login` and make sure your identity has the **Cognitive Services OpenAI User** role on the resource |
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
-| Scenario 6 fails with `404` or *"unsupported"* | The deployment (model or region) does not support the Responses API: use a deployment that supports it, or remove `6` from `scenariosToRun` |
+| Scenario 6 fails with `404` or *"unsupported"* | The deployment (model or region) does not support the Responses API: use a deployment that supports it, or run the other scenarios only: `dotnet run -- --scenarios 1,2,3,4,5` |
 
 ## Provided Files
 

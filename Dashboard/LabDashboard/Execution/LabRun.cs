@@ -15,10 +15,11 @@ public sealed class LabRun
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private TaskCompletionSource _changed = NewSignal();
 
-    public LabRun(LabDefinition lab, RunTarget target)
+    public LabRun(LabDefinition lab, RunTarget target, ScenarioRun? scenarios = null)
     {
         Lab = lab;
         Target = target;
+        Scenarios = scenarios;
     }
 
     public string Id { get; } = Guid.NewGuid().ToString("N")[..12];
@@ -26,6 +27,9 @@ public sealed class LabRun
     public LabDefinition Lab { get; }
 
     public RunTarget Target { get; }
+
+    /// <summary>The scenario selection of the run; null runs the program without one (every check is evaluated).</summary>
+    public ScenarioRun? Scenarios { get; }
 
     public DateTimeOffset StartedAt { get; } = DateTimeOffset.Now;
 

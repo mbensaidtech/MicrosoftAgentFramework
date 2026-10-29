@@ -217,7 +217,7 @@ cd Solution
 dotnet run
 ```
 
-To run only one scenario, edit `scenariosToRun` at the top of `Program.cs` (for example `[2]`). The output is long on purpose: every request and every response is printed in full.
+To run only one scenario: `dotnet run -- --scenarios 2` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). The output is long on purpose: every request and every response is printed in full.
 
 ## How it works
 

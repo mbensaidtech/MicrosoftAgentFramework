@@ -180,7 +180,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (for example `[4]`).
+To run only some scenarios: `dotnet run -- --scenarios 4` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## How function calling works
 

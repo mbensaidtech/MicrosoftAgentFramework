@@ -621,6 +621,21 @@
           </div>
         </div>
 
+        <!-- Scenarios of the project to run, read from its Program.cs: only the ticked ones run (dotnet run -- --scenarios ...). -->
+        <fieldset class="scenarios" data-bind="scenarios" hidden>
+          <legend class="sr-only" data-i18n="scenarios.legend"></legend>
+          <div class="scenarios-head">
+            <span class="scenarios-title" data-i18n="scenarios.title"></span>
+            <span class="mono scenarios-count" data-bind="scenarioCount" aria-live="polite"></span>
+            <div class="push btns">
+              <button class="btn btn-sm" type="button" data-action="select-implemented" data-i18n="scenarios.selectImplemented"></button>
+              <button class="btn btn-sm" type="button" data-action="select-none" data-i18n="scenarios.selectNone"></button>
+            </div>
+          </div>
+          <ul class="scenario-list" data-bind="scenarioList"></ul>
+          <p class="hint scenarios-hint" data-bind="scenarioHint"></p>
+        </fieldset>
+
         <ol class="steps" aria-label="Phases">
           <li class="step" data-phase="build"><span class="sn mono">01</span><b data-i18n="steps.build"></b><span class="st mono"></span></li>
           <li class="step" data-phase="run"><span class="sn mono">02</span><b data-i18n="steps.run"></b><span class="st mono"></span></li>

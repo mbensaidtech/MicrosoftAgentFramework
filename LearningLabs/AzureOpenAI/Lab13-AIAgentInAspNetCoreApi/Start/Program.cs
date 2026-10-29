@@ -24,12 +24,16 @@ using static AIAgentWebApi.ApiConsole;
 // ============================================
 // SCENARIO SELECTION - Choose which scenarios to run
 // ============================================
-// Set to: [1], [2], [3], [4] or [1, 2, 3, 4] to run specific scenarios (3 and 4 continue the conversation of scenario 2).
+// dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
+// dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
+// dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
+// dotnet run -- --scenarios all       -> every scenario, implemented or not
+// dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
 // Run with "dotnet run -- --serve" to keep the API running and call it yourself (curl, REST client).
-HashSet<int> scenariosToRun = [1, 2, 3, 4];
+ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
-bool ShouldRunScenario(int scenario) => scenariosToRun.Count == 0 || scenariosToRun.Contains(scenario);
+bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
 #region Setup: Configuration and Client Initialization
 
@@ -147,6 +151,7 @@ if (ShouldRunScenario(2))
 #endregion
 
 #region Scenario 3: Alice - the conversation continues in another request
+// Requires scenario 2: Alice continues the conversation she started there.
 
 if (ShouldRunScenario(3))
 {
@@ -160,6 +165,7 @@ if (ShouldRunScenario(3))
 #endregion
 
 #region Scenario 4: Bob - the same conversation id, another user
+// Requires scenario 2: Bob sends the conversation id of Alice's conversation.
 
 if (ShouldRunScenario(4))
 {

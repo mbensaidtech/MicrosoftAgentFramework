@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using CommonUtilities;
 using LabDashboard.Catalog;
 using LabDashboard.History;
 using LabDashboard.Reporting;
@@ -41,8 +42,11 @@ public sealed class LabRunner(
 
     public LabRun? Find(string runId) => _runs.GetValueOrDefault(runId);
 
-    /// <summary>Starts a run unless another one is in progress (builds share CommonUtilities, so runs are serialized).</summary>
-    public bool TryStart(LabDefinition lab, RunTarget target, out LabRun run)
+    /// <summary>
+    /// Starts a run unless another one is in progress (builds share CommonUtilities, so runs are serialized).
+    /// With <paramref name="scenarios"/>, the program runs the selected scenarios only (<c>-- --scenarios 1,3</c>, as on the command line).
+    /// </summary>
+    public bool TryStart(LabDefinition lab, RunTarget target, out LabRun run, ScenarioRun? scenarios = null)
     {
         lock (_gate)
         {
@@ -52,7 +56,7 @@ public sealed class LabRunner(
                 return false;
             }
 
-            run = new LabRun(lab, target);
+            run = new LabRun(lab, target, scenarios);
             _active = run;
             _runs[run.Id] = run;
             TrimCompletedRuns();
@@ -90,6 +94,14 @@ public sealed class LabRunner(
                 : (RunStatus.TimedOut, null, $"Timed out after {run.Lab.TimeoutSeconds} s");
             collector.System(summary);
             record = CreateRecord(run, status, stage, summary, collector);
+            // The scenarios that ran before keep their result; the one in progress is the one that timed out (or was cancelled).
+            if (run.Scenarios is { } selection && collector.RunStdout.Count > 0)
+            {
+                (IReadOnlyList<ExpectationResult> checks, IReadOnlyList<ScenarioResult> scenarios) = OutputAnalyzer.EvaluateScenarios(
+                    run.Lab.Expectations, selection, OutputAnalyzer.Split(collector.RunStdout),
+                    run.CancelRequested ? ScenarioEnd.Cancelled : ScenarioEnd.Stopped, [summary]);
+                record = record with { Checks = checks, Scenarios = scenarios };
+            }
         }
         catch (Exception ex)
         {
@@ -221,20 +233,25 @@ public sealed class LabRunner(
         long runMs = phase.ElapsedMilliseconds;
         collector.Phase("run", outcome.FailureStage is null && outcome.ExitCode == 0 ? "completed" : "failed");
 
-        // 3. Checks on the standard output (of the lab, then of a companion client)
+        // 3. Checks on the standard output of each scenario (the whole output, with a companion client, for the checks of the whole run)
         collector.Phase("checks", "started");
-        IReadOnlyList<string> stdout = run.Lab.Companion?.Role == CompanionRole.Client
-            ? [.. collector.RunStdout, .. collector.CompanionStdout]
-            : collector.RunStdout;
-        IReadOnlyList<ExpectationResult> checks = OutputAnalyzer.EvaluateExpectations(run.Lab.Expectations, stdout);
+        IReadOnlyList<string> companionStdout = run.Lab.Companion?.Role == CompanionRole.Client ? collector.CompanionStdout : [];
+        RunOutput output = OutputAnalyzer.Split(collector.RunStdout, companionStdout);
         IReadOnlyList<string> runtimeErrors = outcome.Errors ?? OutputAnalyzer.RuntimeErrors(collector.RunStderr);
+        (IReadOnlyList<ExpectationResult> checks, IReadOnlyList<ScenarioResult>? scenarios) = run.Scenarios is { } selection
+            ? OutputAnalyzer.EvaluateScenarios(run.Lab.Expectations, selection, output,
+                outcome.FailureStage is null && outcome.ExitCode == 0 ? ScenarioEnd.Exited : ScenarioEnd.Stopped, runtimeErrors)
+            : (OutputAnalyzer.EvaluateExpectations(run.Lab.Expectations, output), null);
         int failedChecks = checks.Count(c => !c.Passed);
+        // A selected scenario that never started although the program exited normally (its block was removed, or never reached).
+        List<int> notRun = scenarios?.Where(s => s.Status == ScenarioStatus.NotRun).Select(s => s.Number).ToList() ?? [];
 
         (RunStatus status, string? stage, string summary) = (outcome, failedChecks) switch
         {
             ({ FailureStage: { } failureStage }, _) => (RunStatus.Failed, failureStage, $"{outcome.Summary}: {runtimeErrors.FirstOrDefault() ?? "no error output"}"),
             ({ ExitCode: not 0 }, _) => (RunStatus.Failed, "run", $"Exited with code {outcome.ExitCode}: {runtimeErrors.FirstOrDefault() ?? "no error output"}"),
             (_, > 0) => (RunStatus.Failed, "checks", $"{failedChecks} of {checks.Count} check(s) failed"),
+            _ when notRun.Count > 0 => (RunStatus.Failed, "checks", $"Scenario {string.Join(", ", notRun)} did not run"),
             _ => (RunStatus.Passed, (string?)null, checks.Count == 0 ? "Exited with code 0" : $"All {checks.Count} checks passed"),
         };
         collector.Phase("checks", status == RunStatus.Passed ? "completed" : "failed");
@@ -245,7 +262,8 @@ public sealed class LabRunner(
             RunDurationMs = runMs,
             ExitCode = outcome.ExitCode,
             Checks = checks,
-            TokenUsage = OutputAnalyzer.ParseTokenUsage(stdout),
+            Scenarios = scenarios,
+            TokenUsage = OutputAnalyzer.ParseTokenUsage([.. collector.RunStdout, .. companionStdout]),
             Errors = runtimeErrors,
             BuildWarnings = warnings,
         };
@@ -261,12 +279,19 @@ public sealed class LabRunner(
         LabRun run, string project, string projectDirectory, string dotnet, Collector collector, CancellationToken cancellationToken,
         IReadOnlyDictionary<string, string>? environment = null)
     {
-        collector.System($"$ dotnet run --project {Relative(project)} --no-build");
+        collector.System($"$ dotnet run --project {Relative(project)} --no-build{ScenarioArgumentsText(run)}");
         InteractiveInput? interactive = run.Input is null ? null : new InteractiveInput(run.Input, ResolveInputHook());
         int exitCode = await ProcessRunner.RunAsync(
-            dotnet, ["run", "--project", project, "--no-build"], projectDirectory, collector.ForPhase("run"), cancellationToken, interactive, environment);
+            dotnet, ["run", "--project", project, "--no-build", .. ScenarioArguments(run)], projectDirectory, collector.ForPhase("run"),
+            cancellationToken, interactive, environment);
         return new RunOutcome(exitCode);
     }
+
+    /// <summary>The selection given to the lab program, after <c>--</c>: the same option a developer types (<see cref="LabScenarios"/>).</summary>
+    private static IReadOnlyList<string> ScenarioArguments(LabRun run) =>
+        run.Scenarios is { } selection ? ["--", .. LabScenarios.FormatArguments(selection.Selected)] : [];
+
+    private static string ScenarioArgumentsText(LabRun run) => ScenarioArguments(run) is { Count: > 0 } args ? " " + string.Join(' ', args) : "";
 
     /// <summary>The lab calls a server: start the companion server, wait until it is ready, run the lab, then stop the server.</summary>
     private async Task<RunOutcome> RunWithCompanionServerAsync(
@@ -313,9 +338,9 @@ public sealed class LabRunner(
         TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        collector.System($"$ dotnet run --project {Relative(project)} --no-build   (server, stopped after the companion client{EnvironmentText(companion)})");
+        collector.System($"$ dotnet run --project {Relative(project)} --no-build{ScenarioArgumentsText(run)}   (server, stopped after the companion client{EnvironmentText(companion)})");
         Task<int> server = ProcessRunner.RunAsync(
-            dotnet, ["run", "--project", project, "--no-build"], projectDirectory,
+            dotnet, ["run", "--project", project, "--no-build", .. ScenarioArguments(run)], projectDirectory,
             collector.ForPhase("run", line => { if (readyPattern.IsMatch(line)) { ready.TrySetResult(); } }),
             stop.Token, environment: companion.Environment);
         try
@@ -373,6 +398,7 @@ public sealed class LabRunner(
     private static string EnvironmentText(LabCompanion companion) =>
         companion.Environment.Count == 0 ? "" : ", " + string.Join(", ", companion.Environment.Select(e => $"{e.Key}={e.Value}"));
 
+    /// <summary>A record whose selected scenarios did not run (the run stopped before the program): see the callers for the others.</summary>
     private static RunRecord CreateRecord(LabRun run, RunStatus status, string? failureStage, string summary, Collector collector) => new()
     {
         RunId = run.Id,
@@ -383,6 +409,9 @@ public sealed class LabRunner(
         Summary = summary,
         StartedAt = run.StartedAt,
         DurationMs = (long)run.Elapsed.TotalMilliseconds,
+        Scenarios = run.Scenarios?.Scenarios
+            .Select(s => new ScenarioResult(s.Number, s.Title, run.Scenarios.Selected.Contains(s.Number) ? ScenarioStatus.NotRun : ScenarioStatus.Skipped))
+            .ToList(),
         Log = collector.Log,
     };
 

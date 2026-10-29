@@ -192,7 +192,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs`. Scenarios 3 and 4 continue the conversation of scenario 2: run them with it.
+To run only some scenarios: `dotnet run -- --scenarios 1` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). Scenarios 3 and 4 continue the conversation of scenario 2: `--scenarios 3` runs scenario 2 with it.
 
 ### Step 5 (optional): Call the API yourself
 

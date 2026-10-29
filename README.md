@@ -141,7 +141,28 @@ To only check that your code compiles: `dotnet build LearningLabs/AzureOpenAI/La
 > **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal (it listens on `http://localhost:5000` until `Ctrl+C`), then `Lab06_A2AClient` in another.
 > Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.26.0): a migrated client cannot call an old v0.3 server.
 
-#### 3. Read the result
+#### 3. Choose the scenarios to run
+
+Without option, `dotnet run` runs the **implemented** scenarios only. A scenario is *not implemented* while the code of its `#region Scenario N: …` block of `Program.cs`, or the code before the first scenario (the setup), is still the code delivered with the exercise. Comments and layout do not count: keeping or removing the `TODO` comments changes nothing, writing code does. The delivered exercise (`Start/`) therefore runs no scenario until you write one; the reference solution runs them all. The delivered code is identified by the `exercise-fingerprints.json` file of the lab (fingerprints of its code, not a copy).
+
+Choose the scenarios after `--` (from the project folder, or with `--project` as above):
+
+| Command | Runs |
+|---------|------|
+| `dotnet run` | The implemented scenarios (never a scenario whose code is still the delivered one) |
+| `dotnet run -- --scenarios 2` | Scenario 2 only (`--scenario 2` works too) |
+| `dotnet run -- --scenarios 1,3` | Scenarios 1 and 3 |
+| `dotnet run -- --scenarios implemented` | Every implemented scenario, explicitly (same as no option) |
+| `dotnet run -- --scenarios all` | Every scenario, implemented or not |
+| `dotnet run -- --list-scenarios` | Nothing: lists the scenarios of the lab, implemented or not, and what `dotnet run` would run |
+
+- A scenario you name runs even if it is not implemented (you asked for it: the program says so). An unknown number stops the program with the list of the scenarios (exit code 2).
+- Some scenarios need another one in the same run, declared by a `// Requires scenario N` comment in their block: Lab07 scenarios 2–4 need scenario 1 (it fills the in-memory vector store), Lab13 scenarios 3 and 4 need scenario 2 (same conversation). Naming them adds the scenario they require; by default, a scenario whose required scenario is not implemented is left out.
+- The program prints what it runs (`>>> Scenarios to run: 1, 3 (--scenarios 1,3)`) and a line when each scenario starts (`>>> Running scenario 3: …`).
+
+The selection rules live in `CommonUtilities` (`LabScenarios.cs`, `ScenarioSelection.cs`), and the **dashboard runs the lab with the same option** (`dotnet run --no-build -- --scenarios 1,3`): both modes always run the same scenarios.
+
+#### 4. Read the result
 
 The program prints each scenario (`=== Scenario 1: … ===`), the agent answers and, in most labs, the token usage (`Input tokens: …`).
 Compare it with the output of `Solution/`. Stop a running lab with `Ctrl+C`.
@@ -201,8 +222,9 @@ Switching a card back and forth never loses your own values. Everything is writt
 In the **Run** tab:
 
 1. Choose the project: **My exercise** (`Start/`) or **Reference solution** (`Solution/`).
-2. Click **Run**. The dashboard runs `dotnet build`, then `dotnet run --no-build` — the same commands as the CLI.
-3. Follow the steps **Build → Run → Checks**. **Cancel** stops the run (the whole process tree is killed); a run also stops when the lab timeout is reached.
+2. Tick the **Scenarios** to run. The list is read from the `Program.cs` of the project (again when you come back to the page): each scenario shows *Not implemented* while its code is still the delivered one (see [Choose the scenarios to run](#3-choose-the-scenarios-to-run)), its last result (*Passed*, *Failed*, *Not tested*) and the scenario it requires. By default, the implemented scenarios **not passed yet** are ticked: a scenario already passed, or not implemented, only runs if you tick it. **Select implemented** ticks every implemented scenario in one click, **Clear** unticks them all; ticking a scenario also ticks the scenario it requires.
+3. Click **Run**. The dashboard runs `dotnet build`, then `dotnet run --no-build -- --scenarios <ticked>` — the same commands as the CLI (shown under the list).
+4. Follow the steps **Build → Run → Checks**. **Cancel** stops the run (the whole process tree is killed); a run also stops when the lab timeout is reached.
 
 Only one run can be in progress at a time.
 
@@ -214,10 +236,14 @@ Only one run can be in progress at a time.
 |-------|---------------|
 | **Output** terminal | The program output (stdout/stderr), live; the console spinner is shown as a status line. **Copy output** copies it. |
 | **Verdict** | **Passed** when the build succeeds, the exit code is 0 **and** every check matches the output; otherwise **Failed** with the reason (build errors, exit code, failed checks, *Timed out*, *Cancelled*), plus the build/run durations and the exit code. |
-| **Checks** | Each expected behavior of the lab (e.g. *"Scenario 2 answered"*) and its status. The delivered exercise fails them until its TODOs are completed. |
+| **Checks** | Grouped by scenario: the checks of the whole run (configuration…), then each scenario that ran with its status (*Passed*, *Failed*, *Not run* when the program stopped before it), its checks and the error raised while it was running. Only the checks of the ticked scenarios are evaluated, each on the output of its own scenario. The delivered exercise fails them until its TODOs are completed. |
 | **Errors / Build warnings** | Compiler errors (`error CS…`) or the program's stderr. A missing Azure OpenAI setting links to the settings form. |
 | **Token usage** | Input / output / reasoning / total tokens per scenario, as printed by the lab; *Not available* when the lab prints none. No cost estimate. |
-| **History** tab | Past runs, stored in `Dashboard/.data/history.json` (git-ignored). |
+| **History** tab | Past runs and the scenarios they were limited to, stored in `Dashboard/.data/history.json` (git-ignored). |
+
+An exercise is **Completed** once every scenario passed, in one run or across several: you never have to run the scenarios you already validated again.
+
+**How a scenario is judged.** The checks look at what the scenario does, not at how it presents it: the data only a working implementation can produce (the value a tool returns, an identifier it generates, a fact of the knowledge base, the token counts), and the lines written by the helpers the exercise provides (`WriteRestaurant`, `WriteToolCalls`, `WriteHotels`…: call them as the TODO hints say, they show that the typed object exists). Each check only reads the output of its own scenario, delimited by the line the scenario selection prints when the scenario starts. The scenario header (`=== Scenario 4: … ===`), the separators, the titles and the labels you write yourself are never required: you can rename, move or remove them. The token usage lines keep their wording (`Input tokens: 56`): the dashboard reads them.
 
 The API key never appears in the output, the history or a copied output: it is replaced by `••••`.
 

@@ -277,7 +277,7 @@ dotnet run
 ```
 
 Scenario 2 waits for your messages: tell the agent something new about you (*"I play the piano every evening"*), then an empty line or `exit`.
-Run the lab again with `scenariosToRun = [2]` at the top of `Program.cs`: the agent still knows it — the memories are in MongoDB, not in the process. (Scenario 1 clears the memories of the user at each run.)
+Run the lab again with `dotnet run -- --scenarios 2`: the agent still knows it — the memories are in MongoDB, not in the process. (Scenario 1 clears the memories of the user at each run.)
 
 ## How an AIContextProvider works
 

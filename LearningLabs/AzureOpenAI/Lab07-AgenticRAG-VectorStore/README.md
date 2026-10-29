@@ -143,7 +143,7 @@ TODO 1 to 3 are the same as in Lab 01.
 
 #### Scenario 1: Fill the vector store with the FAQ
 
-The store is in memory: it starts empty at each run, so scenario 1 must run before the others (see `scenariosToRun` at the top of the file).
+The store is in memory: it starts empty at each run, so scenario 1 must run before the others (each of them declares `// Requires scenario 1`: `--scenarios 3` also runs scenario 1).
 
 | TODO | Description | Hints |
 |------|-------------|-------|
@@ -200,7 +200,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios, edit `scenariosToRun` at the top of `Program.cs` (for example `[1, 3]`). Keep scenario 1: it fills the vector store.
+To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). Scenario 1, which fills the vector store, runs with it.
 
 ## How the two RAG approaches work
 

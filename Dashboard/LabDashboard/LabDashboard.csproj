@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The scenario selection rules of the labs (CommonUtilities): the dashboard compiles the same file, it never has its own copy. -->
+    <Compile Include="..\..\CommonUtilities\LabScenarios.cs" Link="Catalog\LabScenarios.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="LabDashboard.Tests" />
   </ItemGroup>
 

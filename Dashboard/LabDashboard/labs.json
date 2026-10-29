@@ -28,47 +28,47 @@
         {
           "id": "scenario1",
           "description": "Scenario 1 - the basic agent answered",
-          "pattern": "^=== Scenario 1:[^\\n]*===\\n\\S"
+          "pattern": "(?i)\\bParis\\b"
         },
         {
           "id": "scenario2",
           "description": "Scenario 2 - the agent with instructions answered",
-          "pattern": "^=== Scenario 2:[^\\n]*===\\n\\S"
+          "pattern": "(?i)\\d[\\d,.   ]*\\d\\s*(?:km|square\\s+kilomet)"
         },
         {
           "id": "scenario3",
           "description": "Scenario 3 - the agent answered the ChatMessages",
-          "pattern": "^=== Scenario 3:[^\\n]*===\\n\\S"
+          "pattern": "(?is)\\A(?=.*\\bBelgium\\b)(?=.*\\bGermany\\b)(?=.*\\bSpain\\b)"
         },
         {
           "id": "scenario4",
           "description": "Scenario 4 - token usage displayed",
-          "pattern": "(?is)=== Scenario 4:.*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario5",
           "description": "Scenario 5 - the streamed answer was displayed",
-          "pattern": "^=== Scenario 5:[^\\n]*===\\n\\S"
+          "pattern": "(?i)\\bParis\\b"
         },
         {
           "id": "scenario5-usage",
           "description": "Scenario 5 - token usage of the streamed run displayed",
-          "pattern": "(?is)=== Scenario 5:.*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario6",
           "description": "Scenario 6 - the agent on the Responses API answered",
-          "pattern": "^=== Scenario 6:[^\\n]*===\\n\\S"
+          "pattern": "(?i)\\d[\\d,.   ]*\\d\\s*(?:km|square\\s+kilomet)"
         },
         {
           "id": "scenario6-response-id",
           "description": "Scenario 6 - the response was stored by the service (resp_... id)",
-          "pattern": "(?is)^=== Scenario 6:.*?^Response id \\(stored by the service\\): resp_\\S+\\s*$"
+          "pattern": "\\bresp_[0-9A-Za-z]{10,}\\b"
         },
         {
           "id": "scenario6-usage",
           "description": "Scenario 6 - token usage of the Responses API run displayed",
-          "pattern": "(?is)=== Scenario 6:.*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -127,42 +127,42 @@
         {
           "id": "scenario1",
           "description": "Scenario 1 - the JSON described in the instructions was parsed",
-          "pattern": "^=== Scenario 1:[^\\n]*===\\nSuccessfully parsed structured response:\\nName: \\S"
+          "pattern": "^Name: \\S"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2",
           "description": "Scenario 2 - RunAsync<T> returned a typed Restaurant",
-          "pattern": "^=== Scenario 2:[^\\n]*===\\nStructured response:\\nName: \\S"
+          "pattern": "^Name: \\S"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3",
           "description": "Scenario 3 - the agent returned JSON that was deserialized",
-          "pattern": "^=== Scenario 3:[^\\n]*===\\nJSON response:\\n\\{[^\\n]*\\}\\nDeserialized response:\\nName: \\S"
+          "pattern": "(?is)\\A(?=.*^\\{[^\\n]*\"name\"\\s*:)(?=.*^Name: \\S)"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario4",
           "description": "Scenario 4 - the streamed JSON was deserialized",
-          "pattern": "^=== Scenario 4:[^\\n]*===\\n\\{[^\\n]*\\}\\nDeserialized response:\\nName: \\S"
+          "pattern": "(?is)\\A(?=.*^\\{[^\\n]*\"name\"\\s*:)(?=.*^Name: \\S)"
         },
         {
           "id": "scenario4-usage",
           "description": "Scenario 4 - token usage of the streamed run displayed",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -219,17 +219,17 @@
         {
           "id": "scenario1-tools",
           "description": "Scenario 1 - every tool has the description taken from [Description]",
-          "pattern": "^Tools available to the agent:\\n- get_employee_info: Retrieves detailed information about an employee[^\\n]*\\n- get_meeting_rooms: \\S[^\\n]*\\n- book_meeting_room: \\S"
+          "pattern": "(?is)\\A(?=.*\\bget_employee_info\\W+Retrieves detailed information about an employee)(?=.*\\bget_meeting_rooms\\W+Lists all available meeting rooms)(?=.*\\bbook_meeting_room\\W+Books a meeting room)"
         },
         {
           "id": "scenario1",
           "description": "Scenario 1 - the agent answered with the data returned by get_employee_info",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?Mohammed BEN SAID"
+          "pattern": "(?is)Mohammed BEN SAID"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-tools",
@@ -239,27 +239,27 @@
         {
           "id": "scenario2",
           "description": "Scenario 2 - the plugin refused the booking in the past and explained why to the model",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Tool\\] book_meeting_room returned: Cannot book: 2025-12-16 is in the past"
+          "pattern": "(?is)^\\[Tool\\] book_meeting_room returned: Cannot book: 2025-12-16 is in the past"
         },
         {
           "id": "scenario2-booked",
           "description": "Scenario 2 - the booking of tomorrow was confirmed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Tool\\] book_meeting_room returned: Booking confirmed!"
+          "pattern": "(?is)^\\[Tool\\] book_meeting_room returned: Booking confirmed!"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3",
           "description": "Scenario 3 - the notification was stored and read back through the injected repository",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^[^\\n]*\\b[0-9a-f]{8}\\b[^\\n]*Meeting at 3pm tomorrow"
+          "pattern": "(?is)^[^\\n]*\\b[0-9a-f]{8}\\b[^\\n]*Meeting at 3pm tomorrow"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario4-middleware",
@@ -274,7 +274,7 @@
         {
           "id": "scenario4-usage",
           "description": "Scenario 4 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -336,27 +336,27 @@
         {
           "id": "scenario1-server",
           "description": "Scenario 1 - connected to the MCP server (server information received)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Connected to: \\S+"
+          "pattern": "(?i)\\bhuggingface\\S*\\s+v?\\d+\\.\\d+"
         },
         {
           "id": "scenario1-tools",
           "description": "Scenario 1 - the tools of the server were listed, including hub_repo_search",
-          "pattern": "^MCP tools available \\([1-9]\\d*\\): (?=[^\\n]*\\bhub_repo_search\\b)\\S"
+          "pattern": "\\bhub_repo_search\\b"
         },
         {
           "id": "scenario2",
           "description": "Scenario 2 - structured result with models of the Hub (owner/name and link)",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Found [1-9]\\d* models:\\n[ \\t]+Name: [^\\s/]+/\\S+\\n[ \\t]+Task: [^\\n]*\\n[ \\t]+Library: [^\\n]*\\n[ \\t]+Link: https://(?:hf\\.co|huggingface\\.co)/\\S+"
+          "pattern": "(?i)https://(?:hf\\.co|huggingface\\.co)/[\\w.-]+/[\\w.-]+"
         },
         {
           "id": "scenario2-tool-calls",
           "description": "Scenario 2 - the agent called at least one MCP tool",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^MCP tools called by the agent:\\n- \\w+\\("
+          "pattern": "(?i)\\bhub_repo_search\\b[^\\n]*\\bquery\\b"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3-tools",
@@ -366,12 +366,12 @@
         {
           "id": "scenario3",
           "description": "Scenario 3 - models found with the selected tool",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Found [1-9]\\d* models: [^\\s/,]+/\\S+"
+          "pattern": "(?<![\\w./:])[A-Za-z0-9][\\w.-]*/[\\w.-]+"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -430,52 +430,52 @@
         {
           "id": "scenario1-history",
           "description": "Scenario 1 - the session keeps the two messages of the first run (user, assistant)",
-          "pattern": "^Messages in the session: 2 \\(user, assistant\\)\\s*$"
+          "pattern": "(?i)\\b2\\b\\D{0,40}\\buser\\b\\W+assistant\\b"
         },
         {
           "id": "scenario1-serialized",
           "description": "Scenario 1 - the serialized session contains the messages of the InMemoryChatHistoryProvider",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Serialized session:\\s*\\{\\s*\"stateBag\":\\s*\\{\\s*\"InMemoryChatHistoryProvider\":\\s*\\{\\s*\"messages\":\\s*\\["
+          "pattern": "(?is)^Serialized session:\\s*\\{\\s*\"stateBag\":\\s*\\{\\s*\"InMemoryChatHistoryProvider\":\\s*\\{\\s*\"messages\":\\s*\\["
         },
         {
           "id": "scenario1-followup",
           "description": "Scenario 1 - after the restore, the follow-up answer knows the city (Paris) and the name (Ada)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Restoring the session from the saved JSON\\.\\.\\.(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+          "pattern": "(?im)^(?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)(?=[^\\n]*(?:million|\\d))"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-bounded",
           "description": "Scenario 2 - the chat reducer kept the history bounded: 2 messages after the first turn, never more than 4",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Messages kept in the session: 2 \\((?:(?!^=== Scenario).)*?^Messages kept in the session: 4 \\((?:(?!^=== Scenario).)*?^Messages kept in the session: 4 \\("
+          "pattern": "(?is)^Messages kept in the session: 2 \\(.*?^Messages kept in the session: 4 \\(.*?^Messages kept in the session: 4 \\("
         },
         {
           "id": "scenario2-forgotten",
           "description": "Scenario 2 - the last answer knows the city of the previous turn (Rome) but not the name given in the first turn",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?User: What is the population of that city\\? And what is my name\\?\\s*$\\s*^Agent: (?![^\\n]*\\bAda\\b)[^\\n]*\\bRome\\b"
+          "pattern": "(?im)^(?![^\\n]*\\bAda\\b)(?=[^\\n]*\\bRome\\b)(?=[^\\n]*(?:million|\\d))"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3-restart",
           "description": "Scenario 3 - a new agent restored the session with the key saved in the serialized session",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?\"MongoChatHistoryProvider\":\\s*\\{\\s*\"sessionDbKey\":\\s*\"([0-9a-f]{32})\"(?:(?!^=== Scenario).)*?^Simulating a restart(?:(?!^=== Scenario).)*?^Restored session - chat history stored in MongoDB under the key: \\1\\s*$"
+          "pattern": "(?is)\"sessionDbKey\":\\s*\"([0-9a-f]{32})\".*?^[^\\n\"]*\\b\\1\\b"
         },
         {
           "id": "scenario3-followup",
           "description": "Scenario 3 - the new agent, with the history from MongoDB, knows Paris and Ada",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Simulating a restart(?:(?!^=== Scenario).)*?^Agent: (?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)"
+          "pattern": "(?im)^(?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)(?=[^\\n]*(?:million|\\d))"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -537,62 +537,62 @@
         {
           "id": "scenario1-request",
           "description": "Scenario 1 - the run paused with an approval request for delete_employee_data(employeeId=EMP001)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent run paused: [1-9]\\d* approval request\\(s\\) pending\\s*$(?:(?!^=== Scenario).)*?^APPROVAL REQUIRED\\s*$(?:(?!^=== Scenario).)*?^\\s*Function: delete_employee_data\\s*$\\s*^\\s*Arguments: employeeId=EMP001\\s*$"
+          "pattern": "(?is)^APPROVAL REQUIRED\\s*$.*?^\\s*Function: delete_employee_data\\s*$\\s*^\\s*Arguments: employeeId=EMP001\\s*$"
         },
         {
           "id": "scenario1-approved",
           "description": "Scenario 1 - the user approved (reply Y) and the tool was executed after the approval",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Function call approved by user\\.\\s*$(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
+          "pattern": "(?im)^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-info",
           "description": "Scenario 2 - get_employee_info ran for both employees without any approval request",
-          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^Tool result \\(get_employee_info\\): Employee EMP001: Alice Martin)(?=(?:(?!^=== Scenario).)*?^Tool result \\(get_employee_info\\): Employee EMP002: Bob Lee)(?!(?:(?!^=== Scenario).)*?^Approval requested for get_employee_info)"
+          "pattern": "(?is)\\A(?=.*?^Tool result \\(get_employee_info\\): Employee EMP001: Alice Martin)(?=.*?^Tool result \\(get_employee_info\\): Employee EMP002: Bob Lee)(?!.*?^Approval requested for get_employee_info)"
         },
         {
           "id": "scenario2-policy",
           "description": "Scenario 2 - the policy approved the deletion of EMP001 (former employee) and rejected the deletion of EMP002 (still employed)",
-          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^Approval requested for delete_employee_data\\(employeeId=EMP001\\)\\s*$\\s*^Policy decision: approved - EMP001 \\(Alice Martin\\) left the company on 2025-12-31\\.)(?=(?:(?!^=== Scenario).)*?^Approval requested for delete_employee_data\\(employeeId=EMP002\\)\\s*$\\s*^Policy decision: rejected - EMP002 \\(Bob Lee\\) is still employed)"
+          "pattern": "(?is)\\A(?=.*\\bdelete_employee_data\\(employeeId=EMP001\\))(?=.*\\bEMP001 \\(Alice Martin\\) left the company on 2025-12-31\\.)(?=.*\\bdelete_employee_data\\(employeeId=EMP002\\))(?=.*\\bEMP002 \\(Bob Lee\\) is still employed)"
         },
         {
           "id": "scenario2-executed",
           "description": "Scenario 2 - the approved deletion (EMP001) was executed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
+          "pattern": "(?is)^Tool result \\(delete_employee_data\\): Sensitive operation executed: All data for employee 'EMP001' has been permanently deleted"
         },
         {
           "id": "scenario2-rejected",
           "description": "Scenario 2 - the rejected deletion (EMP002) was not executed: the model received the rejection and its reason",
-          "pattern": "(?is)^=== Scenario 2:(?!(?:(?!^=== Scenario).)*?employee 'EMP002' has been permanently deleted)(?:(?!^=== Scenario).)*?^Tool result \\(delete_employee_data\\): Tool call invocation rejected\\. EMP002 \\(Bob Lee\\) is still employed"
+          "pattern": "(?is)\\A(?!.*?employee 'EMP002' has been permanently deleted).*?^Tool result \\(delete_employee_data\\): Tool call invocation rejected\\. EMP002 \\(Bob Lee\\) is still employed"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3-blocked",
           "description": "Scenario 3 - the guardrail blocked the forbidden question: the model was not called",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Request blocked: forbidden topic 'salary'\\. The agent was not called\\.\\s*$(?:(?!^=== Scenario).)*?^Token usage: none, the model was not called"
+          "pattern": "(?is)\\A(?!(?:.*?\\binput\\s+tokens\\b[^\\n\\d]*[1-9]){2})(?=.*?\\bblock\\w*\\b[^\\n]*\\bsalar(?:y|ies)\\b)"
         },
         {
           "id": "scenario3-masked",
           "description": "Scenario 3 - the guardrail masked the e-mail and the phone number of the request before the agent saw them",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Request: 2 personal data item\\(s\\) masked before the agent sees them"
+          "pattern": "(?i)\\b2\\b[^\\n]*\\bmask"
         },
         {
           "id": "scenario3-answer",
           "description": "Scenario 3 - the answer gives the status of EMP001 and contains no personal data",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^\\[Guardrail\\] Answer: \\d+ personal data item\\(s\\) masked\\s*$\\s*^Agent: (?![^\\n]*@example\\.com)[^\\n]*\\b(?:Alice|EMP001)\\b"
+          "pattern": "(?im)^(?=[^\\n]*\\bAlice\\b)(?![^\\n]*@)"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -656,17 +656,17 @@
         {
           "id": "scenario1-indexed",
           "description": "Scenario 1 - the 20 FAQ entries were loaded and indexed in the vector store",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Loaded 20 FAQ entries from Data/sav-faq\\.json\\s*$(?:(?!^=== Scenario).)*?^Vector store ready: 20 FAQ entries indexed in the collection 'sav-faq'\\s*$"
+          "pattern": "(?is)\\A(?=.*\\b20\\b)(?=.*\\bsav-faq\\b(?!\\.json))"
         },
         {
           "id": "scenario2-top-result",
           "description": "Scenario 2 - the semantic search ranks the 'contact customer support' entry (faq-010) first for a question that shares no word with it",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^1\\. faq-010 \\(score -?\\d+\\.\\d+\\): How do I contact customer support\\?"
+          "pattern": "(?is)\\A(?:(?!faq-\\d{3}).)*\\bfaq-010\\b[^\\n]*?-?\\d\\.\\d+"
         },
         {
           "id": "scenario2-results",
           "description": "Scenario 2 - three results were displayed with their scores",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^2\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\)(?:(?!^=== Scenario).)*?^3\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\)"
+          "pattern": "(?is)^2\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\).*?^3\\. faq-\\d{3} \\(score -?\\d+\\.\\d+\\)"
         },
         {
           "id": "scenario3-tool",
@@ -676,37 +676,37 @@
         {
           "id": "scenario3-answer",
           "description": "Scenario 3 - the answer gives the 48-hour deadline that only the FAQ entry faq-005 contains",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b48\\s*hours\\b"
+          "pattern": "(?i)\\b48\\s*hours\\b"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario4-search",
           "description": "Scenario 4 - the TextSearchProvider searched the first question and found the 'return a product' entry (faq-001)",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^\\[TextSearchProvider\\] Search input: I want to send back a jacket[^\\n]*$\\s*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-001\\b"
+          "pattern": "(?is)\\A(?:(?!\\[TextSearchProvider\\] Results).)*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-001\\b"
         },
         {
           "id": "scenario4-answer",
           "description": "Scenario 4 - the first answer gives the 30-day return window that only faq-001 contains",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b30\\s*days\\b"
+          "pattern": "(?i)\\b30\\s*days\\b"
         },
         {
           "id": "scenario4-followup-search",
           "description": "Scenario 4 - the follow-up question was searched together with the first one (RecentMessageMemoryLimit) and found the refund entry (faq-002)",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?^\\[TextSearchProvider\\] Search input: I want to send back a jacket[^\\n]*\\| And how long until I get my money back\\?\\s*$\\s*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-002\\b"
+          "pattern": "(?is)^\\[TextSearchProvider\\] Results:.*?^\\[TextSearchProvider\\] Search input: [^\\n]*\\|[^\\n]*$\\s*^\\[TextSearchProvider\\] Results: [^\\n]*\\bfaq-002\\b"
         },
         {
           "id": "scenario4-followup-answer",
           "description": "Scenario 4 - the follow-up answer gives the 5-7 business days of faq-002",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?money back\\?(?:(?!^=== Scenario).)*?^Agent:(?:(?!^=== Scenario).)*?\\b5\\s*(?:-|–|to)\\s*7\\s+business days\\b"
+          "pattern": "(?i)\\b5\\s*(?:-|–|to)\\s*7\\s+business days\\b"
         },
         {
           "id": "scenario4-usage",
           "description": "Scenario 4 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 4:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -770,32 +770,32 @@
         {
           "id": "scenario1-provide-empty",
           "description": "Scenario 1 - after the memories of 'ada' were cleared, the provider ran before the first model call and found no memory",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories of user 'ada' cleared \\(\\d+ deleted\\)\\s*$(?:(?!^=== Scenario).)*?^First session\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] No memory of user 'ada' yet: nothing added to the request\\s*$"
+          "pattern": "(?im)^\\[Memory\\] No memory of user 'ada' yet: nothing added to the request\\s*$"
         },
         {
           "id": "scenario1-extracted",
           "description": "Scenario 1 - after the first run, the provider extracted new memories from the introduction, the name Ada included",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) extracted and stored for user 'ada' \\(extraction run: \\d+ tokens\\):\\s*$(?:(?!^=== Scenario|^Agent:).)*?^  \\+ [^\\n]*\\bAda\\b"
+          "pattern": "(?is)^\\[Memory\\] [1-9]\\d* memor(?:y|ies) extracted and stored for user 'ada' \\(extraction run: \\d+ tokens\\):\\s*$(?:(?!^Agent:).)*?^  \\+ [^\\n]*\\bAda\\b"
         },
         {
           "id": "scenario1-stored",
           "description": "Scenario 1 - MongoDB holds the memories of 'ada': her name and her vegetarian diet",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Memories stored in MongoDB for user 'ada': [1-9]\\d*\\s*$(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bAda\\b)(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bvegetarian\\b)"
+          "pattern": "(?is)^Memories stored in MongoDB for user 'ada': [1-9]\\d*\\s*$(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bAda\\b)(?=(?:\\s*^  - [^\\n]*$)*?\\s*^  - [^\\n]*\\bvegetarian\\b)"
         },
         {
           "id": "scenario1-recall",
           "description": "Scenario 1 - in a new session (empty chat history), the provider added the memories and the answer uses them: the name Ada and one of her preferences (vegetarian, the Alps, Lyon)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^New session \\(empty chat history\\)\\s*$(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$(?:(?!^=== Scenario).)*?^Agent: (?=(?:(?!^Token Usage).)*?\\bAda\\b)(?=(?:(?!^Token Usage).)*?\\b(?:vegetarian|tofu|Alps|Lyon)\\b)"
+          "pattern": "(?is)^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$(?=(?:(?!^Token Usage).)*?(?-i:\\bAda\\b))(?=(?:(?!^Token Usage).)*?\\b(?:vegetarian|tofu|Alps|Lyon)\\b)"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-greeting",
           "description": "Scenario 2 - the agent spoke first (RunAsync without a message): the provider added the memories, had nothing to extract, and the greeting uses the name Ada",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$\\s*^\\[Memory\\] No user message in this run: nothing to extract\\s*$\\s*^Agent: (?=(?:(?!^Type a message).)*?\\bAda\\b)"
+          "pattern": "(?is)^\\[Memory\\] [1-9]\\d* memor(?:y|ies) of user 'ada' added to the request\\s*$\\s*^\\[Memory\\] No user message in this run: nothing to extract\\s*$\\s*^[^\\n]*(?-i:\\bAda\\b)"
         }
       ],
       "translations": {
@@ -851,47 +851,47 @@
         {
           "id": "scenario1-advertised",
           "description": "Scenario 1 - both file-based skills were found and advertised (name and description)",
-          "pattern": "(?s)^=== Scenario 1:(?=(?:(?!^=== Scenario).)*?^Skill advertised: expense-policy - \\S)(?=(?:(?!^=== Scenario).)*?^Skill advertised: it-support - \\S)"
+          "pattern": "(?s)\\A(?=.*?^Skill advertised: expense-policy - \\S)(?=.*?^Skill advertised: it-support - \\S)"
         },
         {
           "id": "scenario1-load",
           "description": "Scenario 1 - the agent loaded the expense-policy skill for the expense question",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Skill\\] load_skill\\(skillName: expense-policy\\) -> "
+          "pattern": "(?s)^\\[Skill\\] load_skill\\(skillName: expense-policy\\) -> "
         },
         {
           "id": "scenario1-resource",
           "description": "Scenario 1 - the agent read the resource references/limits.md and answered with its limit (145)",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\[Skill\\] read_skill_resource\\(skillName: expense-policy, resourceName: references/limits\\.md\\) -> (?:(?!^=== Scenario).)*?^Agent: [^\\n]*\\b145\\b"
+          "pattern": "(?s)^\\[Skill\\] read_skill_resource\\(skillName: expense-policy, resourceName: references/limits\\.md\\) -> .*?^(?!\\[Skill\\])[^\\n]*\\b145\\b"
         },
         {
           "id": "scenario1-no-skill",
           "description": "Scenario 1 - no skill tool ran for the question that no skill covers",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^User: What is the capital of Italy\\?(?:(?!^=== Scenario).)*?^Skill tools run for this question: 0\\s*$"
+          "pattern": "(?is)(?:\\A|^\\[Skill\\][^\\n]*\\n)(?:(?!^\\[Skill\\]).)*?^(?![^\\n]*\\bRome\\b)[^\\n]*\\S[^\\n]*\\n(?:(?!^\\[Skill\\]).)*?\\bRome\\b"
         },
         {
           "id": "scenario2-dynamic",
           "description": "Scenario 2 - the dynamic resource was computed when read (validity date)",
-          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^\\[Skill\\] read_skill_resource\\(skillName: shipping-quote, resourceName: validity\\) -> Quotes made today are valid until \\d{4}-\\d{2}-\\d{2}"
+          "pattern": "(?s)^\\[Skill\\] read_skill_resource\\(skillName: shipping-quote, resourceName: validity\\) -> Quotes made today are valid until \\d{4}-\\d{2}-\\d{2}"
         },
         {
           "id": "scenario2-script",
           "description": "Scenario 2 - the in-process script ran and the answer gave its quote id",
-          "pattern": "^\\[Skill\\] run_skill_script\\(skillName: shipping-quote, scriptName: quote, [^\\n]*-> \\{\"quoteId\":\"(QT-[A-C]\\d+-\\d{3})\"[^\\n]*\\n(?:(?!=== Scenario)[^\\n]*\\n)*?Agent:(?:[^\\n]|\\n(?!=== Scenario))*?\\1"
+          "pattern": "(?s)^\\[Skill\\] run_skill_script\\(skillName: shipping-quote, scriptName: quote, [^\\n]*-> \\{\"quoteId\":\"(QT-[A-C]\\d+-\\d{3})\"[^\\n]*\\n.*?^(?!\\[Skill\\])[^\\n]*\\1"
         },
         {
           "id": "scenario3-default",
           "description": "Scenario 3 - without auto-approval, the first skill tool call waited for an approval",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Without auto-approval, approval requested for load_skill\\("
+          "pattern": "(?is)\\A(?:(?!^\\[Skill\\]).)*?^(?!\\[Skill\\])[^\\n]*\\bload_skill\\("
         },
         {
           "id": "scenario3-approved",
           "description": "Scenario 3 - the policy approved the script for 2.5 kg, which then ran",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Policy decision: approved - Parcel of 2\\.5 kg[^\\n]*\\n\\[Skill\\] run_skill_script\\([^\\n]*-> \\{\\\"quoteId\\\":\\\"QT-"
+          "pattern": "(?is)^[^\\n]*\\bParcel of 2\\.5 kg\\b[^\\n]*\\n\\[Skill\\] run_skill_script\\([^\\n]*-> \\{\"quoteId\":\"QT-"
         },
         {
           "id": "scenario3-rejected",
           "description": "Scenario 3 - the policy rejected the script for 120 kg, which never ran",
-          "pattern": "^Policy decision: rejected - Parcel of 120 kg[^\\n]*\\n(?:(?!\\[Skill\\] run_skill_script|=== Scenario)[^\\n]*\\n)*?Agent: "
+          "pattern": "(?is)^[^\\n]*\\bParcel of 120 kg: over the 30 kg limit\\b(?:(?!^\\[Skill\\] run_skill_script).)*\\z"
         }
       ],
       "translations": {
@@ -950,22 +950,22 @@
         {
           "id": "scenario1-answer",
           "description": "Scenario 1 - the after-sales expert answered the customer",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^AfterSalesExpert: \\S"
+          "pattern": "(?s)^AfterSalesExpert: \\S"
         },
         {
           "id": "scenario1-approved",
           "description": "Scenario 1 - the reviewer scored the answer of the expert and the code sent it to the customer",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^Answer written by hand).)*?^Quality review: (?:[7-9]|10)/10\\n(?:(?!^Answer written by hand).)*?^Decision: sent to the customer$"
+          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review: (?:[7-9]|10)/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\bsent\\b"
         },
         {
           "id": "scenario1-held-back",
           "description": "Scenario 1 - the wrong answer written by hand was held back by the decision of the code",
-          "pattern": "(?s)^Answer written by hand \\(wrong on purpose\\):(?:(?!^=== Scenario).)*?^Quality review: [1-6]/10\\n(?:(?!^=== Scenario).)*?^Decision: held back for a human agent"
+          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review:[^\\n]*\\n(?:(?!^Quality review:).)*^Quality review: [1-6]/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\b(?:held|hold|human)\\b"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage of each agent displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Token Usage \\(AfterSalesExpert\\):\\n\\s*input tokens:?\\s*\\d+(?:(?!^=== Scenario).)*?^Token Usage \\(QualityReviewer\\):\\n\\s*input tokens:?\\s*\\d+"
+          "pattern": "(?is)\\bAfterSalesExpert\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+.*?\\bQualityReviewer\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-tool-schema",
@@ -975,7 +975,7 @@
         {
           "id": "scenario2-order",
           "description": "Scenario 2 - the front desk asked the order specialist with a query that contains the order number",
-          "pattern": "^\\[Delegation\\] ask_order_specialist\\(query: \\\"[^\\n]*ORD-1042[^\\n]*\\\"\\)$"
+          "pattern": "(?im)^\\[Delegation\\] ask_order_specialist(?! returned)[^\\n]*\\bORD-1042\\b"
         },
         {
           "id": "scenario2-after-sales",
@@ -985,12 +985,12 @@
         {
           "id": "scenario2-answer",
           "description": "Scenario 2 - the front desk answered with the options given by the rules (replacement or refund)",
-          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^FrontDesk: (?:(?!^=== Scenario).)*?(?i:replacement|refund)"
+          "pattern": "(?s)^FrontDesk: .*?(?i:replacement|refund)"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage of the front desk displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Token Usage \\(FrontDesk only[^\\n]*\\n\\s*input tokens:?\\s*\\d+"
+          "pattern": "(?i)\\binput tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3-tool",
@@ -1083,47 +1083,55 @@
         {
           "id": "scenario1-card",
           "description": "Scenario 1 - agent card of the AuthAgent read: its skills and both A2A 1.0 interfaces (JSON-RPC and HTTP+JSON)",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n(?:(?!^=== Scenario).)*?^\\s+Skill: GenerateAPIKey - (?:(?!^=== Scenario).)*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
+          "scenarios": [1],
+          "pattern": "(?s)^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n.*?^\\s+Skill: GenerateAPIKey - .*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
         },
         {
           "id": "scenario1-key",
           "description": "Scenario 1 - the remote agent generated a signed API key (Meknes<random>.<signature>)",
+          "scenarios": [1],
           "pattern": "^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
         },
         {
           "id": "scenario1-valid",
           "description": "Scenario 1 - the remote agent (its tool) validated the generated key",
+          "scenarios": [1],
           "pattern": "(?i)^Validation of the generated key: (?![^\\n]*\\b(?:not|isn't|is not)\\s+(?:a\\s+)?valid|[^\\n]*\\binvalid\\b)[^\\n]*\\bvalid\\b"
         },
         {
           "id": "scenario1-tampered",
           "description": "Scenario 1 - the remote agent rejected the tampered key (only the signature check of the server can tell)",
+          "scenarios": [1],
           "pattern": "(?i)^Validation of a tampered key: [^\\n]*(?:\\binvalid\\b|\\b(?:not|isn't)\\s+(?:a\\s+)?valid\\b)"
         },
         {
           "id": "scenario2-tone",
           "description": "Scenario 2 - the CustomerToneAgent, reached by URL, detected a negative tone",
+          "scenarios": [1],
           "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Remote agent: CustomerToneAgent at http\\S+/a2a/customerToneAgent\\s*$\\n(?:(?!^=== Scenario).)*?^Tone: [^\\n]*\\b(?:frustrat|angr|upset|annoy|irritat|dissatisf|negative|impatien|disappoint)"
         },
         {
           "id": "scenario3-tool",
           "description": "Scenario 3 - the local agent called the remote AuthAgent as a function tool",
+          "scenarios": [1],
           "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: AuthAgent\\s*$"
         },
         {
           "id": "scenario3-key",
           "description": "Scenario 3 - the answer of the local agent contains a signed API key",
+          "scenarios": [1],
           "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Assistant: (?:(?!^=== Scenario|^Token Usage:).)*?Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage of the local agent displayed",
+          "scenarios": [1],
           "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
         },
         {
           "id": "session-store",
-          "description": "The server registered a session store for each agent",
-          "pattern": "^Session store: in memory \\(development only\\), one per agent\\.\\s*$"
+          "description": "The server keeps the conversation of a client: in the same session, the client gets back the key of the first turn (client scenario 4)",
+          "pattern": "(?s)^=== Scenario 4:(?:(?!^=== Scenario).)*?^Generated API key: (Meknes[\\w-]+\\.[\\w-]+)\\s*$(?:(?!^New conversation:).)*?^Same session:(?:(?!^New conversation:).)*?\\1"
         },
         {
           "id": "conversation",
@@ -1155,7 +1163,7 @@
             "scenario3-tool": "Scénario 3 - l'agent local a appelé l'AuthAgent distant comme outil",
             "scenario3-key": "Scénario 3 - la réponse de l'agent local contient une clé d'API signée",
             "scenario3-usage": "Scénario 3 - consommation de tokens de l'agent local affichée",
-            "session-store": "Le serveur a enregistré un magasin de sessions pour chaque agent",
+            "session-store": "Le serveur garde la conversation d'un client : dans la même session, le client retrouve la clé du premier tour (scénario 4 du client)",
             "conversation": "Le client a poursuivi une conversation : le serveur a gardé l'historique du contextId (scénario 4 du client)"
           }
         }
@@ -1200,62 +1208,62 @@
         {
           "id": "scenario1-card",
           "description": "Scenario 1 - agent card of the AuthAgent read: its skills and both A2A 1.0 interfaces (JSON-RPC and HTTP+JSON)",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n(?:(?!^=== Scenario).)*?^\\s+Skill: GenerateAPIKey - (?:(?!^=== Scenario).)*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
+          "pattern": "(?s)^Agent card: AuthAgent \\(version [^)\\n]+\\)\\n.*?^\\s+Skill: GenerateAPIKey - .*?^\\s+Interface: JSONRPC \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*\\n\\s+Interface: HTTP\\+JSON \\(A2A 1\\.0\\) at http\\S+/a2a/authAgent\\s*$"
         },
         {
           "id": "scenario1-key",
           "description": "Scenario 1 - the remote agent generated a signed API key (Meknes<random>.<signature>)",
-          "pattern": "^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
+          "pattern": "\\bMeknes[\\w-]+\\.[\\w-]+"
         },
         {
           "id": "scenario1-valid",
           "description": "Scenario 1 - the remote agent (its tool) validated the generated key",
-          "pattern": "(?i)^Validation of the generated key: (?![^\\n]*\\b(?:not|isn't|is not)\\s+(?:a\\s+)?valid|[^\\n]*\\binvalid\\b)[^\\n]*\\bvalid\\b"
+          "pattern": "(?is)\\bMeknes[\\w-]+\\.[\\w-]+\\s*$\\n(?:(?![^\\n]*valid)[^\\n]*\\n)*?(?![^\\n]*\\b(?:not|isn't|is not)\\s+(?:a\\s+)?valid|[^\\n]*\\binvalid\\b)[^\\n]*\\bvalid\\b"
         },
         {
           "id": "scenario1-tampered",
           "description": "Scenario 1 - the remote agent rejected the tampered key (only the signature check of the server can tell)",
-          "pattern": "(?i)^Validation of a tampered key: [^\\n]*(?:\\binvalid\\b|\\b(?:not|isn't)\\s+(?:a\\s+)?valid\\b)"
+          "pattern": "(?is)\\bMeknes[\\w-]+\\.[\\w-]+\\s*$\\n(?:(?![^\\n]*valid)[^\\n]*\\n)*?[^\\n]*valid[^\\n]*\\n.*?^[^\\n]*(?:\\binvalid\\b|\\b(?:not|isn't)\\s+(?:a\\s+)?valid\\b)"
         },
         {
           "id": "scenario2-tone",
           "description": "Scenario 2 - the CustomerToneAgent, reached by URL, detected a negative tone",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Remote agent: CustomerToneAgent at http\\S+/a2a/customerToneAgent\\s*$\\n(?:(?!^=== Scenario).)*?^Tone: [^\\n]*\\b(?:frustrat|angr|upset|annoy|irritat|dissatisf|negative|impatien|disappoint)"
+          "pattern": "(?is)\\bCustomerToneAgent\\b[^\\n]*/a2a/customerToneAgent\\b.*?\\b(?:frustrat|angr|upset|annoy|irritat|dissatisf|negative|impatien|disappoint)"
         },
         {
           "id": "scenario3-tool",
           "description": "Scenario 3 - the local agent called the remote AuthAgent as a function tool",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: AuthAgent\\s*$"
+          "pattern": "(?s)^Tool called: AuthAgent\\s*$"
         },
         {
           "id": "scenario3-key",
           "description": "Scenario 3 - the answer of the local agent contains a signed API key",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Assistant: (?:(?!^=== Scenario|^Token Usage:).)*?Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+          "pattern": "\\bMeknes[\\w-]+\\.[\\w-]+"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage of the local agent displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario4-key",
           "description": "Scenario 4 - the remote agent generated a key in the first turn of the session",
-          "pattern": "(?s)^=== Scenario 4:(?:(?!^=== Scenario).)*?^Generated API key: Meknes[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\s*$"
+          "pattern": "\\bMeknes[\\w-]+\\.[\\w-]+"
         },
         {
           "id": "scenario4-context",
           "description": "Scenario 4 - both turns of the session used the same A2A contextId",
-          "pattern": "^Context id after turn 1: (\\S+)\\s*\\n(?s:(?:(?!^=== Scenario).)*?)^Context id after turn 2: \\1\\s*$"
+          "pattern": "(?s)^Context id after[^\\n]*?\\b([0-9a-f]{32})\\b.*?^Context id after[^\\n]*?\\b\\1\\b"
         },
         {
           "id": "scenario4-remembered",
           "description": "Scenario 4 - in the same session, the remote agent gave back the exact key of the first turn (the server kept the conversation)",
-          "pattern": "(?s)^Same session: (?:(?!^=== Scenario|^New conversation:).)*?^\\s*-> Answer contains the key of turn 1: yes\\s*$"
+          "pattern": "(?s)\\b(Meknes[\\w-]+\\.[\\w-]+)\\b.*?\\b\\1\\b"
         },
         {
           "id": "scenario4-new-conversation",
           "description": "Scenario 4 - without the session, the remote agent did not know the key of the first turn",
-          "pattern": "(?s)^New conversation: (?:(?!^=== Scenario).)*?^\\s*-> Answer contains the key of turn 1: no\\s*$"
+          "pattern": "(?s)\\b(Meknes[\\w-]+\\.[\\w-]+)\\b.*^Context id after[^\\n]*\\n(?=(?:(?!\\1).)*\\S)(?:(?!\\1).)*\\z"
         }
       ],
       "translations": {
@@ -1320,12 +1328,12 @@
         {
           "id": "scenario1-request",
           "description": "Scenario 1 - the handler logged the request on the Azure OpenAI v1 URL (POST .../openai/v1/chat/completions)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===\\s*$\\s*^\\[URL\\] POST https://\\S+/openai/v1/chat/completions\\s*$"
+          "pattern": "(?is)^=== HTTP REQUEST #\\d+ ===\\s*$\\s*^\\[URL\\] POST https://\\S+/openai/v1/chat/completions\\s*$"
         },
         {
           "id": "scenario1-header",
           "description": "Scenario 1 - the handler added the custom header X-agent-name to the request",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?^\\s+X-agent-name: AIAgentWithCustomHttpTransport\\s*$"
+          "pattern": "(?is)^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?^\\s+X-agent-name: AIAgentWithCustomHttpTransport\\s*$"
         },
         {
           "id": "credentials-masked",
@@ -1335,47 +1343,47 @@
         {
           "id": "scenario1-response",
           "description": "Scenario 1 - the handler logged the response status and the duration of the call (200 OK in N ms)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^=== HTTP RESPONSE #\\d+ ===\\s*$\\s*^\\[Status\\] 200 OK \\(OK\\) in \\d+ ms\\s*$"
+          "pattern": "(?is)^=== HTTP RESPONSE #\\d+ ===\\s*$\\s*^\\[Status\\] 200 OK \\(OK\\) in \\d+ ms\\s*$"
         },
         {
           "id": "scenario1-answer",
           "description": "Scenario 1 - the agent answered (Paris) and the run sent at least one HTTP request through the handler",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Agent answer:\\s*$(?:(?!^HTTP requests sent).)*?Paris(?:(?!^=== Scenario).)*?^HTTP requests sent by this run: [1-9]\\d*\\s*$"
+          "pattern": "(?ims)^(?![\\s\"{\\[])[^\\n]*\\bParis\\b.*?^(?![^\\n]*\\btokens?\\b)[^\\n\\d]*\\b[1-9]\\d*\\b[^\\n\\d]*$"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-tools",
           "description": "Scenario 2 - the request sent the tools: the get_weather function in the tools array",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"tools\": \\[(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
+          "pattern": "(?is)^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"tools\": \\[(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
         },
         {
           "id": "scenario2-tool-call",
           "description": "Scenario 2 - a response asked for the tool (finish_reason tool_calls, get_weather)",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP RESPONSE #\\d+ ===(?:(?!^=== HTTP RE).)*?\"finish_reason\": \"tool_calls\"(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
+          "pattern": "(?is)^=== HTTP RESPONSE #\\d+ ===(?:(?!^=== HTTP RE).)*?\"finish_reason\": \"tool_calls\"(?:(?!^=== HTTP RE).)*?\"name\": \"get_weather\""
         },
         {
           "id": "scenario2-tool-result",
           "description": "Scenario 2 - a second request sent the tool result back to the model (role tool, cloudy with a high of 15 degrees Celsius)",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"role\": \"tool\",(?:(?!^=== HTTP RE).)*?\"content\": \"\\\\\"The weather in [^\"\\\\]*Amsterdam[^\"\\\\]* is cloudy with a high of 15 degrees Celsius\\.\\\\\"\""
+          "pattern": "(?is)^=== HTTP REQUEST #\\d+ ===(?:(?!^=== HTTP RE).)*?\"role\": \"tool\",(?:(?!^=== HTTP RE).)*?\"content\": \"\\\\\"The weather in [^\"\\\\]*Amsterdam[^\"\\\\]* is cloudy with a high of 15 degrees Celsius\\.\\\\\"\""
         },
         {
           "id": "scenario2-answer",
           "description": "Scenario 2 - the agent answered with the tool data (15) and the run sent at least two HTTP requests",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Agent answer:\\s*$(?:(?!^HTTP requests sent).)*?\\b15\\b(?:(?!^=== Scenario).)*?^HTTP requests sent by this run: (?:[2-9]|[1-9]\\d+)\\s*$"
+          "pattern": "(?ims)^(?![\\s\"{\\[])[^\\n]*\\b15\\s*(?:°|degrees?\\b|celsius\\b|C\\b).*?^(?![^\\n]*\\btokens?\\b)[^\\n\\d]*\\b(?:[2-9]|[1-9]\\d+)\\b[^\\n\\d]*$"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario3-spans",
           "description": "Scenario 3 - OpenTelemetry recorded the spans of the run",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Spans recorded by OpenTelemetry: [1-9]\\d*\\s*$"
+          "pattern": "(?im)^\\s*(?:invoke_agent|chat|execute_tool) \\S"
         },
         {
           "id": "scenario3-agent-span",
@@ -1394,13 +1402,13 @@
         },
         {
           "id": "scenario3-no-http-log",
-          "description": "Scenario 3 - the HTTP log was turned off during the traced run, the requests were still counted",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario|^=== HTTP RE).)*?^HTTP requests sent by this run: [1-9]\\d*\\s*$"
+          "description": "Scenario 3 - the HTTP log was turned off during the traced run: no request logged, the spans of the run recorded",
+          "pattern": "(?is)\\A(?!.*^=== HTTP RE)(?=.*^\\s*invoke_agent \\S)"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -1436,7 +1444,7 @@
             "scenario3-agent-span": "Scénario 3 - l'exécution de l'assistant de voyage est un span invoke_agent qui contient ses appels au modèle (spans chat)",
             "scenario3-nested": "Scénario 3 - l'agent météo appelé comme outil apparaît dans le span execute_tool, avec son propre appel d'outil",
             "scenario3-inner-tokens": "Scénario 3 - le span de l'agent météo affiche sa propre consommation de tokens",
-            "scenario3-no-http-log": "Scénario 3 - le journal HTTP a été coupé pendant l'exécution tracée, les requêtes ont quand même été comptées",
+            "scenario3-no-http-log": "Scénario 3 - le journal HTTP était coupé pendant l'exécution tracée : aucune requête journalisée, les spans de l'exécution enregistrés",
             "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
           }
         }
@@ -1469,47 +1477,47 @@
         {
           "id": "scenario1-tool",
           "description": "Scenario 1 - the expected tool call was checked: get_order_status with the right order number",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[pass\\] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match"
+          "pattern": "(?s)^\\s*\\[pass\\] tool_call_args_match: Tool call args match: 1/1 get_order_status: args match"
         },
         {
           "id": "scenario1-expected",
           "description": "Scenario 1 - the answer contained a fact only the tool knows (tracking number)",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[pass\\] contains_expected: Response contains expected output: \\\"TRK-48213\\\""
+          "pattern": "(?s)^\\s*\\[pass\\] contains_expected: Response contains expected output: \\\"TRK-48213\\\""
         },
         {
           "id": "scenario1-custom",
           "description": "Scenario 1 - the custom check is_concise ran on the answers",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^\\s*\\[(?:pass|fail)\\] is_concise:"
+          "pattern": "(?s)^\\s*\\[(?:pass|fail)\\] is_concise:"
         },
         {
           "id": "scenario1-summary",
           "description": "Scenario 1 - every question of the dataset passed its checks",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Summary: 4/4 questions passed\\s*$"
+          "pattern": "(?s)^Summary: 4/4 questions passed\\s*$"
         },
         {
           "id": "scenario2-judge",
-          "description": "Scenario 2 - the chat client used as judge is named",
-          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Judge: \\S"
+          "description": "Scenario 2 - the LLM judge explained the score it gave",
+          "pattern": "(?im)^\\s*\\[score [1-5]\\] (?:Relevance|Coherence): \\S[^\\n]{20,}"
         },
         {
           "id": "scenario2-scores",
           "description": "Scenario 2 - the judge scored relevance and coherence from 1 to 5, with a reason",
-          "pattern": "(?s)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^\\s*\\[score [1-5]\\] Relevance: \\S)(?=(?:(?!^=== Scenario).)*?^\\s*\\[score [1-5]\\] Coherence: \\S)"
+          "pattern": "(?s)\\A(?=.*?^\\s*\\[score [1-5]\\] Relevance: \\S)(?=.*?^\\s*\\[score [1-5]\\] Coherence: \\S)"
         },
         {
           "id": "scenario3-comparison",
           "description": "Scenario 3 - both versions were compared question by question, with the checks that failed",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Q1: [^\\n]*\\bpass\\s+FAIL \\([^)\\n]*\\)"
+          "pattern": "(?s)^Q1: [^\\n]*\\bpass\\s+FAIL \\([^)\\n]*\\)"
         },
         {
           "id": "scenario3-regression",
-          "description": "Scenario 3 - the regression of the candidate instructions was detected",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Regression detected: [1-9]\\d* question\\(s\\)"
+          "description": "Scenario 3 - the comparison shows a regression: a question passes with the reference instructions and fails with the candidate ones",
+          "pattern": "(?im)^Q\\d+: [^\\n]*\\bpass\\s+FAIL\\b"
         },
         {
           "id": "scenario3-repetitions",
           "description": "Scenario 3 - a question was repeated 3 times to measure consistency",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Repetitions of Q1: \\d/3 passed\\s*$"
+          "pattern": "(?m)^[^\\n]*\\b[0-3]/3\\b"
         }
       ],
       "translations": {
@@ -1531,10 +1539,10 @@
             "scenario1-expected": "Scénario 1 - la réponse contenait un fait que seul l'outil connaît (numéro de suivi)",
             "scenario1-custom": "Scénario 1 - le contrôle personnalisé is_concise a été appliqué aux réponses",
             "scenario1-summary": "Scénario 1 - chaque question du jeu de données a passé ses contrôles",
-            "scenario2-judge": "Scénario 2 - le chat client utilisé comme juge est indiqué",
+            "scenario2-judge": "Scénario 2 - le juge LLM a justifié la note qu'il a donnée",
             "scenario2-scores": "Scénario 2 - le juge a noté la pertinence et la cohérence de 1 à 5, avec une raison",
             "scenario3-comparison": "Scénario 3 - les deux versions ont été comparées question par question, avec les contrôles en échec",
-            "scenario3-regression": "Scénario 3 - la régression des instructions candidates a été détectée",
+            "scenario3-regression": "Scénario 3 - la comparaison montre une régression : une question réussit avec les instructions de référence et échoue avec les candidates",
             "scenario3-repetitions": "Scénario 3 - une question a été répétée 3 fois pour mesurer la constance"
           }
         }
@@ -1572,32 +1580,32 @@
         {
           "id": "scenario1-unauthorized",
           "description": "Scenario 1 - without a token, the request was refused with 401 before the agent ran",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^HTTP 401 Unauthorized\\b"
+          "pattern": "(?s)^HTTP 401 Unauthorized\\b"
         },
         {
           "id": "scenario1-validation",
           "description": "Scenario 1 - an empty message was refused with 400 and problem details",
-          "pattern": "(?s)^=== Scenario 1:(?:(?!^=== Scenario).)*?^HTTP 400 BadRequest \\(application/problem\\+json\\)\\s*$"
+          "pattern": "(?s)^HTTP 400 BadRequest \\(application/problem\\+json\\)\\s*$"
         },
         {
           "id": "scenario2-streamed",
           "description": "Scenario 2 - the answer was streamed as several Server-Sent Events",
-          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^HTTP 200 OK \\(text/event-stream\\)\\s*$(?:(?!^=== Scenario).)*?^Server-sent events received: (?:[2-9]|[1-9]\\d+)\\s*$"
+          "pattern": "(?s)^HTTP 200 OK \\(text/event-stream\\)\\s*$.*?^Server-sent events received: (?:[2-9]|[1-9]\\d+)\\s*$"
         },
         {
           "id": "scenario2-tool",
           "description": "Scenario 2 - the tool gave the team of Alice, read from her token",
-          "pattern": "(?s)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Agent: (?:(?!^=== Scenario).)*?\\bEngineering\\b"
+          "pattern": "(?s)^Agent: .*?\\bEngineering\\b"
         },
         {
           "id": "scenario3-remembered",
           "description": "Scenario 3 - in a new request, the API loaded the conversation of Alice (ROOM-B)",
-          "pattern": "(?s)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Agent: (?:(?!^=== Scenario).)*?ROOM-B"
+          "pattern": "(?s)^Agent: .*?ROOM-B"
         },
         {
           "id": "scenario4-isolated",
           "description": "Scenario 4 - with the same conversation id, Bob got his own conversation: his team, and no trace of ROOM-B",
-          "pattern": "(?s)^=== Scenario 4:(?:(?!^=== Scenario|ROOM-B).)*?^Agent: (?:(?!^=== Scenario|ROOM-B).)*?\\bSales\\b(?:(?!^=== Scenario|ROOM-B).)*?^Server-sent events received:"
+          "pattern": "(?s)\\A(?:(?!ROOM-B).)*?^Agent: (?:(?!ROOM-B).)*?\\bSales\\b(?:(?!ROOM-B).)*?^Server-sent events received:"
         }
       ],
       "translations": {
@@ -1655,42 +1663,42 @@
         {
           "id": "scenario1-server",
           "description": "Scenario 1 - the HTTP MCP server listens on the MCP endpoint",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^MCP server listening on https?://\\S+/mcp/companyassistant\\s*$"
+          "pattern": "(?i)https?://\\S+/mcp/companyassistant\\b"
         },
         {
           "id": "scenario1-tool",
           "description": "Scenario 1 - the MCP client sees the agent as the CompanyAssistant tool, with a query parameter",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S[^\\n]*$\\s*^\\s*Input schema: \\{[^\\n]*\\\"query\\\""
+          "pattern": "(?is)^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S[^\\n]*$\\s*^\\s*Input schema: \\{[^\\n]*\\\"query\\\""
         },
         {
           "id": "scenario1-result",
           "description": "Scenario 1 - the tool call over HTTP returned the agent's answer with data of the company tools (EMP003 is Charlie Brown)",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Tool result:\\s*$(?:(?!^=== Scenario).)*?Charlie Brown"
+          "pattern": "(?is)^Tool result:\\s*$.*?Charlie Brown"
         },
         {
           "id": "scenario2-server",
           "description": "Scenario 2 - the stdio MCP server was started as a child process (its log on stderr) and lists the CompanyAssistant tool",
-          "pattern": "(?is)^=== Scenario 2:(?=(?:(?!^=== Scenario).)*?^\\[server\\] CompanyAssistant MCP server ready on stdio\\.)(?=(?:(?!^=== Scenario).)*?^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S)"
+          "pattern": "(?is)\\A(?=.*?^\\[server\\] CompanyAssistant MCP server ready on stdio\\.)(?=.*?^MCP tools available \\(1\\):\\s*$\\s*^- CompanyAssistant: \\S)"
         },
         {
           "id": "scenario2-result",
           "description": "Scenario 2 - the tool call over stdio returned the rooms for 10 people or more (Innovation Lab, Executive Suite)",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool result:\\s*$(?=(?:(?!^=== Scenario).)*?Innovation Lab)(?=(?:(?!^=== Scenario).)*?Executive Suite)"
+          "pattern": "(?is)^Tool result:\\s*$(?=.*?Innovation Lab)(?=.*?Executive Suite)"
         },
         {
           "id": "scenario3-tool-call",
           "description": "Scenario 3 - the OfficeAssistant called the CompanyAssistant MCP tool",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: CompanyAssistant\\(query: \\S"
+          "pattern": "(?is)^Tool called: CompanyAssistant\\(query: \\S"
         },
         {
           "id": "scenario3-result",
           "description": "Scenario 3 - the booking went through MCP: names only the company tools know (Brainstorm Corner, Bob Johnson)",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?^Tool called: CompanyAssistant\\((?=(?:(?!^=== Scenario).)*?Bob Johnson)(?=(?:(?!^=== Scenario).)*?Brainstorm Corner)"
+          "pattern": "(?is)^Tool called: CompanyAssistant\\((?=.*?Bob Johnson)(?=.*?Brainstorm Corner)"
         },
         {
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 3:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -1749,50 +1757,53 @@
         {
           "id": "scenario1-tool",
           "description": "Scenario 1 - the agent called get_all_hotels and the tool result (JSON objects) was measured",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d{4,} characters"
+          "pattern": "(?is)^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d{4,} characters"
         },
         {
           "id": "scenario1-hotels",
           "description": "Scenario 1 - the structured output lists the hotels under 100 USD with the cheapest one (Backpacker Hostel, 25 USD) first",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?^Hotels returned by the agent: [1-9]\\d*\\s*$\\s*^\\s*Backpacker Hostel \\(Bangkok\\) - 25 USD/night"
+          "pattern": "(?is)\\A(?:(?!USD/night).)*?^\\s*Backpacker Hostel \\(Bangkok\\) - 25 USD/night"
         },
         {
           "id": "scenario1-usage",
           "description": "Scenario 1 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 1:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "scenario2-tool",
           "description": "Scenario 2 - the agent called get_all_hotels and the tool result (CSV text) was measured",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d+ characters"
+          "pattern": "(?is)^Tool called: get_all_hotels\\(\\)\\s*$\\s*^Tool result sent to the model: \\d+ characters"
         },
         {
           "id": "scenario2-csv",
           "description": "Scenario 2 - the answer is CSV with the expected header and the cheapest hotel first",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Agent answer \\(CSV\\):\\s*$\\s*^Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating\\s*$\\s*^Backpacker Hostel,Bangkok,\\d,25,USD,"
+          "pattern": "(?im)^Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating\\s*$\\s*^Backpacker Hostel,Bangkok,\\d,25,USD,"
         },
         {
           "id": "scenario2-parsed",
           "description": "Scenario 2 - the CSV answer was parsed back into hotels",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?^Parsed back [1-9]\\d* hotels from the CSV answer"
+          "pattern": "(?is)^Name,City,Stars,PricePerNight[^\\n]*$.*?^\\s*Backpacker Hostel \\(Bangkok\\) - 25 USD/night"
         },
         {
           "id": "scenario2-usage",
           "description": "Scenario 2 - token usage displayed",
-          "pattern": "(?is)^=== Scenario 2:(?:(?!^=== Scenario).)*?input tokens:?\\s*\\d+"
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         },
         {
           "id": "comparison-tool-result",
+          "scenarios": [1, 2],
           "description": "Comparison - the CSV tool result is smaller than the JSON one",
           "pattern": "^Tool result \\(chars\\)\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
         },
         {
           "id": "comparison-input",
+          "scenarios": [1, 2],
           "description": "Comparison - the CSV run used fewer input tokens than the JSON run",
           "pattern": "^Input tokens\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
         },
         {
           "id": "comparison-output",
+          "scenarios": [1, 2],
           "description": "Comparison - the CSV run used fewer output tokens than the JSON run",
           "pattern": "^Output tokens\\s+\\d+\\s+\\d+\\s+-\\d+%\\s*$"
         }

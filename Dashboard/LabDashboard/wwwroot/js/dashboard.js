@@ -31,6 +31,9 @@ const state = {
   labs: [], currentId: null, view: null, details: null,
   eventSource: null, clockTimer: null, runId: null, runTarget: null,
   record: null, recordIsHistory: false, target: "start",
+  // Scenarios of the current lab per project ({ start, solution }, GET /labs/{id}/scenarios) and the ticked ones per "lab:target":
+  // { set, touched } — untouched, the selection follows the default (the implemented scenarios not passed yet).
+  scenarios: null, selections: new Map(),
   // AI models settings: status from the server, a refused switch per kind ("trainer" | "custom": what it opened), kinds with a request in flight.
   models: null, modelAsk: { chat: null, embedding: null }, modelBusy: new Set(), settingsTab: "models",
   // The trainer's configurations: the overview (GET /trainer-models), the unlock under way on the server, the kinds ticked for Unlock,
@@ -90,10 +93,25 @@ function targetLabel(target) {
   return t(`target.${target}`);
 }
 
+/** The scenarios a run was limited to ("Scenarios 2, 4"), or null when it ran every scenario (or had no selection). */
+function scenarioScope(record) {
+  const scenarios = record.scenarios ?? [];
+  if (!scenarios.some((s) => s.status === "skipped")) return null;
+  const selected = scenarios.filter((s) => s.status !== "skipped").map((s) => s.number);
+  return t("scenarios.scope", { list: selected.join(", ") });
+}
+
 /** Localized summary built from the structured record (the server summary stays English for the API). */
 function summarize(record, lab) {
+  const scope = scenarioScope(record);
+  const text = summarizeOutcome(record, lab);
+  return scope ? `${text} · ${scope}` : text;
+}
+
+function summarizeOutcome(record, lab) {
   const checks = record.checks ?? [];
   const failed = checks.filter((c) => !c.passed).length;
+  const notRun = (record.scenarios ?? []).filter((s) => s.status === "notRun").map((s) => s.number);
   switch (record.status) {
     case "passed":
       return checks.length ? t("summary.passed", { count: checks.length }) : t("summary.passedNoChecks");
@@ -109,6 +127,7 @@ function summarize(record, lab) {
         const reason = record.errors[0];
         return reason ? `${t("summary.run", { code: record.exitCode })} — ${reason}` : t("summary.run", { code: record.exitCode });
       }
+      if (record.failureStage === "checks" && failed === 0 && notRun.length) return t("summary.notRun", { list: notRun.join(", ") });
       if (record.failureStage === "checks") return t("summary.checks", { failed, count: checks.length });
       if (record.failureStage === "ready" || record.failureStage === "companion") {
         const reason = record.errors[0];
@@ -156,6 +175,7 @@ async function applyLanguage(lang) {
   renderAbout();
   renderReadouts();
   renderTerminalTitle();
+  renderScenarios();
   if (state.record) renderResults(state.record);
   renderInput();
 }
@@ -200,6 +220,7 @@ async function selectLab(id) {
   closeStream();
   state.currentId = id;
   state.record = null;
+  state.scenarios = null;
   renderRail();
 
   state.details = await api.get(`/labs/${encodeURIComponent(id)}?lang=${language()}`);
@@ -216,6 +237,7 @@ async function selectLab(id) {
   renderReadme();
   wireTabs(main);
   wireRunControls(main);
+  wireScenarios(main);
   wireInput(main);
   resetInput();
   wireSolution(main);
@@ -230,6 +252,7 @@ async function selectLab(id) {
   } else if (state.details.lastRun) {
     showRecordedRun(state.details.lastRun);
   }
+  loadScenarios();
 }
 
 function renderLabTexts() {
@@ -267,7 +290,7 @@ function renderAbout() {
   $(main, "objectives").replaceChildren(...objectives.map((o) => el("li", null, o)));
   $(main, "packages").replaceChildren(...details.packages.map((p) => el("li", null, p)));
   $(main, "checkList").replaceChildren(...details.checks.map((c) => el("li", null, checkText(details.lab, c.id, c.description))));
-  $(main, "commandStart").textContent = `${t("about.cmdStart")}\n${details.commands.start}`;
+  $(main, "commandStart").textContent = `${t("about.cmdStart")}\n${details.commands.start}\n${t("about.cmdScenarios")}\n${details.commands.scenarios}`;
   $(main, "commandSolution").textContent = `${t("about.cmdSolution")}\n${details.commands.solution}`;
   $(main, "folder").textContent = details.folder;
   const note = $(main, "interactiveNote");
@@ -298,14 +321,17 @@ function renderHistory() {
     const row = el("tr");
     const status = el("td");
     status.append(pill(run.status, t(`status.${run.status}`)));
+    const project = el("td", null, targetLabel(run.target));
+    const scope = scenarioScope(run);
+    if (scope) project.append(el("small", "history-scope", scope));
     row.append(
       el("td", "num", `#${runs.length - index}`),
-      el("td", null, targetLabel(run.target)),
+      project,
       status,
       el("td", null, fmtDate(run.startedAt)),
       el("td", "r", fmtDuration(run.durationMs)),
       el("td", "r", run.tokenUsage?.total != null ? fmtNumber(run.tokenUsage.total) : "—"),
-      el("td", "summary", summarize(run, state.details.lab)));
+      el("td", "summary", summarizeOutcome(run, state.details.lab)));
     return row;
   }));
 }
@@ -351,10 +377,148 @@ function wireSolution(main) {
   });
 }
 
+// ---------- scenarios ----------
+// The scenarios of the project come from its Program.cs (GET /labs/{id}/scenarios), read again when the page gets the focus back
+// (the learner implements them meanwhile) and after each run (their last result). Only the ticked scenarios run: the run request
+// sends their numbers, and the program receives them as `dotnet run -- --scenarios ...`, the option a developer types.
+const currentScenarios = () => state.scenarios?.[state.target] ?? [];
+const byNumber = (scenarios) => new Map(scenarios.map((s) => [s.number, s]));
+
+async function loadScenarios() {
+  const id = state.currentId;
+  let scenarios = null;
+  try {
+    scenarios = await api.get(`/labs/${encodeURIComponent(id)}/scenarios`);
+  } catch { /* the lab still runs: without a list, every implemented scenario runs */ }
+  if (id !== state.currentId) return;
+  state.scenarios = scenarios;
+  renderScenarios();
+}
+
+/** The scenarios and, transitively, those they require: a scenario never runs without them (same rule as the labs). */
+function withRequired(numbers, scenarios) {
+  const known = byNumber(scenarios);
+  const result = new Set();
+  const pending = [...numbers];
+  while (pending.length) {
+    const number = pending.pop();
+    if (!known.has(number) || result.has(number)) continue;
+    result.add(number);
+    pending.push(...known.get(number).requires);
+  }
+  return result;
+}
+
+/** The implemented scenarios whose required scenarios are implemented too (what `dotnet run` runs without option). */
+function implementedSelection(scenarios) {
+  const known = byNumber(scenarios);
+  return new Set(scenarios
+    .filter((s) => [...withRequired([s.number], scenarios)].every((n) => known.get(n).implemented))
+    .map((s) => s.number));
+}
+
+/** Untouched, the selection is the implemented scenarios not passed yet (with what they require): a passed scenario never runs again by itself. */
+function selectionFor(target = state.target) {
+  const scenarios = state.scenarios?.[target] ?? [];
+  const key = `${state.currentId}:${target}`;
+  let entry = state.selections.get(key);
+  if (!entry?.touched) {
+    const pending = [...implementedSelection(scenarios)].filter((n) => scenarios.find((s) => s.number === n).last?.status !== "passed");
+    entry = { set: withRequired(pending, scenarios), touched: false };
+    state.selections.set(key, entry);
+  }
+  // A scenario removed from Program.cs meanwhile cannot be asked for.
+  for (const number of [...entry.set]) if (!scenarios.some((s) => s.number === number)) entry.set.delete(number);
+  return entry;
+}
+
+function renderScenarios() {
+  const main = state.view;
+  if (!main) return;
+  const scenarios = currentScenarios();
+  const box = $(main, "scenarios");
+  box.hidden = !scenarios.length;
+  const runButton = main.querySelector('[data-action="run"]');
+  if (box.hidden) {
+    runButton.disabled = !!state.runId;
+    return;
+  }
+
+  const running = !!state.runId;
+  const { set } = selectionFor();
+  $(main, "scenarioList").replaceChildren(...scenarios.map((s) => {
+    const item = el("li", `scenario${s.implemented ? "" : " todo"}${set.has(s.number) ? " selected" : ""}`);
+    const label = el("label");
+    const check = el("input");
+    check.type = "checkbox";
+    check.checked = set.has(s.number);
+    check.disabled = running;
+    check.dataset.number = String(s.number);
+    label.append(check, el("span", "mono scenario-num", String(s.number)), el("span", "scenario-title", s.title));
+
+    const badges = el("span", "scenario-badges");
+    if (!s.implemented) {
+      const todo = pill("todo", t(s.setupImplemented ? "scenarios.notImplemented" : "scenarios.setupNotDone"));
+      todo.title = t("scenarios.notImplementedTitle");
+      badges.append(todo);
+    }
+    const last = s.last ? pill(s.last.status, t(`scenarios.last.${s.last.status}`)) : pill("none", t("scenarios.neverRun"));
+    if (s.last) last.title = t("scenarios.lastAt", { date: fmtDate(s.last.startedAt) });
+    badges.append(last);
+    if (s.requires.length) badges.append(el("span", "scenario-requires", t("scenarios.requires", { list: s.requires.join(", ") })));
+    item.append(label, badges);
+    return item;
+  }));
+
+  const selected = scenarios.filter((s) => set.has(s.number));
+  const notImplemented = selected.filter((s) => !s.implemented).map((s) => s.number);
+  $(main, "scenarioCount").textContent = t("scenarios.count", { selected: selected.length, count: scenarios.length });
+  const hint = $(main, "scenarioHint");
+  hint.classList.toggle("warn", notImplemented.length > 0);
+  hint.textContent = [
+    scenarios[0].setupImplemented ? null : t("scenarios.hintSetup"),
+    !selected.length
+      ? t(scenarios.some((s) => s.implemented) ? "scenarios.hintNone" : "scenarios.hintNoneImplemented")
+      : notImplemented.length
+        ? t("scenarios.hintNotImplemented", { list: notImplemented.join(", ") })
+        : t("scenarios.hintCommand", { list: selected.map((s) => s.number).join(",") }),
+  ].filter(Boolean).join(" ");
+  main.querySelector('[data-action="select-implemented"]').disabled = running || implementedSelection(scenarios).size === 0;
+  main.querySelector('[data-action="select-none"]').disabled = running || !selected.length;
+  runButton.disabled = running || !selected.length;
+}
+
+function wireScenarios(main) {
+  // Ticking a scenario ticks the scenarios it requires; unticking one unticks the scenarios that require it.
+  $(main, "scenarioList").addEventListener("change", (event) => {
+    const check = event.target.closest('input[type="checkbox"]');
+    if (!check) return;
+    const scenarios = currentScenarios();
+    const entry = selectionFor();
+    const number = Number(check.dataset.number);
+    entry.touched = true;
+    if (check.checked) {
+      for (const required of withRequired([number], scenarios)) entry.set.add(required);
+    } else {
+      for (const s of scenarios) if (withRequired([s.number], scenarios).has(number)) entry.set.delete(s.number);
+    }
+    renderScenarios();
+  });
+  main.querySelector('[data-action="select-implemented"]').addEventListener("click", () => {
+    state.selections.set(`${state.currentId}:${state.target}`, { set: implementedSelection(currentScenarios()), touched: true });
+    renderScenarios();
+  });
+  main.querySelector('[data-action="select-none"]').addEventListener("click", () => {
+    state.selections.set(`${state.currentId}:${state.target}`, { set: new Set(), touched: true });
+    renderScenarios();
+  });
+}
+
 // ---------- running ----------
 function setTarget(target) {
   state.target = target;
   state.view.querySelectorAll("[data-target]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.target === target)));
+  renderScenarios();
 }
 
 function wireRunControls(main) {
@@ -363,9 +527,14 @@ function wireRunControls(main) {
 
   main.querySelector('[data-action="run"]').addEventListener("click", async () => {
     const target = state.target;
-    const { ok, status, payload } = await api.post(`/labs/${encodeURIComponent(state.currentId)}/runs`, { target });
+    const body = { target };
+    if (currentScenarios().length) body.scenarios = [...selectionFor(target).set].sort((a, b) => a - b);
+    const { ok, status, payload } = await api.post(`/labs/${encodeURIComponent(state.currentId)}/runs`, body);
     if (!ok) {
-      toast(status === 409 ? t("toast.busy") : t("toast.startError", { status }));
+      const scenarioError = status === 400 ? payload?.errors?.scenarios : null;
+      toast(status === 409 ? t("toast.busy") : scenarioError ? t(`scenarios.error.${scenarioError}`) : t("toast.startError", { status }));
+      // The program changed since the list was read: read it again.
+      if (scenarioError) loadScenarios();
       return;
     }
     toast(t("toast.started", { target: targetLabel(target) }));
@@ -396,6 +565,7 @@ function setRunning(running) {
   cancel.disabled = false;
   cancel.querySelector("span").textContent = t("run.cancel");
   main.querySelectorAll("[data-target]").forEach((b) => { b.disabled = running; });
+  renderScenarios();
 }
 
 function resetRunView() {
@@ -454,6 +624,7 @@ function attachToRun(runId, target) {
     const record = JSON.parse(e.data).result;
     state.runId = null;
     finishRun(record);
+    loadScenarios(); // their last result changed
     await refreshLabs();
     state.details = await api.get(`/labs/${encodeURIComponent(record.labId)}?lang=${language()}`);
     renderReadouts();
@@ -672,17 +843,17 @@ function renderResults(record) {
 
   const checks = record.checks;
   $(main, "checksCount").textContent = checks.length ? t("checks.passedCount", { passed: checks.filter((c) => c.passed).length, count: checks.length }) : "";
-  $(main, "checks").replaceChildren(...(checks.length
-    ? checks.map((c) => {
-        const item = el("li", c.passed ? "ok" : "ko");
-        item.append(icon(c.passed ? "check" : "x"), el("span", null, checkText(lab, c.id, c.description)));
-        return item;
-      })
-    : [el("li", "ko", record.failureStage === "build" ? t("checks.notEvaluatedBuild") : t("checks.notEvaluated"))]));
+  $(main, "checks").replaceChildren(...(record.scenarios?.length
+    ? scenarioCheckItems(record, lab)
+    : checks.length
+      ? checks.map((c) => checkItem(c, lab))
+      : [el("li", "ko", record.failureStage === "build" ? t("checks.notEvaluatedBuild") : t("checks.notEvaluated"))]));
 
   renderTokens($(main, "tokens"), record.tokenUsage);
 
-  $(main, "errorsCard").hidden = record.errors.length === 0;
+  // Errors raised while a scenario was running are shown with that scenario; the others (build, configuration) here.
+  const attached = record.scenarios?.some((s) => s.errors.length) ?? false;
+  $(main, "errorsCard").hidden = record.errors.length === 0 || attached;
   $(main, "errors").textContent = record.errors.join("\n");
   // The lab stopped because its Azure OpenAI configuration is missing: point to the AI models settings, on the model concerned.
   const missingConfig = record.errors.find((e) => /AzureOpenAI:\w+' is not configured/.test(e));
@@ -695,6 +866,42 @@ function renderResults(record) {
   $(main, "warningsCard").hidden = record.buildWarnings.length === 0;
   $(main, "warningsCount").textContent = String(record.buildWarnings.length);
   $(main, "warnings").replaceChildren(...record.buildWarnings.map((w) => el("li", null, w)));
+}
+
+function checkItem(check, lab) {
+  const item = el("li", check.passed ? "ok" : "ko");
+  item.append(icon(check.passed ? "check" : "x"), el("span", null, checkText(lab, check.id, check.description)));
+  return item;
+}
+
+/** The checks grouped by scenario: the checks of the whole run, then each scenario that ran with its checks and its errors. */
+function scenarioCheckItems(record, lab) {
+  const checks = new Map(record.checks.map((c) => [c.id, c]));
+  const owned = new Set(record.scenarios.flatMap((s) => s.checks));
+  const items = [];
+  const runChecks = record.checks.filter((c) => !owned.has(c.id));
+  if (runChecks.length) {
+    items.push(el("li", "check-group", t("scenarios.runChecks")));
+    items.push(...runChecks.map((c) => checkItem(c, lab)));
+  }
+
+  for (const scenario of record.scenarios.filter((s) => s.status !== "skipped")) {
+    const head = el("li", `check-group scenario-result ${scenario.status}`);
+    head.append(el("span", null, t("scenarios.heading", { number: scenario.number, title: scenario.title })),
+      pill(scenario.status, t(`scenarios.status.${scenario.status}`)));
+    items.push(head);
+    items.push(...scenario.checks.map((id) => checks.get(id)).filter(Boolean).map((c) => checkItem(c, lab)));
+    if (scenario.status === "notRun") items.push(el("li", "ko muted", t("scenarios.notRunHint")));
+    if (scenario.errors.length) {
+      const error = el("li", "ko scenario-error");
+      error.append(icon("x"), el("pre", "errors", scenario.errors.join("\n")));
+      items.push(error);
+    }
+  }
+
+  const skipped = record.scenarios.filter((s) => s.status === "skipped").map((s) => s.number);
+  if (skipped.length) items.push(el("li", "muted scenario-skipped", t("scenarios.skipped", { list: skipped.join(", ") })));
+  return items;
 }
 
 function renderTokens(container, usage) {
@@ -1762,6 +1969,8 @@ function wireSettings() {
   wireSettings();
   wireReporting();
   wireReset();
+  // Back from the editor: the learner may have written the code of a scenario, read the scenarios again.
+  window.addEventListener("focus", () => { if (state.view && !state.runId) loadScenarios(); });
   // A change seen by the journey (a run started or ended in another tab) refreshes the lab list too.
   initJourney({ onOpen: (id) => selectLab(id), onChange: () => refreshLabs().catch(() => {}) });
   setServer("connecting");

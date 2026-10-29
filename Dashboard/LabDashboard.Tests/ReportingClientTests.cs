@@ -785,6 +785,27 @@ public sealed class ReportingClientTests : IAsyncDisposable
         }
     }
 
+    [Fact]
+    public void A_run_limited_to_some_scenarios_reports_every_scenario_with_its_result()
+    {
+        Context ctx = CreateClient($"http://127.0.0.1:{FakeAdminServer.FreePort()}");
+        RunRecord record = new()
+        {
+            RunId = "s1", LabId = "asking", Target = RunTarget.Start, Status = RunStatus.Passed, Summary = "All 2 checks passed",
+            StartedAt = DateTimeOffset.Now, DurationMs = 10,
+            Checks = [new("config", "Configuration", true), new("scenario2", "Scenario 2", true)],
+            Scenarios = [new(1, "First", ScenarioStatus.Skipped), new(2, "Second", ScenarioStatus.Passed), new(3, "Third", ScenarioStatus.NotRun)],
+        };
+
+        ctx.Client.RunFinished(record);
+
+        // The admin dashboard does not complete the lab on a run with a skipped scenario: the snapshot that follows decides.
+        JsonNode payload = ctx.Outbox.PeekBatch().Single(e => e.Type == "run.finished").Payload!;
+        Assert.Equal("""[{"number":1,"status":"skipped"},{"number":2,"status":"passed"},{"number":3,"status":"notRun"}]""",
+            payload["scenarios"]!.ToJsonString());
+        Assert.Equal("progress.snapshot", ctx.Outbox.PeekBatch().Last().Type);
+    }
+
     // ---------- helpers ----------
 
     private sealed record Context(ReportingClient Client, IdentityStore Identity, ReportingOutbox Outbox);
