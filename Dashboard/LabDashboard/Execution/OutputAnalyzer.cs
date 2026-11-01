@@ -204,7 +204,7 @@ public static partial class OutputAnalyzer
             int number = scenario.Number;
             if (!selected.Contains(number))
             {
-                return new ScenarioResult(number, scenario.Title, ScenarioStatus.Skipped);
+                return new ScenarioResult(number, scenario.Title, ScenarioStatus.Skipped) { NotImplemented = selection.NotImplemented.Contains(number) };
             }
 
             List<ExpectationResult> own = checks.Where((_, i) => evaluated[i].Owner == number).ToList();

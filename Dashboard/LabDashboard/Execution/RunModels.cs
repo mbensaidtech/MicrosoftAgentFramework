@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using LabDashboard.Catalog;
 
 namespace LabDashboard.Execution;
@@ -39,10 +40,20 @@ public sealed record ScenarioResult(int Number, string Title, ScenarioStatus Sta
 {
     public IReadOnlyList<string> Checks { get; init; } = [];
     public IReadOnlyList<string> Errors { get; init; } = [];
+
+    /// <summary>Asked for, but not implemented when the run started: left out (<see cref="ScenarioStatus.Skipped"/>).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool NotImplemented { get; init; }
 }
 
-/// <summary>The scenarios of the program when the run started, and those it runs (passed to the program with --scenarios).</summary>
-public sealed record ScenarioRun(IReadOnlyList<CommonUtilities.LabScenario> Scenarios, IReadOnlyList<int> Selected);
+/// <summary>
+/// The scenarios of the program when the run started, those it runs (passed to the program with --scenarios), and those asked for
+/// but left out because they could not run (not implemented).
+/// </summary>
+public sealed record ScenarioRun(IReadOnlyList<CommonUtilities.LabScenario> Scenarios, IReadOnlyList<int> Selected)
+{
+    public IReadOnlyList<int> NotImplemented { get; init; } = [];
+}
 
 /// <summary>One token usage block printed by the exercise (e.g. "Token Usage:" followed by the counts).</summary>
 public sealed record TokenUsageReport(string Label, long? Input, long? Output, long? Reasoning, long? Total);

@@ -616,7 +616,6 @@ details.fig:not([open]) > summary { border-bottom: 0; }
 .scenario-badges { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .scenario-requires { font-size: 11.5px; color: var(--txt3); }
 .scenarios-hint { margin-top: 8px; }
-.scenarios-hint.warn { color: var(--warn); }
 .pill.todo, .pill.notRun { color: var(--warn); background: var(--warnbg); border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 .pill.notRun::before { opacity: .5; }
 

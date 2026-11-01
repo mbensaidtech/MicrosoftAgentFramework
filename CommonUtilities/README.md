@@ -82,8 +82,7 @@ bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 | Command | Runs |
 |---------|------|
 | `dotnet run` | The implemented scenarios: the code of their `#region Scenario N: …` block, and of the setup before the first scenario, is no longer the delivered code (comments and layout do not count) |
-| `dotnet run -- --scenarios 2` / `--scenarios 1,3` | Those scenarios (and the ones they require: `// Requires scenario N` in their block), implemented or not |
-| `dotnet run -- --scenarios all` | Every scenario |
+| `dotnet run -- --scenarios 2` / `--scenarios 1,3` | Those scenarios (and the ones they require: `// Requires scenario N` in their block). A scenario that is not implemented never runs: when named, it is left out and the program says so |
 | `dotnet run -- --list-scenarios` | Nothing: lists the scenarios and their state |
 
 `ShouldRun` prints the selection once (`>>> Scenarios to run: …`) and a line when a scenario starts (`>>> Running scenario N: Title`).

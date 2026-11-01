@@ -8,9 +8,9 @@ namespace CommonUtilities;
 /// dotnet run                          the implemented scenarios (a scenario whose code is still the delivered one is left out)
 /// dotnet run -- --scenarios 2         scenario 2 (and the scenarios it requires)
 /// dotnet run -- --scenarios 1,3       scenarios 1 and 3
-/// dotnet run -- --scenarios all       every scenario, implemented or not
 /// dotnet run -- --list-scenarios      the scenarios of the lab and their state, then exit
 /// </code>
+/// A scenario that is not implemented never runs: when named, it is left out (the program says so) and the other scenarios run.
 /// The Lab Bench dashboard runs the lab with the same option.
 /// </summary>
 public sealed class ScenarioSelection

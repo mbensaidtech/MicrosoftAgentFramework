@@ -100,9 +100,8 @@ public class LabScenariosTests
     [InlineData(new string[0], "1,3")] // the implemented scenarios
     [InlineData(new[] { "--scenarios", "implemented" }, "1,3")]
     [InlineData(new[] { "--scenarios", "3" }, "3")]
-    [InlineData(new[] { "--scenario=2" }, "1,2")] // with the scenario it requires; not implemented but asked for
+    [InlineData(new[] { "--scenario=1" }, "1")]
     [InlineData(new[] { "--serve", "--scenarios", "3, 1" }, "1,3")] // the arguments of the lab itself are left alone
-    [InlineData(new[] { "--scenarios", "all" }, "1,2,3")]
     public void Plans_what_runs_from_the_command_line(string[] args, string expected)
     {
         ScenarioRequest request = LabScenarios.ParseArguments(args, out bool list, out string? error);
@@ -123,19 +122,35 @@ public class LabScenariosTests
             [new(1, "Fill", []) { CodeImplemented = false }, new(2, "Search", [1]), new(3, "Agent", [])];
 
         ScenarioPlan byDefault = LabScenarios.Plan(scenarios, ScenarioRequest.Implemented);
-        ScenarioPlan asked = LabScenarios.Plan(scenarios, new ScenarioRequest([2]));
+        ScenarioPlan asked = LabScenarios.Plan(scenarios, new ScenarioRequest([2, 3]));
 
         Assert.Equal([3], byDefault.Selected);
         Assert.Equal([1, 2], byDefault.LeftOut);
-        Assert.Equal([1, 2], asked.Selected);
-        Assert.Equal([1], asked.AddedAsRequired);
-        Assert.Equal([1], asked.NotImplemented);
+        Assert.Empty(byDefault.NotImplemented);
+        // Asked for, scenario 2 cannot run without scenario 1: it is left out, scenario 3 runs.
+        Assert.Equal([3], asked.Selected);
+        Assert.Equal([2], asked.NotImplemented);
+    }
+
+    [Theory]
+    [InlineData(new[] { "--scenarios", "2" }, "")]
+    [InlineData(new[] { "--scenarios", "1,2,3" }, "1,3")] // the other scenarios asked for run
+    public void A_not_implemented_scenario_is_left_out_even_when_asked_for(string[] args, string selected)
+    {
+        ScenarioRequest request = LabScenarios.ParseArguments(args, out _, out string? error);
+        ScenarioPlan plan = LabScenarios.Plan(Scenarios, request);
+
+        Assert.Null(error);
+        Assert.Equal(selected, string.Join(',', plan.Selected));
+        Assert.Equal([2], plan.NotImplemented);
+        Assert.Contains(LabScenarios.DescribePlan(Scenarios, request, plan), line => line.StartsWith(">>> Scenarios not run: 2 (not implemented yet", StringComparison.Ordinal));
     }
 
     [Theory]
     [InlineData(new[] { "--scenarios" }, "needs a value")]
     [InlineData(new[] { "--scenarios", "1,x" }, "not a scenario number")]
     [InlineData(new[] { "--scenarios", "0" }, "not a scenario number")]
+    [InlineData(new[] { "--scenarios", "all" }, "not a scenario number")] // a scenario that is not implemented never runs: no option forces them
     public void Refuses_a_malformed_selection(string[] args, string error)
     {
         LabScenarios.ParseArguments(args, out _, out string? message);
@@ -190,12 +205,13 @@ public class LabScenariosTests
         string[] stdout = ["Endpoint: x", ">>> Running scenario 1: Fill the store", "filled", ">>> Running scenario 3: Agent"];
 
         (IReadOnlyList<ExpectationResult> checks, IReadOnlyList<ScenarioResult> scenarios) = OutputAnalyzer.EvaluateScenarios(
-            expectations, new ScenarioRun(Scenarios, [1, 3]), OutputAnalyzer.Split(stdout), ScenarioEnd.Stopped,
+            expectations, new ScenarioRun(Scenarios, [1, 3]) { NotImplemented = [2] }, OutputAnalyzer.Split(stdout), ScenarioEnd.Stopped,
             ["Unhandled exception. System.InvalidOperationException: boom"]);
 
-        // Scenario 2 was not selected: neither its checks nor the comparison of 1 and 2 are evaluated.
+        // Scenario 2 was asked for but is not implemented: it did not run, neither its checks nor the comparison of 1 and 2 are evaluated.
         Assert.Equal(["config", "scenario1", "scenario3"], checks.Select(c => c.Id));
         Assert.Equal([ScenarioStatus.Passed, ScenarioStatus.Skipped, ScenarioStatus.Failed], scenarios.Select(s => s.Status));
+        Assert.Equal([false, true, false], scenarios.Select(s => s.NotImplemented));
         Assert.Equal(["scenario1"], scenarios[0].Checks);
         Assert.Empty(scenarios[0].Errors);
         Assert.Equal(["Unhandled exception. System.InvalidOperationException: boom"], scenarios[2].Errors);

@@ -16,7 +16,6 @@ using FirstBasicAIAgent;
 // dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
-// dotnet run -- --scenarios all       -> every scenario, implemented or not
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
@@ -30,9 +29,7 @@ var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
-// TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
-// Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
-// OpenAIClientOptions clientOptions = ...
+OpenAIClientOptions clientOptions = new() { Endpoint = AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) };
 
 // TODO 2: Create the OpenAIClient
 // - If settings.APIKey is set: authenticate with an ApiKeyCredential
@@ -40,11 +37,13 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 //   DefaultAzureCredential and the scope "https://ai.azure.com/.default"
 // Note: the AuthenticationPolicy constructor is flagged experimental (OPENAI001), keep the pragma around it.
 #pragma warning disable OPENAI001
-// OpenAIClient client = ...
+OpenAIClient client = !string.IsNullOrWhiteSpace(settings.APIKey)
+    ? new OpenAIClient(new ApiKeyCredential(settings.APIKey), clientOptions)
+    : new OpenAIClient(new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"), clientOptions);
 #pragma warning restore OPENAI001
 
 // TODO 3: Get a ChatClient (Chat Completions API) for the deployment
-// ChatClient chatClient = ...
+ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
 #endregion
 
@@ -55,15 +54,14 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteDividerLine();
 
     // TODO 4: Create a basic AI Agent from the ChatClient (no instructions, no name)
-    // AIAgent basicAgent = ...
+        AIAgent basicAgent = chatClient.AsAIAgent();
 
     // TODO 5: Run the agent with a simple string prompt
     // Hint: chain .WithSpinner("Running agent") to show a loading animation
-    // AgentResponse basicResponse = ...
+    AgentResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?").WithSpinner("Running agent");
 
     // TODO 6: Display the response
-    ColoredConsole.WriteInfoLine("=== Scenario 1: Basic Agent ===");
-    // ColoredConsole.WritePrimaryLogLine(basicResponse.Text);
+    ColoredConsole.WritePrimaryLogLine(basicResponse.Text);
 }
 
 #endregion
@@ -75,14 +73,16 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
 
     // TODO 7: Create an AI Agent with specific instructions and a name
-    // AIAgent geographyAgent = ...
+      AIAgent geographyAgent = chatClient.AsAIAgent(
+        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
+        name: "GeographyAgent");
 
     // TODO 8: Run the agent with a geography-related question
-    // AgentResponse geographyResponse = ...
+    AgentResponse geographyResponse = await geographyAgent.RunAsync("Hello, what is the surface area of France?").WithSpinner("Running agent");
 
     // TODO 9: Display the response (the agent name is available through geographyAgent.Name)
     ColoredConsole.WriteInfoLine("=== Scenario 2: Agent with Instructions ===");
-    // ColoredConsole.WritePrimaryLogLine(geographyResponse.Text);
+    ColoredConsole.WritePrimaryLogLine(geographyResponse.Text);
 }
 
 #endregion
@@ -94,7 +94,10 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
 
     // TODO 10: Create an AI Agent with specific instructions and a name
-    // AIAgent geographyAgent = ...
+    AIAgent geographyAgent = chatClient.AsAIAgent(
+        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
+        name: "GeographyAgent");
+
 
     // TODO 11: Create a system message to refine the agent behavior for this run only
     // AIExtensions.ChatMessage systemMessage = ...

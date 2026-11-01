@@ -171,7 +171,9 @@ public class OutputAnalyzerTests
         "  Total tokens: 94",
     ];
 
-    // Standard output of the Lab01 exercise as delivered, every scenario asked for (`--scenarios all`): only what the Start already prints.
+    // Standard output of the Lab01 exercise as delivered, every scenario run (recorded when `--scenarios all` could still force them): only
+    // what the Start already prints. Such a run no longer happens, but a scenario counts as implemented as soon as one character of its code
+    // changes: its checks must still fail on this output.
     private static readonly string[] Lab01StartOutput =
     [
         "Endpoint: https://example.openai.azure.com/",

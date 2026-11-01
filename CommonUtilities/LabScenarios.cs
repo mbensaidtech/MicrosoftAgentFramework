@@ -25,15 +25,16 @@ public sealed record LabScenario(int Number, string Title, IReadOnlyList<int> Re
     public bool Implemented => SetupImplemented && CodeImplemented;
 }
 
-/// <summary>What a run asks for: scenario numbers, every scenario (<see cref="All"/>), or neither: the implemented scenarios.</summary>
-public sealed record ScenarioRequest(IReadOnlyList<int>? Numbers, bool All = false)
+/// <summary>What a run asks for: scenario numbers, or none: the implemented scenarios.</summary>
+public sealed record ScenarioRequest(IReadOnlyList<int>? Numbers)
 {
     public static readonly ScenarioRequest Implemented = new(Numbers: null);
 }
 
 /// <summary>
 /// The scenarios a run executes (<see cref="Selected"/>, ascending), with the scenarios added because a selected one requires them,
-/// the selected scenarios that are not implemented, the requested numbers the lab does not have, and the scenarios left out by default.
+/// the requested scenarios left out because they cannot run (not implemented, or requiring a scenario that is not), the requested
+/// numbers the lab does not have, and the scenarios left out. Asking for a scenario that cannot run is not an error: it is left out.
 /// </summary>
 public sealed record ScenarioPlan(
     IReadOnlyList<int> Selected,
@@ -65,7 +66,6 @@ public static partial class LabScenarios
     public const string ScenariosOption = "--scenarios";
     public const string ScenarioOption = "--scenario";
     public const string ListOption = "--list-scenarios";
-    public const string AllValue = "all";
     public const string ImplementedValue = "implemented";
 
     /// <summary>The fingerprints of the delivered exercise, in the folder of the lab (the parent of Start/ and Solution/).</summary>
@@ -244,15 +244,14 @@ public static partial class LabScenarios
     }
 
     /// <summary>
-    /// Reads <c>--scenarios 1,3</c>, <c>--scenarios=1,3</c>, <c>--scenario 2</c>, <c>--scenarios all</c>, <c>--scenarios implemented</c>
-    /// and <c>--list-scenarios</c>; every other argument belongs to the lab and is ignored.
+    /// Reads <c>--scenarios 1,3</c>, <c>--scenarios=1,3</c>, <c>--scenario 2</c>, <c>--scenarios implemented</c> and <c>--list-scenarios</c>;
+    /// every other argument belongs to the lab and is ignored.
     /// </summary>
     public static ScenarioRequest ParseArguments(IReadOnlyList<string> args, out bool list, out string? error)
     {
         list = false;
         error = null;
         List<int>? numbers = null;
-        bool all = false;
         for (int i = 0; i < args.Count; i++)
         {
             string arg = args[i];
@@ -273,17 +272,11 @@ public static partial class LabScenarios
             string? value = arg.Length > option.Length ? arg[(option.Length + 1)..] : i + 1 < args.Count ? args[++i] : null;
             if (string.IsNullOrWhiteSpace(value))
             {
-                error = $"{option} needs a value: scenario numbers (1,3), '{AllValue}' or '{ImplementedValue}'.";
+                error = $"{option} needs a value: scenario numbers (1,3) or '{ImplementedValue}'.";
                 return ScenarioRequest.Implemented;
             }
 
             value = value.Trim();
-            if (value.Equals(AllValue, StringComparison.OrdinalIgnoreCase))
-            {
-                all = true;
-                continue;
-            }
-
             if (value.Equals(ImplementedValue, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -293,7 +286,7 @@ public static partial class LabScenarios
             {
                 if (!int.TryParse(part, out int number) || number <= 0)
                 {
-                    error = $"'{part}' is not a scenario number. Use for example {ScenariosOption} 1,3 ({AllValue}: every scenario).";
+                    error = $"'{part}' is not a scenario number. Use for example {ScenariosOption} 1,3 ({ImplementedValue}: every implemented scenario).";
                     return ScenarioRequest.Implemented;
                 }
 
@@ -301,15 +294,16 @@ public static partial class LabScenarios
             }
         }
 
-        return all ? new ScenarioRequest(null, All: true) : new ScenarioRequest(numbers?.Distinct().Order().ToList());
+        return new ScenarioRequest(numbers?.Distinct().Order().ToList());
     }
 
     /// <summary>The arguments that select these scenarios, after <c>dotnet run ... --</c>.</summary>
     public static IReadOnlyList<string> FormatArguments(IEnumerable<int> numbers) => [ScenariosOption, string.Join(',', numbers)];
 
     /// <summary>
-    /// Decides what runs. Requested numbers run with the scenarios they require (even when one is not implemented: it was asked for);
-    /// <see cref="ScenarioRequest.All"/> runs every scenario; otherwise only the implemented scenarios whose required scenarios are implemented too.
+    /// Decides what runs: the requested scenarios that can run (implemented, and so are the scenarios they require), with the scenarios
+    /// they require; without numbers, every scenario that can run. A scenario that cannot run never runs: when requested, it is left out
+    /// and listed in <see cref="ScenarioPlan.NotImplemented"/>, and the other requested scenarios run.
     /// When the scenarios of the lab are unknown (no Program.cs), the requested numbers are taken as they are.
     /// </summary>
     public static ScenarioPlan Plan(IReadOnlyList<LabScenario> scenarios, ScenarioRequest request)
@@ -321,19 +315,20 @@ public static partial class LabScenarios
         }
 
         List<int> unknown = request.Numbers?.Where(n => !known.ContainsKey(n)).ToList() ?? [];
-        IEnumerable<int> wanted = request.All ? known.Keys
-            : request.Numbers is not null ? request.Numbers.Where(known.ContainsKey)
-            : known.Values.Where(s => WithRequired([s.Number], known).All(n => known[n].Implemented)).Select(s => s.Number);
-
-        List<int> asked = wanted.ToList();
-        List<int> selected = WithRequired(asked, known).Order().ToList();
+        List<int> asked = (request.Numbers?.Where(known.ContainsKey) ?? known.Keys).ToList();
+        List<int> runnable = asked.Where(n => Runnable(n, known)).ToList();
+        List<int> selected = WithRequired(runnable, known).Order().ToList();
         return new ScenarioPlan(
             selected,
             selected.Except(asked).ToList(),
-            selected.Where(n => !known[n].Implemented).ToList(),
+            request.Numbers is null ? [] : asked.Except(runnable).Order().ToList(),
             unknown,
             known.Keys.Except(selected).Order().ToList());
     }
+
+    /// <summary>A scenario can run: it is implemented, and so are the scenarios it requires.</summary>
+    private static bool Runnable(int number, IReadOnlyDictionary<int, LabScenario> known) =>
+        WithRequired([number], known).All(n => known[n].Implemented);
 
     /// <summary>The scenarios and, transitively, the scenarios they require (only those of the lab).</summary>
     private static HashSet<int> WithRequired(IEnumerable<int> numbers, IReadOnlyDictionary<int, LabScenario> known)
@@ -375,24 +370,17 @@ public static partial class LabScenarios
             return [];
         }
 
-        string how = request.All ? $"{ScenariosOption} {AllValue}"
-            : request.Numbers is not null ? $"{ScenariosOption} {string.Join(',', request.Numbers)}"
-            : "the implemented ones";
+        string how = request.Numbers is not null ? $"{ScenariosOption} {string.Join(',', request.Numbers)}" : "the implemented ones";
         List<string> lines = [plan.Selected.Count == 0
             ? $"{PlanPrefix} to run: none ({how})"
             : $"{PlanPrefix} to run: {string.Join(", ", plan.Selected)} ({how}{(plan.AddedAsRequired.Count > 0 ? $"; required: {string.Join(", ", plan.AddedAsRequired)}" : "")})"];
 
-        if (plan.NotImplemented.Count > 0)
+        IReadOnlyList<int> notRun = request.Numbers is null ? plan.LeftOut : plan.NotImplemented;
+        if (notRun.Count > 0)
         {
-            lines.Add($"{PlanPrefix} not implemented yet (code unchanged since the exercise was delivered), run anyway: {string.Join(", ", plan.NotImplemented)}");
-        }
-
-        List<int> notImplemented = plan.LeftOut.Where(n => scenarios.First(s => s.Number == n) is { Implemented: false }).ToList();
-        if (request.Numbers is null && !request.All && notImplemented.Count > 0)
-        {
-            string why = scenarios[0].SetupImplemented ? "their code is still the delivered one" : "the setup before the scenarios is still the delivered one";
-            lines.Add($"{PlanPrefix} not run: {string.Join(", ", plan.LeftOut)} (not implemented: {why}). " +
-                      $"Run one anyway with: dotnet run -- {ScenariosOption} {notImplemented[0]}");
+            string why = scenarios[0].SetupImplemented ? "their code, or the code of a scenario they require, is still the delivered one"
+                : "the setup before the scenarios is still the delivered one";
+            lines.Add($"{PlanPrefix} not run: {string.Join(", ", notRun)} (not implemented yet: {why})");
         }
 
         return lines;
@@ -427,8 +415,7 @@ public static partial class LabScenarios
         foreach ((string command, string effect) in new[]
         {
             ("dotnet run", $"runs {(byDefault.Selected.Count > 0 ? string.Join(", ", byDefault.Selected) : "no scenario")} (the implemented scenarios)"),
-            ($"dotnet run -- {ScenariosOption} 1,3", "runs scenarios 1 and 3 (and the scenarios they require)"),
-            ($"dotnet run -- {ScenariosOption} {AllValue}", "runs every scenario, implemented or not"),
+            ($"dotnet run -- {ScenariosOption} 1,3", "runs scenarios 1 and 3 and the scenarios they require (one that is not implemented is left out)"),
         })
         {
             lines.Add($"{command,-32} {effect}");

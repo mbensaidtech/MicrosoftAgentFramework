@@ -172,8 +172,8 @@ api.MapGet("/labs/{id}/solution", (string id, LabCatalog catalog) =>
 });
 
 // The scenarios of the exercise and of the solution, read now from their Program.cs (the learner edits the exercise meanwhile):
-// state (implemented: its code, and the setup, are no longer the delivered ones), the scenarios each one requires, and the last result
-// of each one on that project.
+// state (implemented: its code, and the setup, are no longer the delivered ones; runnable: implemented, and so are the scenarios it
+// requires), the scenarios each one requires, and the last result of each one on that project.
 api.MapGet("/labs/{id}/scenarios", (string id, LabCatalog catalog, RunHistoryStore history) =>
 {
     if (catalog.Find(id) is not { } lab)
@@ -187,11 +187,14 @@ api.MapGet("/labs/{id}/scenarios", (string id, LabCatalog catalog, RunHistorySto
         target =>
         {
             IReadOnlyDictionary<int, (ScenarioStatus Status, RunRecord Run)> last = ExerciseProgress.LastScenarioResults(runs, target);
-            return catalog.Scenarios(lab, target).Select(scenario => new
+            IReadOnlyList<LabScenario> scenarios = catalog.Scenarios(lab, target);
+            HashSet<int> runnable = [.. LabScenarios.Plan(scenarios, ScenarioRequest.Implemented).Selected];
+            return scenarios.Select(scenario => new
             {
                 scenario.Number,
                 scenario.Title,
                 scenario.Implemented,
+                Runnable = runnable.Contains(scenario.Number),
                 scenario.SetupImplemented,
                 scenario.Requires,
                 Last = last.TryGetValue(scenario.Number, out var result)
@@ -209,7 +212,8 @@ api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalo
     }
 
     // The selection is checked against the Program.cs of the project, with the rules of the labs: the scenarios asked for and the
-    // scenarios they require; without "scenarios", the implemented ones (as `dotnet run` without option). The program receives the
+    // scenarios they require; without "scenarios", the implemented ones (as `dotnet run` without option). A scenario that is not
+    // implemented never runs: asked for, it is left out and the run records it (the other scenarios run). The program receives the
     // resulting list (`-- --scenarios 1,3`), so that what runs is exactly what was checked here.
     IReadOnlyList<LabScenario> scenarios = catalog.Scenarios(lab, request.Target);
     ScenarioRun? selection = null;
@@ -217,18 +221,20 @@ api.MapPost("/labs/{id}/runs", (string id, RunRequest request, LabCatalog catalo
     {
         ScenarioPlan plan = LabScenarios.Plan(scenarios, new ScenarioRequest(request.Scenarios));
         string? error = plan.Unknown.Count > 0 || (scenarios.Count == 0 && plan.Selected.Count > 0) ? "unknown"
-            : plan.Selected.Count == 0 ? request.Scenarios is null ? "noneImplemented" : "required"
-            : null;
+            : plan.Selected.Count > 0 ? null
+            : request.Scenarios is null ? "noneImplemented"
+            : plan.NotImplemented.Count > 0 ? "notImplemented"
+            : "required";
         if (error is not null)
         {
             return Results.BadRequest(new { errors = new Dictionary<string, string> { ["scenarios"] = error } });
         }
 
-        selection = new ScenarioRun(scenarios, plan.Selected);
+        selection = new ScenarioRun(scenarios, plan.Selected) { NotImplemented = plan.NotImplemented };
     }
 
     return runner.TryStart(lab, request.Target, out LabRun run, selection)
-        ? Results.Accepted($"/api/runs/{run.Id}/events", new { runId = run.Id, scenarios = selection?.Selected })
+        ? Results.Accepted($"/api/runs/{run.Id}/events", new { runId = run.Id, scenarios = selection?.Selected, notImplemented = selection?.NotImplemented })
         : Results.Conflict(new { error = $"A run is already in progress ({run.Lab.Title}, {run.Target}).", runId = run.Id });
 });
 

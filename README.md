@@ -153,11 +153,10 @@ Choose the scenarios after `--` (from the project folder, or with `--project` as
 | `dotnet run -- --scenarios 2` | Scenario 2 only (`--scenario 2` works too) |
 | `dotnet run -- --scenarios 1,3` | Scenarios 1 and 3 |
 | `dotnet run -- --scenarios implemented` | Every implemented scenario, explicitly (same as no option) |
-| `dotnet run -- --scenarios all` | Every scenario, implemented or not |
 | `dotnet run -- --list-scenarios` | Nothing: lists the scenarios of the lab, implemented or not, and what `dotnet run` would run |
 
-- A scenario you name runs even if it is not implemented (you asked for it: the program says so). An unknown number stops the program with the list of the scenarios (exit code 2).
-- Some scenarios need another one in the same run, declared by a `// Requires scenario N` comment in their block: Lab07 scenarios 2–4 need scenario 1 (it fills the in-memory vector store), Lab13 scenarios 3 and 4 need scenario 2 (same conversation). Naming them adds the scenario they require; by default, a scenario whose required scenario is not implemented is left out.
+- A scenario that is not implemented **never runs**: when you name one, it is left out (`>>> Scenarios not run: 2 (not implemented yet: …)`) and the other scenarios you named run. An unknown number stops the program with the list of the scenarios (exit code 2).
+- Some scenarios need another one in the same run, declared by a `// Requires scenario N` comment in their block: Lab07 scenarios 2–4 need scenario 1 (it fills the in-memory vector store), Lab13 scenarios 3 and 4 need scenario 2 (same conversation). Naming them adds the scenario they require; a scenario whose required scenario is not implemented is left out too.
 - The program prints what it runs (`>>> Scenarios to run: 1, 3 (--scenarios 1,3)`) and a line when each scenario starts (`>>> Running scenario 3: …`).
 
 The selection rules live in `CommonUtilities` (`LabScenarios.cs`, `ScenarioSelection.cs`), and the **dashboard runs the lab with the same option** (`dotnet run --no-build -- --scenarios 1,3`): both modes always run the same scenarios.
@@ -222,7 +221,14 @@ Switching a card back and forth never loses your own values. Everything is writt
 In the **Run** tab:
 
 1. Choose the project: **My exercise** (`Start/`) or **Reference solution** (`Solution/`).
-2. Tick the **Scenarios** to run. The list is read from the `Program.cs` of the project (again when you come back to the page): each scenario shows *Not implemented* while its code is still the delivered one (see [Choose the scenarios to run](#3-choose-the-scenarios-to-run)), its last result (*Passed*, *Failed*, *Not tested*) and the scenario it requires. By default, the implemented scenarios **not passed yet** are ticked: a scenario already passed, or not implemented, only runs if you tick it. **Select implemented** ticks every implemented scenario in one click, **Clear** unticks them all; ticking a scenario also ticks the scenario it requires.
+2. Tick the **Scenarios** to run. The list is read from the `Program.cs` of the project (again when you come back to the page) and shows three separate things for each scenario:
+   - **whether it can run**: *Not implemented* while its code is still the delivered one (see [Choose the scenarios to run](#3-choose-the-scenarios-to-run)), *Waiting for N* when it requires a scenario that is not implemented;
+   - **its last result**: *Passed*, *Failed* or *Not tested*;
+   - **whether it is ticked** for the next run. Every box can be ticked, even for a scenario that is not implemented: it is then left out of the run (the line under the list says so) and stays ticked until you write it. When no ticked scenario can run, **Run** waits.
+
+   By default, what is left to do is ticked: the implemented scenarios **not passed yet** (failed, or never run: a scenario you just wrote is ticked as soon as you come back to the page) and the **next scenario**, the one after the last passed (scenario 1 at the start), even before you write it. A passed scenario only runs again if you tick it, and the line under the list says so (*Passed already, run again*); the scenarios a ticked one requires are ticked with it (*required by N*).
+
+   Your ticks are for the next run only: when it ends, the list goes back to the default with the new results, so a scenario that just passed is unticked and the one after it is ticked, a failed one stays ticked, and a ticked scenario left out because it was not implemented stays ticked. **Default** goes back to it before running, **Select implemented** ticks every implemented scenario (the passed ones included), **Clear** unticks them all.
 3. Click **Run**. The dashboard runs `dotnet build`, then `dotnet run --no-build -- --scenarios <ticked>` — the same commands as the CLI (shown under the list).
 4. Follow the steps **Build → Run → Checks**. **Cancel** stops the run (the whole process tree is killed); a run also stops when the lab timeout is reached.
 

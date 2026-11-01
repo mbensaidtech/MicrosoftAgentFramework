@@ -621,14 +621,16 @@
           </div>
         </div>
 
-        <!-- Scenarios of the project to run, read from its Program.cs: only the ticked ones run (dotnet run -- --scenarios ...). -->
+        <!-- Scenarios of the project to run, read from its Program.cs: only the ticked ones run (dotnet run -- --scenarios ...).
+             Ticked by default: what is left to do (see defaultSelection); a ticked scenario that is not implemented is left out of the run. -->
         <fieldset class="scenarios" data-bind="scenarios" hidden>
           <legend class="sr-only" data-i18n="scenarios.legend"></legend>
           <div class="scenarios-head">
             <span class="scenarios-title" data-i18n="scenarios.title"></span>
             <span class="mono scenarios-count" data-bind="scenarioCount" aria-live="polite"></span>
             <div class="push btns">
-              <button class="btn btn-sm" type="button" data-action="select-implemented" data-i18n="scenarios.selectImplemented"></button>
+              <button class="btn btn-sm" type="button" data-action="select-default" data-i18n="scenarios.selectDefault" data-i18n-title="scenarios.selectDefaultTitle"></button>
+              <button class="btn btn-sm" type="button" data-action="select-implemented" data-i18n="scenarios.selectImplemented" data-i18n-title="scenarios.selectImplementedTitle"></button>
               <button class="btn btn-sm" type="button" data-action="select-none" data-i18n="scenarios.selectNone"></button>
             </div>
           </div>

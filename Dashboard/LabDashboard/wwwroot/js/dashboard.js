@@ -32,8 +32,10 @@ const state = {
   eventSource: null, clockTimer: null, runId: null, runTarget: null,
   record: null, recordIsHistory: false, target: "start",
   // Scenarios of the current lab per project ({ start, solution }, GET /labs/{id}/scenarios) and the ticked ones per "lab:target":
-  // { set, touched } — untouched, the selection follows the default (the implemented scenarios not passed yet).
-  scenarios: null, selections: new Map(),
+  // { set, runnable, touched } — untouched, the selection follows the default (see defaultSelection); ticked by hand, it lasts until
+  // the run ends, then the default applies again with the new results. `carried`, per "lab:target": the scenarios ticked for the last
+  // run but left out because they were not implemented, still ticked until they run.
+  scenarios: null, selections: new Map(), carried: new Map(),
   // AI models settings: status from the server, a refused switch per kind ("trainer" | "custom": what it opened), kinds with a request in flight.
   models: null, modelAsk: { chat: null, embedding: null }, modelBusy: new Set(), settingsTab: "models",
   // The trainer's configurations: the overview (GET /trainer-models), the unlock under way on the server, the kinds ticked for Unlock,
@@ -409,26 +411,54 @@ function withRequired(numbers, scenarios) {
   return result;
 }
 
-/** The implemented scenarios whose required scenarios are implemented too (what `dotnet run` runs without option). */
-function implementedSelection(scenarios) {
+/** The scenarios that can run: implemented, and so are the scenarios they require (decided by the server, with the rules of the labs). */
+const runnableSet = (scenarios) => new Set(scenarios.filter((s) => s.runnable).map((s) => s.number));
+
+const passed = (scenario) => scenario?.last?.status === "passed";
+
+/** A ticked scenario and, when it can run, the scenarios it requires (they run with it); one that cannot run yet is ticked alone. */
+function withRequiredIfRunnable(numbers, scenarios) {
   const known = byNumber(scenarios);
-  return new Set(scenarios
-    .filter((s) => [...withRequired([s.number], scenarios)].every((n) => known.get(n).implemented))
-    .map((s) => s.number));
+  const result = new Set(numbers.filter((n) => known.has(n)));
+  for (const number of withRequired(numbers.filter((n) => known.get(n)?.runnable), scenarios)) result.add(number);
+  return result;
 }
 
-/** Untouched, the selection is the implemented scenarios not passed yet (with what they require): a passed scenario never runs again by itself. */
+/**
+ * The default selection: what is left to do, never a scenario already passed (unless a ticked one requires it).
+ * - the runnable scenarios not passed yet (failed, or never run: a scenario just written is ticked);
+ * - the next step of the exercise: the first scenario and each scenario that follows a passed one, when not passed yet, ticked even
+ *   when not implemented (it runs once written).
+ */
+function defaultSelection(scenarios) {
+  const picks = scenarios.filter((s, i) => !passed(s) && (s.runnable || i === 0 || passed(scenarios[i - 1])));
+  return withRequiredIfRunnable(picks.map((s) => s.number), scenarios);
+}
+
+const sameSet = (a, b) => a.size === b.size && [...a].every((n) => b.has(n));
+
+/**
+ * The scenarios ticked for the next run. Untouched, the default, computed again from Program.cs and the last results, with the
+ * scenarios carried from the last run. Ticked by hand, the choice lasts until the run ends, kept in line with Program.cs read again:
+ * a scenario that just became runnable is ticked when it has not passed, and a ticked one that became runnable ticks what it requires.
+ * Any scenario can be ticked; one that cannot run is left out of the run (see renderScenarios).
+ */
 function selectionFor(target = state.target) {
   const scenarios = state.scenarios?.[target] ?? [];
   const key = `${state.currentId}:${target}`;
+  const known = byNumber(scenarios);
+  const runnable = runnableSet(scenarios);
   let entry = state.selections.get(key);
   if (!entry?.touched) {
-    const pending = [...implementedSelection(scenarios)].filter((n) => scenarios.find((s) => s.number === n).last?.status !== "passed");
-    entry = { set: withRequired(pending, scenarios), touched: false };
-    state.selections.set(key, entry);
+    const carried = (state.carried.get(key) ?? []).filter((n) => known.has(n) && !passed(known.get(n)));
+    entry = { set: withRequiredIfRunnable([...defaultSelection(scenarios), ...carried], scenarios), runnable, touched: false };
+  } else {
+    const ready = [...runnable].filter((n) => !entry.runnable.has(n) && (!passed(known.get(n)) || entry.set.has(n)));
+    for (const number of withRequired(ready, scenarios)) entry.set.add(number);
+    for (const number of [...entry.set]) if (!known.has(number)) entry.set.delete(number);
+    entry.runnable = runnable;
   }
-  // A scenario removed from Program.cs meanwhile cannot be asked for.
-  for (const number of [...entry.set]) if (!scenarios.some((s) => s.number === number)) entry.set.delete(number);
+  state.selections.set(key, entry);
   return entry;
 }
 
@@ -444,10 +474,15 @@ function renderScenarios() {
     return;
   }
 
+  // Three separate things per scenario: whether it can run (a badge when it cannot), its last result (a badge), and whether it is
+  // ticked for the next run. Every scenario can be ticked; a ticked one that cannot run (not implemented, or requiring one that is
+  // not) is left out of the run, as the line under the list says.
   const running = !!state.runId;
   const { set } = selectionFor();
+  const known = byNumber(scenarios);
+  const selectedNumbers = scenarios.filter((s) => set.has(s.number) && s.runnable).map((s) => s.number);
   $(main, "scenarioList").replaceChildren(...scenarios.map((s) => {
-    const item = el("li", `scenario${s.implemented ? "" : " todo"}${set.has(s.number) ? " selected" : ""}`);
+    const item = el("li", `scenario${s.runnable ? "" : " todo"}${set.has(s.number) ? " selected" : ""}`);
     const label = el("label");
     const check = el("input");
     check.type = "checkbox";
@@ -461,31 +496,43 @@ function renderScenarios() {
       const todo = pill("todo", t(s.setupImplemented ? "scenarios.notImplemented" : "scenarios.setupNotDone"));
       todo.title = t("scenarios.notImplementedTitle");
       badges.append(todo);
+    } else if (!s.runnable) {
+      const waiting = [...withRequired(s.requires, scenarios)].filter((n) => !known.get(n).implemented).sort((a, b) => a - b);
+      const todo = pill("todo", t("scenarios.waiting", { list: waiting.join(", ") }));
+      todo.title = t("scenarios.waitingTitle");
+      badges.append(todo);
     }
     const last = s.last ? pill(s.last.status, t(`scenarios.last.${s.last.status}`)) : pill("none", t("scenarios.neverRun"));
     if (s.last) last.title = t("scenarios.lastAt", { date: fmtDate(s.last.startedAt) });
     badges.append(last);
     if (s.requires.length) badges.append(el("span", "scenario-requires", t("scenarios.requires", { list: s.requires.join(", ") })));
+    const requiredBy = selectedNumbers.filter((n) => n !== s.number && withRequired([n], scenarios).has(s.number));
+    if (set.has(s.number) && requiredBy.length) {
+      badges.append(el("span", "scenario-requires", t("scenarios.requiredBy", { list: requiredBy.join(", ") })));
+    }
     item.append(label, badges);
     return item;
   }));
 
   const selected = scenarios.filter((s) => set.has(s.number));
-  const notImplemented = selected.filter((s) => !s.implemented).map((s) => s.number);
+  const runnable = scenarios.filter((s) => s.runnable);
+  const willRun = selected.filter((s) => s.runnable);
+  const leftOut = selected.filter((s) => !s.runnable).map((s) => s.number);
+  const rerun = willRun.filter(passed).map((s) => s.number);
   $(main, "scenarioCount").textContent = t("scenarios.count", { selected: selected.length, count: scenarios.length });
-  const hint = $(main, "scenarioHint");
-  hint.classList.toggle("warn", notImplemented.length > 0);
-  hint.textContent = [
+  $(main, "scenarioHint").textContent = [
     scenarios[0].setupImplemented ? null : t("scenarios.hintSetup"),
     !selected.length
-      ? t(scenarios.some((s) => s.implemented) ? "scenarios.hintNone" : "scenarios.hintNoneImplemented")
-      : notImplemented.length
-        ? t("scenarios.hintNotImplemented", { list: notImplemented.join(", ") })
-        : t("scenarios.hintCommand", { list: selected.map((s) => s.number).join(",") }),
+      ? t(!runnable.length ? "scenarios.hintNoneImplemented" : runnable.every(passed) ? "scenarios.hintAllPassed" : "scenarios.hintNone")
+      : !willRun.length ? t("scenarios.hintOnlyNotImplemented", { list: leftOut.join(", ") })
+      : t("scenarios.hintCommand", { list: selected.map((s) => s.number).join(",") }),
+    willRun.length && leftOut.length ? t("scenarios.hintNotImplemented", { list: leftOut.join(", ") }) : null,
+    rerun.length ? t("scenarios.hintRerun", { list: rerun.join(", ") }) : null,
   ].filter(Boolean).join(" ");
-  main.querySelector('[data-action="select-implemented"]').disabled = running || implementedSelection(scenarios).size === 0;
+  main.querySelector('[data-action="select-default"]').disabled = running || sameSet(set, defaultSelection(scenarios));
+  main.querySelector('[data-action="select-implemented"]').disabled = running || !runnable.length;
   main.querySelector('[data-action="select-none"]').disabled = running || !selected.length;
-  runButton.disabled = running || !selected.length;
+  runButton.disabled = running || !willRun.length;
 }
 
 function wireScenarios(main) {
@@ -498,18 +545,24 @@ function wireScenarios(main) {
     const number = Number(check.dataset.number);
     entry.touched = true;
     if (check.checked) {
-      for (const required of withRequired([number], scenarios)) entry.set.add(required);
+      for (const required of withRequiredIfRunnable([number], scenarios)) entry.set.add(required);
     } else {
       for (const s of scenarios) if (withRequired([s.number], scenarios).has(number)) entry.set.delete(s.number);
     }
     renderScenarios();
   });
+  main.querySelector('[data-action="select-default"]').addEventListener("click", () => {
+    state.selections.delete(`${state.currentId}:${state.target}`);
+    state.carried.delete(`${state.currentId}:${state.target}`);
+    renderScenarios();
+  });
   main.querySelector('[data-action="select-implemented"]').addEventListener("click", () => {
-    state.selections.set(`${state.currentId}:${state.target}`, { set: implementedSelection(currentScenarios()), touched: true });
+    const runnable = runnableSet(currentScenarios());
+    state.selections.set(`${state.currentId}:${state.target}`, { set: new Set(runnable), runnable, touched: true });
     renderScenarios();
   });
   main.querySelector('[data-action="select-none"]').addEventListener("click", () => {
-    state.selections.set(`${state.currentId}:${state.target}`, { set: new Set(), touched: true });
+    state.selections.set(`${state.currentId}:${state.target}`, { set: new Set(), runnable: runnableSet(currentScenarios()), touched: true });
     renderScenarios();
   });
 }
@@ -623,6 +676,10 @@ function attachToRun(runId, target) {
     closeStream();
     const record = JSON.parse(e.data).result;
     state.runId = null;
+    // The choice made by hand was for this run: the next one starts again from the default (a scenario that just passed is unticked,
+    // the one after it is ticked), keeping the ticked scenarios left out because they were not implemented.
+    state.selections.delete(`${record.labId}:${record.target}`);
+    state.carried.set(`${record.labId}:${record.target}`, (record.scenarios ?? []).filter((x) => x.notImplemented).map((x) => x.number));
     finishRun(record);
     loadScenarios(); // their last result changed
     await refreshLabs();
@@ -899,7 +956,11 @@ function scenarioCheckItems(record, lab) {
     }
   }
 
-  const skipped = record.scenarios.filter((s) => s.status === "skipped").map((s) => s.number);
+  const notImplemented = record.scenarios.filter((s) => s.notImplemented).map((s) => s.number);
+  const skipped = record.scenarios.filter((s) => s.status === "skipped" && !s.notImplemented).map((s) => s.number);
+  if (notImplemented.length) {
+    items.push(el("li", "muted scenario-skipped", t("scenarios.skippedNotImplemented", { list: notImplemented.join(", ") })));
+  }
   if (skipped.length) items.push(el("li", "muted scenario-skipped", t("scenarios.skipped", { list: skipped.join(", ") })));
   return items;
 }

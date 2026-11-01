@@ -16,7 +16,6 @@ using static A2AClient.AgentConsole;
 // dotnet run                          -> the implemented scenarios (a scenario whose code is still the delivered one is left out)
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
-// dotnet run -- --scenarios all       -> every scenario, implemented or not
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
 // All scenarios need the A2A server of Lab06_A2AServer (http://localhost:5000)
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);

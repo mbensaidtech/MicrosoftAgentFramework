@@ -794,14 +794,19 @@ public sealed class ReportingClientTests : IAsyncDisposable
             RunId = "s1", LabId = "asking", Target = RunTarget.Start, Status = RunStatus.Passed, Summary = "All 2 checks passed",
             StartedAt = DateTimeOffset.Now, DurationMs = 10,
             Checks = [new("config", "Configuration", true), new("scenario2", "Scenario 2", true)],
-            Scenarios = [new(1, "First", ScenarioStatus.Skipped), new(2, "Second", ScenarioStatus.Passed), new(3, "Third", ScenarioStatus.NotRun)],
+            Scenarios =
+            [
+                new(1, "First", ScenarioStatus.Skipped), new(2, "Second", ScenarioStatus.Passed), new(3, "Third", ScenarioStatus.NotRun),
+                new(4, "Fourth", ScenarioStatus.Skipped) { NotImplemented = true },
+            ],
         };
 
         ctx.Client.RunFinished(record);
 
         // The admin dashboard does not complete the lab on a run with a skipped scenario: the snapshot that follows decides.
+        // A scenario left out because it was not implemented is a skipped one for the admin (its schema knows number and status only).
         JsonNode payload = ctx.Outbox.PeekBatch().Single(e => e.Type == "run.finished").Payload!;
-        Assert.Equal("""[{"number":1,"status":"skipped"},{"number":2,"status":"passed"},{"number":3,"status":"notRun"}]""",
+        Assert.Equal("""[{"number":1,"status":"skipped"},{"number":2,"status":"passed"},{"number":3,"status":"notRun"},{"number":4,"status":"skipped"}]""",
             payload["scenarios"]!.ToJsonString());
         Assert.Equal("progress.snapshot", ctx.Outbox.PeekBatch().Last().Type);
     }

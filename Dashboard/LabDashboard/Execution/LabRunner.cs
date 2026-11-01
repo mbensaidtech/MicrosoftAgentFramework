@@ -410,7 +410,8 @@ public sealed class LabRunner(
         StartedAt = run.StartedAt,
         DurationMs = (long)run.Elapsed.TotalMilliseconds,
         Scenarios = run.Scenarios?.Scenarios
-            .Select(s => new ScenarioResult(s.Number, s.Title, run.Scenarios.Selected.Contains(s.Number) ? ScenarioStatus.NotRun : ScenarioStatus.Skipped))
+            .Select(s => run.Scenarios.Selected.Contains(s.Number) ? new ScenarioResult(s.Number, s.Title, ScenarioStatus.NotRun)
+                : new ScenarioResult(s.Number, s.Title, ScenarioStatus.Skipped) { NotImplemented = run.Scenarios.NotImplemented.Contains(s.Number) })
             .ToList(),
         Log = collector.Log,
     };
