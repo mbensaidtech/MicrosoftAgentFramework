@@ -536,7 +536,7 @@ gets answers comparable with the README's Expected Output. Reference implementat
 - **Fingerprints**: `LabPrompts.cs` holds only constants, but any change to the executable code of a Start (a provided `const`, a format call, a using) changes
   its fingerprints: regenerate them with `dotnet run -- exercise-fingerprints` and check that the Start still lists every scenario as not implemented.
 
-MultiAgentSystem `Lab02_OrchestrationSequential` and `Lab03_OrchestrationConcurrent` (not in the catalog yet) do not have the file: they adopt the convention when they are migrated.
+MultiAgentSystem `Lab02_OrchestrationSequential` follows the convention since its migration (agent names and instructions in `LabPrompts.cs`; the input is the transcript in `Data/`). `Lab03_OrchestrationConcurrent` (not in the catalog yet) does not have the file: it adopts the convention when it is migrated.
 
 ## Tests
 

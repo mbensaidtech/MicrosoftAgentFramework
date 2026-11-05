@@ -69,10 +69,10 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | preview.260205.1 | Suppression de `UserInputRequests` | #3682 | Lab09 ✅ |
 | 1.14.0 | **Liaison des réponses d'approbation** aux demandes surfacées (`[BREAKING]`) ; `ToolApprovalAgent` sorti d'expérimental | #7111, #7107 | Lab09 ✅ (session obligatoire) |
 | **1.22.0** | **Liaison des approbations renforcée** (`[BREAKING]`, replay) : seules les demandes enregistrées par le framework dans la session font foi ; liaison aussi pour les réponses « always approve » | #8375, #8432 | Lab09 ✅ |
-| preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 | MAS-Lab02/03 (à vérifier) |
+| preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 | aucun pour MAS-Lab02 ✅ (aucun executor personnalisé : `BuildSequential` seulement) ; MAS-Lab03 à vérifier |
 | preview.260205.1 | Agent et session fournis à `AIContextProvider` / `ChatHistoryProvider` | #3695 | Lab05, Lab12 ✅ |
 | rc1 | Session `StateBag`, plusieurs providers par agent, composition au lieu d'héritage typé ; `AIContextProviderFactory` → `AIContextProviders` ; `InvokingAsync` / `InvokedAsync` deviennent non virtuels (on surcharge `ProvideAIContextAsync` / `StoreAIContextAsync`) | #3806, #3988 | Lab05, Lab12 ✅ (§4.18) |
-| rc1 | Événements `AgentResponse[Update]` unifiés en `WorkflowOutputEvent` ; renommages API Workflows | #3441, #4090 | MAS-Lab02/03 |
+| rc1 | Événements `AgentResponse[Update]` unifiés en `WorkflowOutputEvent` ; renommages API Workflows (`InProcessExecution.StreamAsync` → `RunStreamingAsync`) | #3441, #4090 | MAS-Lab02 ✅ (§4.19), MAS-Lab03 |
 | rc1 | Améliorations Structured Output | #3761 | Lab02 |
 | 1.0.0 | Suppression de `OpenAIAssistantClientExtensions` ; `Microsoft.Agents.AI.AzureAI` → `Microsoft.Agents.AI.Foundry` | #5058, #5042 | aucun |
 | 1.19.0 | Support MCP long-running tasks migré | #7774 | aucun (Lab04 n'utilise pas l'extension Tasks ; cité dans « Going further ») |
@@ -683,6 +683,50 @@ Points découverts :
 
 ---
 
+### 4.19 Workflows : orchestration séquentielle (validé sur MAS-Lab02)
+
+**Ancienne approche** (preview.251219)
+```csharp
+var workflow = AgentWorkflowBuilder.BuildSequential(workflowName: "...", agents: [a, b]);
+StreamingRun run = await InProcessExecution.StreamAsync(workflow, messages);
+await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
+await foreach (WorkflowEvent evt in run.WatchStreamAsync())
+    if (evt is WorkflowOutputEvent o) { result = (List<ChatMessage>)o.Data!; break; }
+```
+
+**Nouvelle approche** (1.26.0, page Learn « Sequential orchestration », sample `03-workflows/_StartHere/03_AgentWorkflowPatterns`)
+```csharp
+Workflow workflow = AgentWorkflowBuilder.BuildSequential("name", [a, b, c]);                 // ou (name, chainOnlyAgentResponses: true, [...])
+await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, messages); // messages : List<ChatMessage>
+await run.TrySendMessageAsync(new TurnToken(emitEvents: true));                               // false : pas de streaming des agents
+await foreach (WorkflowEvent evt in run.WatchStreamAsync())
+{
+    switch (evt)
+    {
+        case AgentResponseUpdateEvent u: /* u.ExecutorId, u.Update */ break;                 // AVANT WorkflowOutputEvent (classe dérivée)
+        case RequestInfoEvent r when r.Request.TryGetDataAs(out ToolApprovalRequestContent? req):
+            await run.SendResponseAsync(r.Request.CreateResponse(req.CreateResponse(approved: true))); break;
+        case WorkflowOutputEvent o: result = o.As<List<ChatMessage>>(); break;
+        case ExecutorFailedEvent f: /* f.Data = exception */ break;
+        case WorkflowErrorEvent e: /* e.Exception */ break;
+    }
+}
+```
+
+**Explication** — API toutes dans `PublicAPI.Shipped.txt` 1.26.0 (seuls Magentic et `WorkflowSessionCheckpointRecovery` sont `[Experimental]`) : aucun `#pragma`. `StreamAsync` n'existe plus. `Microsoft.Agents.AI.Workflows` 1.26.0 se référence explicitement (non apporté par `Microsoft.Agents.AI.OpenAI`) ; il apporte `Microsoft.Extensions.AI.Evaluation` 10.10.0 et `Microsoft.Extensions.Hosting.Abstractions` 10.0.9 en transitif (aucune vulnérabilité). Avec `emitEvents: true`, chaque agent est exécuté en **streaming** (`RunStreamingAsync`) : garder `Microsoft.Extensions.AI.OpenAI` 10.11.0 explicite (§8) ; avec `false`, `RunAsync`.
+
+Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
+- **Graphe** : `BuildSequential` enveloppe chaque agent dans un executor d'id `<Name>_<Id sans tirets>` et ajoute un executor terminal `OutputMessages` qui produit la sortie (`List<ChatMessage>`) ; `workflow.StartExecutorId` + `ReflectEdges()` (ou `ToMermaidString()`) permettent de l'afficher.
+- **Protocole** : un executor d'agent accumule les messages reçus et n'appelle son agent qu'à la réception d'un `TurnToken`, qu'il retransmet ensuite. Sans `TurnToken` : aucun appel au modèle, exécution `Idle`, pas de sortie.
+- **Contexte** : par défaut (`ForwardIncomingMessages = true`), chaque agent reçoit la conversation entière ; les messages des autres agents lui sont présentés en rôle `user` (`ReassignOtherAgentsAsUsers`). `chainOnlyAgentResponses: true` ne transmet que la réponse de l'agent précédent **et** réduit la sortie aux messages du dernier agent. Mesuré (gpt-4o-mini, 3 agents) : jetons d'entrée 576 / ~760 / ~980 contre 576 / ~250 / ~300 ; effet de bord observé : le rédacteur signe « [Your Name] » faute de transcription.
+- **Session** : chaque executor crée une session de son agent par exécution ; un même `AIAgent` peut figurer dans plusieurs workflows.
+- **Usage** : la sortie ne porte pas l'usage ; avec `emitEvents: true`, `updates.ToAgentResponse().Usage` par `ExecutorId` le donne par agent. `EmitAgentResponseEvents` n'est pas activé par `BuildSequential`.
+- **Erreurs** : un agent en échec ne lève pas d'exception dans `WatchStreamAsync` : `ExecutorFailedEvent` (exception dans `Data`) puis `WorkflowErrorEvent`, sans sortie. Les ignorer rend l'échec silencieux.
+- **Piège du type d'entrée** : `RunStreamingAsync<TInput>` déclare le type **statique** de l'entrée ; une variable typée `object` n'est acceptée par aucun agent et l'entrée est **ignorée sans erreur** (`EnqueueMessageAsync` renvoie `false`) : le premier agent répond « please provide the transcript ». Constaté pendant le prototype (d'abord pris pour une concurrence entrée/`TurnToken`, infirmé : le modèle documenté fonctionne avec `List<ChatMessage>`).
+- **Approbation** : un outil `ApprovalRequiredAIFunction` met le workflow en pause (`RequestInfoEvent`, statut `PendingRequests`) ; `SendResponseAsync` le reprend (nouveau `WorkflowStartedEvent`), statut final `Idle`. **Limite constatée** : si l'agent demande **plusieurs** appels approuvables en parallèle et que le code répond un par un, la première réponse relance l'agent et les autres demandes sont rejetées automatiquement (1.25.0, #9152) ; la réponse suivante échoue (`InvalidOperationException: The agent did not return a function call and result for approval request ...`). Le lab demande un seul appel (`send_email` « exactly once ») ; le sample officiel `GroupChatToolApproval` n'a lui aussi qu'un appel approuvable.
+- **Tags de sortie** (`OutputTag.Intermediate`, `WithIntermediateOutputFrom`) : présents dans l'API publiée, mais les événements observés en 1.26.0 n'ont aucun tag (comportement activé derrière un « Futures scope » dans les tests officiels) : non enseignés.
+- **1.27.0** (publiée le 2026-10-30, non retenue : version figée à 1.26.0, §8) : aucune rupture dans Workflows hors déclaratif / Magentic d'après les notes de version ; un prototype avec les mêmes appels (séquentiel, `chainOnlyAgentResponses`, approbation) donne les mêmes résultats en 1.27.0 qu'en 1.26.0 (vérifié le 2026-11-05).
+
 ## 5. APIs / packages supprimés ou remplacés
 
 | Nom | Statut | Impact | Remplacement recommandé | Exercices touchés |
@@ -705,7 +749,8 @@ Points découverts :
 | `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab console qui construit un `ServiceCollection` : MAS) ; inutile pour Lab10 (framework partagé ASP.NET Core via `ModelContextProtocol.AspNetCore`) |
 | `UserInputRequests`, `UserInputRequestContent` | Supprimés | Compilation + concept | `response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>()` + boucle `while` ; session obligatoire (§4.15) | Lab09 ✅ |
 | `FunctionApprovalRequestContent` (`.FunctionCall`) | Renommé (MEAI 10.x) | Compilation | `ToolApprovalRequestContent` (`.ToolCall` à caster en `FunctionCallContent`), `CreateResponse(approved, reason)` (§4.15) | Lab09 ✅ |
-| `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02/03 (à vérifier) |
+| `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02 : non concerné ✅ ; MAS-Lab03 (à vérifier) |
+| `InProcessExecution.StreamAsync(workflow, input)` ; `(List<ChatMessage>)evt.Data!` | Supprimé (rc1) ; cast remplacé | Compilation | `InProcessExecution.RunStreamingAsync(workflow, input)` (+ `await using`) ; `WorkflowOutputEvent.As<List<ChatMessage>>()` (§4.19) | MAS-Lab02 ✅ |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) ; recherche vectorielle : `InMemoryVectorStore` (Lab07, §4.13) | Lab05 ✅, Lab07 ✅ |
 | `MongoVectorStore` (SK) + MongoDB Atlas Vector Search | Préversion, service externe | Lab07 non exécutable sans compte Atlas | `InMemoryVectorStore` ; tout connecteur `Microsoft.Extensions.VectorData` stable en « Going further » (§4.13) | Lab07 ✅ |
 | `Microsoft.Extensions.VectorData.Abstractions` 9.7.0 (référence explicite) | Remplacé | Version | 10.10.0 transitif via MAF 1.22.0 | Lab05 ✅, Lab07 ✅ |

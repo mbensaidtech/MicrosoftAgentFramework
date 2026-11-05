@@ -2524,6 +2524,263 @@ public class OutputAnalyzerTests
             usage.Reports.Select(r => r.Label));
     }
 
+    // Standard output of the MultiAgentSystem Lab02 solution (real run, streamed texts shortened to their first lines).
+    private static readonly string[] MultiAgentLab02SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        ">>> Scenarios to run: 1, 2, 3 (the implemented ones)",
+        ">>> Running scenario 1: A sequential workflow - build it, run it, read its output",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A sequential workflow - build it, run it, read its output ===",
+        "Workflow meeting-notes: MeetingSummarizer -> ActionItemsExtractor -> OutputMessages",
+        "Workflow output (3 messages):",
+        "  [user] (input): Meeting Transcript - Project Alpha Weekly Sync ... (2412 characters)",
+        "  [assistant] MeetingSummarizer: - Mohammed finished the authentication module and will write unit tests by Friday, also addressing database performance issues next week.",
+        "      - Emma's dashboard mockups are ready for review; she needs feedback by Wednesday and API specs from Mohammed for mobile layouts.",
+        "      - Michael reported three critical bugs in the payment module, prioritizing the security issue PAY-201 for Mohammed to address this afternoon.",
+        "  [assistant] ActionItemsExtractor: 1. Mohammed - Write unit tests for the authentication module - Due Friday.",
+        "      2. Mohammed - Address database performance issues - Due next week.",
+        "      3. Emma - Gather feedback on dashboard mockups - Due Wednesday.",
+        "Token usage: not available without the streaming events (see scenario 2).",
+        ">>> Running scenario 2: Follow the pipeline - what each agent receives",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Follow the pipeline - what each agent receives ===",
+        "--- Context: the whole conversation (default) ---",
+        "Workflow meeting-follow-up: ActionItemsExtractor -> FollowUpWriter -> Translator -> OutputMessages",
+        "ActionItemsExtractor:",
+        "1. Mohammed - Write unit tests for the authentication module - Due date: Friday",
+        "2. Mohammed - Optimize database queries - Due date: Next week",
+        "FollowUpWriter:",
+        "Subject: Follow-up on Action Items from Project Alpha Weekly Sync",
+        "",
+        "Dear Team,",
+        "",
+        "Thank you for attending the meeting. Below are the action items discussed along with their respective owners and due dates:",
+        "",
+        "1. Mohammed - Write unit tests for the authentication module - Due date: Friday",
+        "2. Mohammed - Optimize database queries - Due date: Next week",
+        "",
+        "Please ensure that you complete your tasks by the mentioned due dates. Let’s keep the momentum going!",
+        "",
+        "Best,",
+        "Sarah",
+        "Translator:",
+        "Objet : Suivi des actions issues de la synchronisation hebdomadaire du projet Alpha",
+        "",
+        "Chère équipe,",
+        "",
+        "Merci d'avoir assisté à la réunion. Ci-dessous les actions discutées ainsi que leurs responsables et dates d'échéance respectives :",
+        "",
+        "1. Mohammed - Écrire des tests unitaires pour le module d'authentification - Date d'échéance : Vendredi",
+        "2. Mohammed - Optimiser les requêtes de la base de données - Date d'échéance : La semaine prochaine",
+        "",
+        "Veuillez vous assurer de compléter vos tâches avant les dates d'échéance mentionnées. Maintenons l'élan !",
+        "",
+        "Cordialement,",
+        "Sarah",
+        "[Context] ActionItemsExtractor received 1 message: user",
+        "  Token Usage (ActionItemsExtractor):",
+        "    Input tokens: 576",
+        "    Output tokens: 175",
+        "    Total tokens: 751",
+        "[Context] FollowUpWriter received 2 messages: user, ActionItemsExtractor",
+        "  Token Usage (FollowUpWriter):",
+        "    Input tokens: 766",
+        "    Output tokens: 237",
+        "    Total tokens: 1003",
+        "[Context] Translator received 3 messages: user, ActionItemsExtractor, FollowUpWriter",
+        "  Token Usage (Translator):",
+        "    Input tokens: 980",
+        "    Output tokens: 347",
+        "    Total tokens: 1327",
+        "[Context] OutputMessages received 4 messages: user, ActionItemsExtractor, FollowUpWriter, Translator",
+        "Workflow output (4 messages): user, ActionItemsExtractor, FollowUpWriter, Translator",
+        "--- Context: the previous agent only (chainOnlyAgentResponses: true) ---",
+        "Workflow meeting-follow-up-chained: ActionItemsExtractor -> FollowUpWriter -> Translator -> OutputMessages",
+        "ActionItemsExtractor:",
+        "1. Mohammed - Write unit tests for the authentication module - Due date: January 12, 2026",
+        "2. Mohammed - Look into optimizing database queries - Due date: January 15, 2026",
+        "FollowUpWriter:",
+        "Subject: Follow-Up on Meeting - Action Items",
+        "",
+        "Dear Team,",
+        "",
+        "Thank you for your participation in our recent meeting. Below are the action items assigned, along with their respective owners and due dates:",
+        "",
+        "1. Mohammed - Write unit tests for the authentication module - Due date: January 12, 2026",
+        "2. Mohammed - Look into optimizing database queries - Due date: January 15, 2026",
+        "",
+        "Please ensure that you complete your action items by the specified dates. Let’s keep up the great work!",
+        "",
+        "Best,",
+        "[Your Name]",
+        "Translator:",
+        "Objet : Suivi de la réunion - Actions à entreprendre",
+        "",
+        "Chère équipe,",
+        "",
+        "Merci pour votre participation à notre récente réunion. Voici les actions assignées, ainsi que leurs propriétaires respectifs et les dates d'échéance :",
+        "",
+        "1. Mohammed - Écrire des tests unitaires pour le module d'authentification - Date d'échéance : 12 janvier 2026",
+        "2. Mohammed - Examiner l'optimisation des requêtes de la base de données - Date d'échéance : 15 janvier 2026",
+        "",
+        "Veuillez vous assurer de compléter vos actions dans les délais indiqués. Continuons à faire du bon travail !",
+        "",
+        "Cordialement,",
+        "[Votre Nom]",
+        "[Context] ActionItemsExtractor received 1 message: user",
+        "  Token Usage (ActionItemsExtractor):",
+        "    Input tokens: 576",
+        "    Output tokens: 212",
+        "    Total tokens: 788",
+        "[Context] FollowUpWriter received 1 message: ActionItemsExtractor",
+        "  Token Usage (FollowUpWriter):",
+        "    Input tokens: 282",
+        "    Output tokens: 280",
+        "    Total tokens: 562",
+        "[Context] Translator received 1 message: FollowUpWriter",
+        "  Token Usage (Translator):",
+        "    Input tokens: 319",
+        "    Output tokens: 358",
+        "    Total tokens: 677",
+        "[Context] OutputMessages received 1 message: Translator",
+        "Workflow output (1 message): Translator",
+        ">>> Running scenario 3: Human in the loop - approve a tool call before it runs",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Human in the loop - approve a tool call before it runs ===",
+        "Workflow meeting-minutes: ActionItemsExtractor -> FollowUpWriter -> MinutesSender -> OutputMessages",
+        "[Approval] send_email(to: \"Sarah, Mohammed, Emma, Michael\", subject: \"Follow-Up on Action Items from Project Alpha Weekly Sync\", body: (1112 characters)) waits for an approval",
+        "Run status: PendingRequests",
+        "[Approval] send_email: approved",
+        "Workflow output (8 messages):",
+        "  [user] (input): Meeting Transcript - Project Alpha Weekly Sync ... (2412 characters)",
+        "  [assistant] ActionItemsExtractor: 1. Mohammed - Write unit tests for the authentication module - Due date: Friday.",
+        "      2. Mohammed - Optimize database queries - Due date: Next week.",
+        "      3. Emma - Gather feedback on the new dashboard mockups - Due date: Wednesday.",
+        "  [assistant] FollowUpWriter: Subject: Follow-Up on Action Items from Project Alpha Weekly Sync",
+        "",
+        "      Dear Team,",
+        "",
+        "      Thank you for your participation in the meeting. Below are the action items we discussed, along with their owners and due dates:",
+        "",
+        "      1. Mohammed - Write unit tests for the authentication module - Due date: **Friday**.",
+        "      2. Mohammed - Optimize database queries - Due date: **Next week**.",
+        "",
+        "      Please ensure you complete your tasks by the respective due dates. Let me know if you need any assistance.",
+        "",
+        "      Best,",
+        "      Sarah",
+        "  [assistant] MinutesSender: (asks for an approval)",
+        "  [user] (the answer of the code): (approval: approved)",
+        "  [assistant] MinutesSender: (calls send_email)",
+        "  [tool] MinutesSender: (result: Email sent to Sarah, Mohammed, Emma, Michael (subject: Follow-Up on Action Items from Project Alpha Weekly Sync, 1112 characters).)",
+        "  [assistant] MinutesSender: The email was sent successfully to Sarah, Mohammed, Emma, and Michael.",
+        "Run status: Idle",
+    ];
+
+    // Standard output of the MultiAgentSystem Lab02 exercise as delivered (TODOs not done yet).
+    private static readonly string[] MultiAgentLab02StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        ">>> Scenarios to run: 1, 2, 3 (the implemented ones)",
+        ">>> Running scenario 1: A sequential workflow - build it, run it, read its output",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A sequential workflow - build it, run it, read its output ===",
+        ">>> Running scenario 2: Follow the pipeline - what each agent receives",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Follow the pipeline - what each agent receives ===",
+        ">>> Running scenario 3: Human in the loop - approve a tool call before it runs",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Human in the loop - approve a tool call before it runs ===",
+    ];
+
+    [Fact]
+    public void Every_multiagent_lab02_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab02")!;
+
+        Assert.All(Evaluate(lab.Expectations, MultiAgentLab02SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            Evaluate(lab.Expectations, MultiAgentLab02StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Multiagent_lab02_checks_fail_when_the_context_is_not_chained_and_the_approval_is_not_handled()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab02")!;
+        // The agents were not in the order of the pipeline, chainOnlyAgentResponses was left out of the second workflow,
+        // and the approval request was never answered: the run stayed paused, without output.
+        string[] output =
+        [
+            ">>> Running scenario 1: A sequential workflow - build it, run it, read its output",
+            "Workflow meeting-notes: ActionItemsExtractor -> MeetingSummarizer -> OutputMessages",
+            "Workflow output (3 messages):",
+            "  [user] (input): Meeting Transcript - Project Alpha Weekly Sync ... (2412 characters)",
+            "  [assistant] ActionItemsExtractor: 1. Mohammed - Write unit tests - Due Friday.",
+            "  [assistant] MeetingSummarizer: - The team reviewed the action items.",
+            ">>> Running scenario 2: Follow the pipeline - what each agent receives",
+            "Translator:",
+            "Objet : Suivi de la réunion",
+            "[Context] ActionItemsExtractor received 1 message: user",
+            "  Token Usage (ActionItemsExtractor):",
+            "    Input tokens: 576",
+            "    Output tokens: 175",
+            "    Total tokens: 751",
+            "[Context] FollowUpWriter received 2 messages: user, ActionItemsExtractor",
+            "  Token Usage (FollowUpWriter):",
+            "    Input tokens: 766",
+            "    Output tokens: 237",
+            "    Total tokens: 1003",
+            "[Context] Translator received 3 messages: user, ActionItemsExtractor, FollowUpWriter",
+            "  Token Usage (Translator):",
+            "    Input tokens: 980",
+            "    Output tokens: 347",
+            "    Total tokens: 1327",
+            "Workflow output (4 messages): user, ActionItemsExtractor, FollowUpWriter, Translator",
+            ">>> Running scenario 3: Human in the loop - approve a tool call before it runs",
+            "Workflow meeting-minutes: ActionItemsExtractor -> FollowUpWriter -> MinutesSender -> OutputMessages",
+            "[Approval] send_email(to: \"Sarah, Mohammed, Emma, Michael\", subject: \"Follow-Up\", body: (999 characters)) waits for an approval",
+            "Run status: PendingRequests",
+        ];
+
+        Assert.Equal(
+            ["scenario2-full-context", "scenario2-full-output", "scenario2-translation", "scenario3-pipeline", "scenario3-paused"],
+            Evaluate(lab.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Labels_the_multiagent_lab02_token_usage_with_the_agent_of_each_turn()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(MultiAgentLab02SolutionOutput));
+
+        // Scenario 2 only: one report per agent for each of its two runs (scenarios 1 and 3 run without the streaming events)
+        Assert.Equal(
+            [
+                "Scenario 2 · Token Usage (ActionItemsExtractor)",
+                "Scenario 2 · Token Usage (FollowUpWriter)",
+                "Scenario 2 · Token Usage (Translator)",
+                "Scenario 2 · Token Usage (ActionItemsExtractor)",
+                "Scenario 2 · Token Usage (FollowUpWriter)",
+                "Scenario 2 · Token Usage (Translator)",
+            ],
+            usage.Reports.Select(r => r.Label));
+    }
+
     // Standard output of the Lab13 solution (real run): the API, then the four scenarios that call it.
     private static readonly string[] Lab13SolutionOutput =
     [
@@ -2905,6 +3162,7 @@ public class OutputAnalyzerTests
         ["azureopenai-lab14"] = Lab14SolutionOutput,
         ["azureopenai-lab15"] = Lab15SolutionOutput,
         ["multiagent-lab01"] = MultiAgentLab01SolutionOutput,
+        ["multiagent-lab02"] = MultiAgentLab02SolutionOutput,
     };
 
     public static TheoryData<string> CatalogLabs() => [.. LabCatalogTests.LoadRealCatalog().Labs.Select(lab => lab.Id)];

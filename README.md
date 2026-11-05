@@ -47,7 +47,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code (C# Dev Kit), Visual Studio 2026 (18.0+) or Rider | Editing the exercises | Any editor works with the `dotnet` CLI. Visual Studio 2022 cannot target `net10.0`. |
 
-> **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) targets 1.26.0 too; Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). In **MultiAgentSystem**, Lab 01 (*Delegate a Task to Another Agent*) and Lab 02 (*Sequential Orchestration*) target 1.26.0 too; Lab 03 is not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)). See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -58,7 +58,7 @@ There are two ways to run a lab. Both run **the same projects, with the same `do
 
 | | Option A — `dotnet` CLI | Option B — Lab Bench Dashboard |
 |---|---|---|
-| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab15, with Lab06 server and client; MultiAgentSystem Lab01), in the order of the [learning path](#learning-path) |
+| Labs available | **All labs** | Migrated labs only (AzureOpenAI Lab01 to Lab15, with Lab06 server and client; MultiAgentSystem Lab01 and Lab02), in the order of the [learning path](#learning-path) |
 | How you run a lab | `dotnet run` in a terminal | **Run** button in a local web page |
 | Configuration | `appsettings.json`, user secrets or environment variables | The same, plus the **AI models** settings: the trainer's configuration (access code) or your own, for the LLM and the embedding model |
 | Result | You read the console output | **Passed / Failed** verdict, automatic checks, token usage, run history |
@@ -257,7 +257,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 #### Dashboard limitations
 
-- Only the migrated labs are listed (AzureOpenAI Lab01–Lab15, MultiAgentSystem Lab01), in the order of the [learning path](#learning-path): run the other labs with the CLI.
+- Only the migrated labs are listed (AzureOpenAI Lab01–Lab15, MultiAgentSystem Lab01 and Lab02), in the order of the [learning path](#learning-path): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
 - Lab12: needs its storage (its MongoDB container, or `Storage:Mode` set to `EmbeddedMongoDb` or `JsonFile`, see its README). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
@@ -493,9 +493,9 @@ This lab is split into two parts: start the server, then run the client.
 
 This part focuses on building **multi-agent systems** where multiple agents collaborate to solve complex problems. You will learn how to orchestrate agents, use agents as tools, and build sophisticated AI workflows.
 
-> **Lab 01** targets Agent Framework **1.26.0** (stable APIs only) and is available in the Lab Bench dashboard.
+> **Lab 01** and **Lab 02** target Agent Framework **1.26.0** (stable APIs only) and are available in the Lab Bench dashboard.
 >
-> ⚠️ **Lab 02 and Lab 03 are not migrated yet.** They still target a December 2025 preview of Agent Framework (`1.0.0-preview.251204.1`) and use APIs that no longer exist in the current version (`CreateAIAgent`, `AgentRunResponse`, `AzureOpenAIClient`, `InProcessExecution.StreamAsync`). They are **not part of the recommended learning path** and are not available in the dashboard: orchestrations and workflows will be covered in a later phase.
+> ⚠️ **Lab 03 is not migrated yet.** It still targets a December 2025 preview of Agent Framework (`1.0.0-preview.251204.1`) and uses APIs that no longer exist in the current version (`CreateAIAgent`, `AgentRunResponse`, `AzureOpenAIClient`, `InProcessExecution.StreamAsync`). It is **not part of the recommended learning path** and is not available in the dashboard.
 
 ---
 
@@ -511,13 +511,15 @@ This part focuses on building **multi-agent systems** where multiple agents coll
 
 ---
 
-### Lab 02 - Orchestration Sequential
+### Lab 02 - Sequential Orchestration: a Pipeline of Agents
 
-**Learn how to orchestrate multiple agents in a sequential pipeline**
+**Learn how to chain agents in a sequential workflow: build it, run it, follow it, choose the context each agent receives, and keep a human in the loop**
 
 | Scenario | Description |
 |----------|-------------|
-| Scenario 1 | Process data through a chain of specialized agents |
+| Scenario 1 | Build a two-step pipeline with `AgentWorkflowBuilder.BuildSequential`, run it with a `TurnToken`, read its output (`WorkflowOutputEvent`) and its errors |
+| Scenario 2 | Follow a three-step pipeline through its events (`ExecutorInvokedEvent`, `AgentResponseUpdateEvent`): what each agent receives and its token usage, with the whole conversation (default) or the previous agent only (`chainOnlyAgentResponses`) |
+| Scenario 3 | Human in the loop: the last agent's tool requires an approval (`ApprovalRequiredAIFunction`); the workflow pauses (`RequestInfoEvent`) until the code answers with `SendResponseAsync` |
 
 ---
 
@@ -657,7 +659,7 @@ echo $env:AzureOpenAI__Endpoint
 
 ## Learning Path
 
-The labs keep their numbers, but the **essential path** follows the order below (the order of the Lab Bench dashboard). Lab 08 and Lab 10 are **optional**. MultiAgentSystem Lab 02 and Lab 03 are not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow them for now.
+The labs keep their numbers, but the **essential path** follows the order below (the order of the Lab Bench dashboard). Lab 08 and Lab 10 are **optional**. MultiAgentSystem Lab 03 is not migrated yet (see [Part 2](#part-2-multiagentsystem---multi-agent-solutions)): do not follow it for now.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -672,6 +674,7 @@ The labs keep their numbers, but the **essential path** follows the order below 
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 4. Agents working with agents                                                                │
 │    MultiAgentSystem Lab01 Delegate a task to another agent (same process)                    │
+│    → MultiAgentSystem Lab02 Sequential orchestration (a pipeline of agents, a workflow)      │
 │    → Lab06 A2A server → Lab06 A2A client (remote agents, A2A — preview packages)             │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 5. In production                                                                             │
