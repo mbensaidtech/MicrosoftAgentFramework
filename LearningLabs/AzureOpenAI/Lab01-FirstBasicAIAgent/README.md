@@ -33,6 +33,7 @@ Lab01-FirstBasicAIAgent/
 ├── README.md
 ├── Start/                      <-- Your working folder
 │   ├── Program.cs              <-- Complete the TODOs here
+│   ├── LabPrompts.cs           <-- Provided: names, instructions and questions of the agents
 │   ├── ConfigurationHelper.cs
 │   ├── AzureOpenAISettings.cs
 │   ├── appsettings.json
@@ -79,7 +80,9 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Geography.Name`, `Agents.Geography.Instructions`, `Questions.SurfaceAreaOfFrance`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code.
 
 ---
 
@@ -98,7 +101,7 @@ Open `Start/Program.cs` and complete the TODOs:
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 4** | Create a basic AI Agent from the ChatClient | • Extension method: `chatClient.AsAIAgent()` <br> • No parameters needed for a basic agent <br> • Store it in an `AIAgent` variable |
-| **TODO 5** | Run the agent with a simple string prompt | • Method: `await agent.RunAsync(string message)` <br> • Example prompt: "Hello, what is the capital of France?" <br> • Returns: `AgentResponse` <br> • Optional: chain `.WithSpinner("Running agent")` |
+| **TODO 5** | Run the agent with a simple string prompt | • Method: `await agent.RunAsync(string message)` <br> • Question: `Questions.CapitalOfFrance` <br> • Returns: `AgentResponse` <br> • Optional: chain `.WithSpinner("Running agent")` |
 | **TODO 6** | Display the response | • `response.Text` contains the text of the answer <br> • `ColoredConsole.WritePrimaryLogLine(response.Text)` |
 
 ---
@@ -107,8 +110,8 @@ Open `Start/Program.cs` and complete the TODOs:
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 7** | Create an agent with instructions and a name | • `chatClient.AsAIAgent(instructions: "...", name: "...")` <br> • `instructions`: define the agent's behavior (e.g., "You are a helpful geography assistant...") <br> • `name`: give it a meaningful name (e.g., "GeographyAgent") |
-| **TODO 8** | Run the agent with a geography question | • `await agent.RunAsync(string message)` <br> • e.g., "What is the surface area of France?" |
+| **TODO 7** | Create an agent with instructions and a name | • `chatClient.AsAIAgent(instructions: Agents.Geography.Instructions, name: Agents.Geography.Name)` <br> • `instructions`: define the agent's behavior <br> • `name`: identifies the agent (logs, multi-agent systems) |
+| **TODO 8** | Run the agent with a geography question | • `await agent.RunAsync(string message)` <br> • Question: `Questions.SurfaceAreaOfFrance` |
 | **TODO 9** | Display the response | • `ColoredConsole.WritePrimaryLogLine(response.Text)` <br> • Optional: show `agent.Name` in the scenario title |
 
 ---
@@ -117,9 +120,9 @@ Open `Start/Program.cs` and complete the TODOs:
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 10** | Create an AI Agent | • Same as TODO 7: `chatClient.AsAIAgent(instructions: "...", name: "...")` |
-| **TODO 11** | Create a system message | • `new AIExtensions.ChatMessage(AIExtensions.ChatRole.System, "content")` <br> • It is added to the agent instructions for this run only <br> • System messages must always be written by the developer, never built from end-user input |
-| **TODO 12** | Create a user message | • `new AIExtensions.ChatMessage(AIExtensions.ChatRole.User, "content")` <br> • e.g., "What are the neighboring countries of France?" |
+| **TODO 10** | Create an AI Agent | • Same as TODO 7: `Agents.Geography` |
+| **TODO 11** | Create a system message | • `new AIExtensions.ChatMessage(AIExtensions.ChatRole.System, SystemMessages.GeographyExpert)` <br> • It is added to the agent instructions for this run only <br> • System messages must always be written by the developer, never built from end-user input |
+| **TODO 12** | Create a user message | • `new AIExtensions.ChatMessage(AIExtensions.ChatRole.User, Questions.NeighborsOfFrance)` |
 | **TODO 13** | Run the agent with the messages | • `await agent.RunAsync([systemMessage, userMessage])` <br> • `RunAsync` accepts any `IEnumerable<ChatMessage>` |
 | **TODO 14** | Display the response | • `ColoredConsole.WritePrimaryLogLine(response.Text)` |
 
@@ -129,8 +132,8 @@ Open `Start/Program.cs` and complete the TODOs:
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 15** | Create an AI Agent | • Same pattern: `chatClient.AsAIAgent(instructions: "...", name: "...")` <br> • e.g., a "ColorDecoratorAgent" |
-| **TODO 16** | Run the agent with a question | • `await agent.RunAsync(string message)` <br> • e.g., "What colors match with blue?" |
+| **TODO 15** | Create an AI Agent | • Same pattern, with `Agents.ColorDecorator.Instructions` and `Agents.ColorDecorator.Name` |
+| **TODO 16** | Run the agent with a question | • `await agent.RunAsync(Questions.ColorsMatchingBlue)` |
 | **TODO 17** | Display the response | • `ColoredConsole.WritePrimaryLogLine(response.Text)` |
 | **TODO 18** | Display token usage | • `response.Usage` (type `UsageDetails`, may be `null`) <br> • Properties: `InputTokenCount`, `OutputTokenCount`, `TotalTokenCount` <br> • `ReasoningTokenCount`: part of the output tokens spent on hidden reasoning by reasoning models (`null` or `0` otherwise) <br> • Use null-conditional: `response.Usage?.InputTokenCount` <br> • Display with `ColoredConsole.WriteSecondaryLogLine(...)`, with the labels of the [Expected Output](#expected-output): `$"  Input tokens: {response.Usage?.InputTokenCount}"`, `Output tokens`, `Reasoning tokens (included in output)`, `Total tokens` |
 
@@ -140,17 +143,17 @@ Open `Start/Program.cs` and complete the TODOs:
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 19** | Create an AI Agent | • e.g., a "StorytellerAgent" whose instructions ask for short stories |
-| **TODO 20** | Stream the answer | • `agent.RunStreamingAsync(string message)` returns `IAsyncEnumerable<AgentResponseUpdate>` <br> • `await foreach (AgentResponseUpdate update in agent.RunStreamingAsync("...")) { Console.Write(update.Text); }` <br> • Keep each update in a `List<AgentResponseUpdate> updates` <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
+| **TODO 19** | Create an AI Agent | • Same pattern, with `Agents.Storyteller.Instructions` and `Agents.Storyteller.Name` |
+| **TODO 20** | Stream the answer | • `agent.RunStreamingAsync(string message)` returns `IAsyncEnumerable<AgentResponseUpdate>` <br> • `await foreach (AgentResponseUpdate update in agent.RunStreamingAsync(Questions.StoryAboutParis)) { Console.Write(update.Text); }` <br> • Keep each update in a `List<AgentResponseUpdate> updates` <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
 | **TODO 21** | Display the token usage of the streamed run | • `AgentResponse streamedResponse = updates.ToAgentResponse();` combines all the updates into one response <br> • Then read `streamedResponse.Usage` as in TODO 18 |
 
 #### Scenario 6: Responses API
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 22** | Create the agent on the Responses API | • `AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: "...", name: "GeographyAgent");` <br> • Same `OpenAIClient` as before: only the API changes. With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` around it <br> • `AsAIAgent(model: ...)` for a `ResponsesClient` comes from the `OpenAI.Responses` namespace (already imported) |
-| **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) <br> • Display it as `ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");` (the label of the [Expected Output](#expected-output)), then the usage as in TODO 18 |
-| **TODO 24** | Ask a follow-up question in the same conversation | • The question `"And what is its population?"` only makes sense after the first one: *its* is Italy. In scenarios 1 to 5, each `RunAsync` is independent and the agent would not know what *its* refers to <br> • Pass the id of the first response as the `ConversationId` of the run: `ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });` <br> • `AgentResponse followUpResponse = await responsesAgent.RunAsync("And what is its population?", options: followUpOptions).WithSpinner("Running agent");` <br> • The Responses API chains the new request to the stored response (`previous_response_id`): the **service** adds the first question and answer, only the new question is sent. The input tokens of the follow-up include them <br> • Display `ColoredConsole.WriteInfoLine($"=== Follow-up question, chained to {responsesResponse.ResponseId} ===");`, the answer, `$"Follow-up response id: {followUpResponse.ResponseId}"` and the usage under `"Token Usage (follow-up, history kept by the service): "` (labels of the [Expected Output](#expected-output)) <br> • To continue further, pass `followUpResponse.ResponseId` with the third question: each response id points to the whole conversation up to it |
+| **TODO 22** | Create the agent on the Responses API | • `AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: Agents.Geography.Instructions, name: Agents.Geography.Name);` <br> • Same `OpenAIClient` as before: only the API changes. With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` around it <br> • `AsAIAgent(model: ...)` for a `ResponsesClient` comes from the `OpenAI.Responses` namespace (already imported) |
+| **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync(Questions.SurfaceAreaOfItaly).WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) <br> • Display it as `ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");` (the label of the [Expected Output](#expected-output)), then the usage as in TODO 18 |
+| **TODO 24** | Ask a follow-up question in the same conversation | • The question `Questions.ItsPopulation` (*"And what is its population?"*) only makes sense after the first one: *its* is Italy. In scenarios 1 to 5, each `RunAsync` is independent and the agent would not know what *its* refers to <br> • Pass the id of the first response as the `ConversationId` of the run: `ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });` <br> • `AgentResponse followUpResponse = await responsesAgent.RunAsync(Questions.ItsPopulation, options: followUpOptions).WithSpinner("Running agent");` <br> • The Responses API chains the new request to the stored response (`previous_response_id`): the **service** adds the first question and answer, only the new question is sent. The input tokens of the follow-up include them <br> • Display `ColoredConsole.WriteInfoLine($"=== Follow-up question, chained to {responsesResponse.ResponseId} ===");`, the answer, `$"Follow-up response id: {followUpResponse.ResponseId}"` and the usage under `"Token Usage (follow-up, history kept by the service): "` (labels of the [Expected Output](#expected-output)) <br> • To continue further, pass `followUpResponse.ResponseId` with the third question: each response id points to the whole conversation up to it |
 
 ---
 
@@ -319,6 +322,7 @@ Answers vary from one run to another. The follow-up answer names Italy although 
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, the same for everyone
 - `FirstBasicAIAgent.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

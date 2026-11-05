@@ -59,7 +59,7 @@ if (ShouldRunScenario(1))
     AIAgent basicAgent = chatClient.AsAIAgent();
 
     // Step 2: Run the agent with a simple string prompt (with spinner to show loading)
-    AgentResponse basicResponse = await basicAgent.RunAsync("Hello, what is the capital of France?").WithSpinner("Running agent");
+    AgentResponse basicResponse = await basicAgent.RunAsync(Questions.CapitalOfFrance).WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 1: Basic Agent ===");
@@ -76,11 +76,11 @@ if (ShouldRunScenario(2))
 
     // Step 1: Create an AI Agent with specific instructions and a name
     AIAgent geographyAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
-        name: "GeographyAgent");
+        instructions: Agents.Geography.Instructions,
+        name: Agents.Geography.Name);
 
     // Step 2: Run the agent with a geography-related question (with spinner to show loading)
-    AgentResponse geographyResponse = await geographyAgent.RunAsync("Hello, what is the surface area of France?").WithSpinner("Running agent");
+    AgentResponse geographyResponse = await geographyAgent.RunAsync(Questions.SurfaceAreaOfFrance).WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine($"=== Scenario 2: Agent with Instructions ({geographyAgent.Name}) ===");
@@ -97,19 +97,19 @@ if (ShouldRunScenario(3))
 
     // Step 1: Create an AI Agent with specific instructions and a name
     AIAgent geographyAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
-        name: "GeographyAgent");
+        instructions: Agents.Geography.Instructions,
+        name: Agents.Geography.Name);
 
     // Step 2: Create a system message to refine the agent behavior for this run only
     // (system messages must always be written by the developer, never built from end-user input)
     AIExtensions.ChatMessage systemMessage = new(
         AIExtensions.ChatRole.System,
-        "You are a geography expert. Provide detailed and accurate information about world geography.");
+        SystemMessages.GeographyExpert);
 
     // Step 3: Create a user message with a geography question
     AIExtensions.ChatMessage userMessage = new(
         AIExtensions.ChatRole.User,
-        "What are the neighboring countries of France? give me the countries in a list without any other text.");
+        Questions.NeighborsOfFrance);
 
     // Step 4: Run the agent with a collection of ChatMessages (with spinner to show loading)
     AgentResponse chatMessageResponse = await geographyAgent.RunAsync([systemMessage, userMessage]).WithSpinner("Running agent");
@@ -129,11 +129,11 @@ if (ShouldRunScenario(4))
 
     // Step 1: Create an AI Agent with specific instructions and a name
     AIAgent colorDecoAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful color decorator assistant. You are able to answer questions about the color of the world.",
-        name: "ColorDecoratorAgent");
+        instructions: Agents.ColorDecorator.Instructions,
+        name: Agents.ColorDecorator.Name);
 
     // Step 2: Run the agent with a color-related question (with spinner to show loading)
-    AgentResponse colorResponse = await colorDecoAgent.RunAsync("Hello, what are colors that match with the color blue? give me the colors in a list without any other text.").WithSpinner("Running agent");
+    AgentResponse colorResponse = await colorDecoAgent.RunAsync(Questions.ColorsMatchingBlue).WithSpinner("Running agent");
 
     // Step 3: Display the response
     ColoredConsole.WriteInfoLine("=== Scenario 4: Get consumed tokens from the agent response ===");
@@ -159,15 +159,15 @@ if (ShouldRunScenario(5))
 
     // Step 1: Create an AI Agent with specific instructions and a name
     AIAgent storytellerAgent = chatClient.AsAIAgent(
-        instructions: "You are a storyteller. You write short, vivid stories for travelers.",
-        name: "StorytellerAgent");
+        instructions: Agents.Storyteller.Instructions,
+        name: Agents.Storyteller.Name);
 
     ColoredConsole.WriteInfoLine("=== Scenario 5: Streaming ===");
 
     // Step 2: Run the agent in streaming mode and write each update as soon as it arrives
     // (no spinner here: the text itself shows the progress)
     List<AgentResponseUpdate> updates = [];
-    await foreach (AgentResponseUpdate update in storytellerAgent.RunStreamingAsync("Tell me a four-sentence story about a trip to Paris."))
+    await foreach (AgentResponseUpdate update in storytellerAgent.RunStreamingAsync(Questions.StoryAboutParis))
     {
         Console.Write(update.Text);
         updates.Add(update);
@@ -198,12 +198,12 @@ if (ShouldRunScenario(6))
 #pragma warning disable OPENAI001
     AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(
         model: settings.ChatDeploymentName,
-        instructions: "You are a helpful geography assistant. You are able to answer questions about the geography of the world.",
-        name: "GeographyAgent");
+        instructions: Agents.Geography.Instructions,
+        name: Agents.Geography.Name);
 #pragma warning restore OPENAI001
 
     // Step 2: Run it exactly like the Chat Completions agents: RunAsync and AgentResponse do not change
-    AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");
+    AgentResponse responsesResponse = await responsesAgent.RunAsync(Questions.SurfaceAreaOfItaly).WithSpinner("Running agent");
 
     // Step 3: Display the answer, the id of the response (stored by the service by default) and the token usage
     ColoredConsole.WriteInfoLine("=== Scenario 6: Responses API ===");
@@ -220,7 +220,7 @@ if (ShouldRunScenario(6))
     // Here, the id of the first response is passed as the ConversationId of the run: the Responses API chains the new request
     // to the stored response (previous_response_id), so the service brings back the history. Only the new question is sent.
     ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });
-    AgentResponse followUpResponse = await responsesAgent.RunAsync("And what is its population?", options: followUpOptions).WithSpinner("Running agent");
+    AgentResponse followUpResponse = await responsesAgent.RunAsync(Questions.ItsPopulation, options: followUpOptions).WithSpinner("Running agent");
 
     // Step 5: Display the follow-up answer, its own response id and its token usage
     // (the input tokens now include the first question and answer, added by the service)
