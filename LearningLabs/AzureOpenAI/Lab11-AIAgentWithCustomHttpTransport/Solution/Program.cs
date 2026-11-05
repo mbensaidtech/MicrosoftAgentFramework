@@ -73,7 +73,7 @@ if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: See the HTTP traffic of an agent run ===");
-    string prompt = "Hello, what is the capital of France?";
+    string prompt = Questions.CapitalOfFrance;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // Step 1: Create a basic AI Agent from the ChatClient (its requests go through the custom transport)
@@ -99,13 +99,13 @@ if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: One agent run, several HTTP requests (function calling) ===");
-    string prompt = "What is the weather like in Amsterdam?";
+    string prompt = Questions.WeatherInAmsterdam;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // Step 1: Create an agent with a function tool (its description and JSON schema are sent in the "tools" of each request)
     AIAgent weatherAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant. Use the tools to answer.",
-        name: "WeatherAgent",
+        instructions: Agents.Weather.Instructions,
+        name: Agents.Weather.Name,
         tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]);
 
     // Step 2: Run the agent, counting the HTTP requests: the model first asks for the tool ("tool_calls"),
@@ -128,7 +128,7 @@ if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Observe an agent with OpenTelemetry ===");
-    string prompt = "I am going to Amsterdam tomorrow. Do I need an umbrella?";
+    string prompt = Questions.UmbrellaInAmsterdam;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // Step 1: Create the tracer provider. It listens to the activity source of the lab, and keeps the finished spans
@@ -145,9 +145,9 @@ if (ShouldRunScenario(3))
     // - the agent (AsBuilder().UseOpenTelemetry): an "invoke_agent" span around the whole run
     // EnableSensitiveData stays false (the default): prompts, answers and tool arguments are not recorded
     AIAgent weatherAgent = chatClient.AsAIAgent(
-            instructions: "You are a helpful assistant. Use the tools to answer.",
-            name: "WeatherAgent",
-            description: "Gives the weather forecast for a city.",
+            instructions: Agents.Weather.Instructions,
+            name: Agents.Weather.Name,
+            description: Agents.Weather.Description,
             tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")],
             clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
         .AsBuilder()
@@ -156,8 +156,8 @@ if (ShouldRunScenario(3))
 
     // Step 3: Create a travel assistant that calls the weather agent as a tool, instrumented the same way
     AIAgent travelAgent = chatClient.AsAIAgent(
-            instructions: "You help travelers prepare their trips. Use your tools, then answer in two sentences.",
-            name: "TravelAssistant",
+            instructions: Agents.TravelAssistant.Instructions,
+            name: Agents.TravelAssistant.Name,
             tools: [weatherAgent.AsAIFunction()],
             clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
         .AsBuilder()

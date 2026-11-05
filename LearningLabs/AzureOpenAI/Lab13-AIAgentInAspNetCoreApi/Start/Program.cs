@@ -70,9 +70,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Provided: the development token issuer (Auth/DevTokenIssuer.cs), used by the API (TODO 6) and by the scenarios
 DevTokenIssuer tokenIssuer = new();
 
-// TODO 4: Register the agent in dependency injection, as a singleton, with the tool get_my_profile
+// TODO 4: Register the agent in dependency injection, as a singleton, with the instructions and the name of
+// Agents.IntranetAssistant (provided in LabPrompts.cs) and the tool get_my_profile
 // Hint: builder.Services.AddHttpContextAccessor();
-//       builder.Services.AddSingleton<AIAgent>(serviceProvider => chatClient.AsAIAgent(instructions: ..., name: "IntranetAssistant",
+//       builder.Services.AddSingleton<AIAgent>(serviceProvider => chatClient.AsAIAgent(instructions: Agents.IntranetAssistant.Instructions,
+//           name: Agents.IntranetAssistant.Name,
 //           tools: [AIFunctionFactory.Create(EmployeeDirectory.GetMyProfile, "get_my_profile")], services: serviceProvider));
 
 // TODO 5: Register the store of the conversations as a singleton
@@ -127,7 +129,7 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteInfoLine("=== Scenario 1: Requests refused before the agent runs ===");
 
     // Step 1: No token: the authorization of the endpoint refuses the request (401 Unauthorized)
-    await SendMessageAsync(httpClient, token: null, Guid.NewGuid(), "Hello, which team am I in?");
+    await SendMessageAsync(httpClient, token: null, Guid.NewGuid(), Questions.HelloWhichTeam);
 
     // Step 2: A valid token, but an empty message: the endpoint refuses it (400 Bad Request, problem details)
     await SendMessageAsync(httpClient, aliceToken, Guid.NewGuid(), " ");
@@ -143,8 +145,7 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteInfoLine("=== Scenario 2: Alice - a streamed answer, with a tool that knows who she is ===");
 
     // Step 1: Alice starts a conversation. The tool reads her profile from her token, not from the model
-    await SendMessageAsync(httpClient, aliceToken, aliceConversationId,
-        "Which team am I in? Please also remember that my favorite meeting room is ROOM-B.");
+    await SendMessageAsync(httpClient, aliceToken, aliceConversationId, Questions.WhichTeamAndRememberFavoriteRoom);
 }
 
 #endregion
@@ -158,7 +159,7 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteInfoLine("=== Scenario 3: Alice - the conversation continues in another request ===");
 
     // Step 1: A new HTTP request, the same conversation id: the API loads the session saved by the previous request
-    await SendMessageAsync(httpClient, aliceToken, aliceConversationId, "Which meeting room do I prefer?");
+    await SendMessageAsync(httpClient, aliceToken, aliceConversationId, Questions.WhichRoomDoIPrefer);
 }
 
 #endregion
@@ -173,7 +174,7 @@ if (ShouldRunScenario(4))
 
     // Step 1: Bob sends the conversation id of Alice. The storage key contains his own user id: he gets a new conversation,
     // without Alice's messages, and the tool gives his profile
-    await SendMessageAsync(httpClient, bobToken, aliceConversationId, "Which meeting room do I prefer, and which team am I in?");
+    await SendMessageAsync(httpClient, bobToken, aliceConversationId, Questions.WhichRoomAndWhichTeam);
 }
 
 #endregion

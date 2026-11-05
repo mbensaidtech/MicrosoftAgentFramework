@@ -62,17 +62,18 @@ if (ShouldRunScenario(1))
     // TODO 4: Create the skills provider for the folder of file-based skills
     // Hint: AgentSkillsProvider skillsProvider = new(skillsPath);
 
-    // TODO 5: Create the agent "EmployeeAssistant" with the provider, trace the skill tools, and auto-approve the read-only ones,
-    // then display the skills advertised
-    // Hint: chatClient.AsAIAgent(new ChatClientAgentOptions { Name = ..., ChatOptions = new() { Instructions = ... }, AIContextProviders = [skillsProvider] })
+    // TODO 5: Create the agent with the name and the instructions of Agents.EmployeeAssistant (provided in LabPrompts.cs) and the provider,
+    // trace the skill tools, and auto-approve the read-only ones, then display the skills advertised
+    // Hint: chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.EmployeeAssistant.Name,
+    //       ChatOptions = new() { Instructions = Agents.EmployeeAssistant.Instructions }, AIContextProviders = [skillsProvider] })
     //       .AsBuilder().Use(TraceSkillCall).UseToolApproval(new ToolApprovalAgentOptions { AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] }).Build();
     //       await WriteFileSkillsAsync(skillsPath, agent);
     // AIAgent agent = ...
 
-    // TODO 6: Ask a question that matches a skill (see the README), and display the answer and the number of skill tools run
+    // TODO 6: Ask the question Questions.HotelNightInParis, which matches a skill, and display the answer and the number of skill tools run
     // Hint: int callsBefore = SkillCallCount; ... ColoredConsole.WriteSecondaryLogLine($"Skill tools run for this question: {SkillCallCount - callsBefore}");
 
-    // TODO 7: Ask a question that no skill covers ("What is the capital of Italy?"), same display
+    // TODO 7: Ask the question Questions.CapitalOfItaly, which no skill covers, same display
 }
 
 #endregion
@@ -84,17 +85,19 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: A skill defined in code, with a dynamic resource and a script ===");
 
-    // TODO 8: Define the skill "shipping-quote" in code: name, description, instructions (see the README),
+    // TODO 8: Define the skill Skills.ShippingQuote in code: its name, description and instructions (provided in LabPrompts.cs),
     // the static resource "rates", the dynamic resource "validity" and the script "quote" (ShippingRates.cs)
-    // Hint: new AgentInlineSkill(name: ..., description: ..., instructions: ...).AddResource("rates", ShippingRates.RatesTable)
+    // Hint: new AgentInlineSkill(name: Skills.ShippingQuote.Name, description: Skills.ShippingQuote.Description,
+    //       instructions: Skills.ShippingQuote.Instructions).AddResource("rates", ShippingRates.RatesTable)
     //       .AddResource("validity", ShippingRates.Validity).AddScript("quote", ShippingRates.Quote);
     // AgentInlineSkill shippingSkill = ...
 
-    // TODO 9: Create the agent "ShippingAssistant" with a provider for this skill, trace the skill tools, and auto-approve all the skill tools
+    // TODO 9: Create the agent with the name and the instructions of Agents.ShippingAssistant and a provider for this skill,
+    // trace the skill tools, and auto-approve all the skill tools
     // Hint: AutoApprovalRules = [AgentSkillsProvider.AllToolsAutoApprovalRule]
     // AIAgent agent = ...
 
-    // TODO 10: Ask for a quote (see the README) and display the answer
+    // TODO 10: Ask for a quote with the question Questions.QuoteWithValidity and display the answer
 }
 
 #endregion
@@ -106,17 +109,19 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Approve the skill tools ===");
 
-    // TODO 11: Create the provider of the same skill as scenario 2, and the ChatClientAgentOptions of the agent
+    // TODO 11: Create the provider of the same skill as scenario 2 (Skills.ShippingQuote), and the ChatClientAgentOptions of the agent
+    // (same Agents.ShippingAssistant as scenario 2)
     // ChatClientAgentOptions agentOptions = ...
 
-    // TODO 12: Without auto-approval (UseToolApproval() with no rule), run a question and display the pending approval request
+    // TODO 12: Without auto-approval (UseToolApproval() with no rule), run the question Questions.CostFor2Point5Kg
+    // and display the pending approval request
     // Hint: for each ToolApprovalRequestContent of the response:
     //       ColoredConsole.WriteWarningLine($"Without auto-approval, approval requested for {FormatCall((FunctionCallContent)request.ToolCall)}");
 
     // TODO 13: Create the agent that auto-approves the read-only skill tools only (AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule)
     // AIAgent agent = ...
 
-    // TODO 14: For a 2.5 kg parcel and a 120 kg parcel: run the question in a new session, then answer each pending request with
+    // TODO 14: For a 2.5 kg parcel and a 120 kg parcel (Questions.QuoteFor2Point5Kg, Questions.QuoteFor120Kg): run the question in a new session, then answer each pending request with
     // the decision of ScriptApprovalPolicy.Decide(call) until no request is left, and display the answer (see the README for the loop)
 }
 

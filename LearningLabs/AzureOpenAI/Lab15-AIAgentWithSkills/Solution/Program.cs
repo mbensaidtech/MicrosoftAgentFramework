@@ -71,8 +71,8 @@ if (ShouldRunScenario(1))
     AIAgent agent = chatClient
         .AsAIAgent(new ChatClientAgentOptions
         {
-            Name = "EmployeeAssistant",
-            ChatOptions = new() { Instructions = "You are the assistant of Contoso employees. Use the available skills when they match the question." },
+            Name = Agents.EmployeeAssistant.Name,
+            ChatOptions = new() { Instructions = Agents.EmployeeAssistant.Instructions },
             AIContextProviders = [skillsProvider]
         })
         .AsBuilder()
@@ -82,7 +82,7 @@ if (ShouldRunScenario(1))
     await WriteFileSkillsAsync(skillsPath, agent);
 
     // Step 3: A question that matches a skill: the agent loads it, reads its resource, then answers with the limit of the resource
-    const string ExpenseQuestion = "What is the maximum I can spend on a hotel night in Paris for a business trip?";
+    const string ExpenseQuestion = Questions.HotelNightInParis;
     ColoredConsole.WriteUserLine($"User: {ExpenseQuestion}");
     int callsBefore = SkillCallCount;
     AgentResponse expenseResponse = await agent.RunAsync(ExpenseQuestion, await agent.CreateSessionAsync());
@@ -90,7 +90,7 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteSecondaryLogLine($"Skill tools run for this question: {SkillCallCount - callsBefore}");
 
     // Step 4: A question that no skill covers: no skill is loaded, its instructions never reach the model
-    const string OtherQuestion = "What is the capital of Italy?";
+    const string OtherQuestion = Questions.CapitalOfItaly;
     ColoredConsole.WriteUserLine($"User: {OtherQuestion}");
     callsBefore = SkillCallCount;
     AgentResponse otherResponse = await agent.RunAsync(OtherQuestion, await agent.CreateSessionAsync());
@@ -110,14 +110,9 @@ if (ShouldRunScenario(2))
     // Step 1: Define the skill in code: name, description, instructions, then its resources and its script.
     // The script is a C# method run in the program: its parameters become the JSON schema the model fills
     AgentInlineSkill shippingSkill = new AgentInlineSkill(
-            name: "shipping-quote",
-            description: "Quotes the cost of shipping a parcel. Use when asked how much it costs to send a parcel, or for a shipping quote.",
-            instructions: """
-                Use this skill to quote the shipping cost of a parcel.
-                1. Read the rates resource to find the zone of the destination.
-                2. Read the validity resource to know until when the quote is valid.
-                3. Run the quote script with the weight in kg and the zone, and give the quote id and the price it returns.
-                """)
+            name: Skills.ShippingQuote.Name,
+            description: Skills.ShippingQuote.Description,
+            instructions: Skills.ShippingQuote.Instructions)
         .AddResource("rates", ShippingRates.RatesTable)
         .AddResource("validity", ShippingRates.Validity)
         .AddScript("quote", ShippingRates.Quote);
@@ -128,8 +123,8 @@ if (ShouldRunScenario(2))
     AIAgent agent = chatClient
         .AsAIAgent(new ChatClientAgentOptions
         {
-            Name = "ShippingAssistant",
-            ChatOptions = new() { Instructions = "You are the shipping assistant of an online store. Use the available skills." },
+            Name = Agents.ShippingAssistant.Name,
+            ChatOptions = new() { Instructions = Agents.ShippingAssistant.Instructions },
             AIContextProviders = [skillsProvider]
         })
         .AsBuilder()
@@ -138,7 +133,7 @@ if (ShouldRunScenario(2))
         .Build();
 
     // Step 3: Ask for a quote: the agent loads the skill, reads both resources and runs the script
-    const string QuoteQuestion = "How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id and until when it is valid.";
+    const string QuoteQuestion = Questions.QuoteWithValidity;
     ColoredConsole.WriteUserLine($"User: {QuoteQuestion}");
     AgentResponse response = await agent.RunAsync(QuoteQuestion, await agent.CreateSessionAsync());
     ColoredConsole.WriteAssistantLine($"Agent: {response.Text}");
@@ -155,28 +150,22 @@ if (ShouldRunScenario(3))
 
     // Step 1: The same code-defined skill as scenario 2
     AgentSkillsProvider skillsProvider = new(new AgentInlineSkill(
-            name: "shipping-quote",
-            description: "Quotes the cost of shipping a parcel. Use when asked how much it costs to send a parcel, or for a shipping quote.",
-            instructions: """
-                Use this skill to quote the shipping cost of a parcel.
-                1. Read the rates resource to find the zone of the destination.
-                2. Read the validity resource to know until when the quote is valid.
-                3. Run the quote script with the weight in kg and the zone, and give the quote id and the price it returns.
-                """)
+            name: Skills.ShippingQuote.Name,
+            description: Skills.ShippingQuote.Description,
+            instructions: Skills.ShippingQuote.Instructions)
         .AddResource("rates", ShippingRates.RatesTable)
         .AddResource("validity", ShippingRates.Validity)
         .AddScript("quote", ShippingRates.Quote));
     ChatClientAgentOptions agentOptions = new()
     {
-        Name = "ShippingAssistant",
-        ChatOptions = new() { Instructions = "You are the shipping assistant of an online store. Use the available skills." },
+        Name = Agents.ShippingAssistant.Name,
+        ChatOptions = new() { Instructions = Agents.ShippingAssistant.Instructions },
         AIContextProviders = [skillsProvider]
     };
 
     // Step 2: No auto-approval: the first skill tool call (load_skill) stops the run with an approval request
     AIAgent strictAgent = chatClient.AsAIAgent(agentOptions).AsBuilder().Use(TraceSkillCall).UseToolApproval().Build();
-    AgentResponse pending = await strictAgent.RunAsync("How much does it cost to ship a 2.5 kg parcel to Germany?", await strictAgent.CreateSessionAsync())
-        ;
+    AgentResponse pending = await strictAgent.RunAsync(Questions.CostFor2Point5Kg, await strictAgent.CreateSessionAsync());
     foreach (ToolApprovalRequestContent request in pending.Messages.SelectMany(message => message.Contents).OfType<ToolApprovalRequestContent>())
     {
         ColoredConsole.WriteWarningLine($"Without auto-approval, approval requested for {FormatCall((FunctionCallContent)request.ToolCall)}");
@@ -191,7 +180,7 @@ if (ShouldRunScenario(3))
         .Build();
 
     // Step 4: Two parcels: the policy of the program (ScriptApprovalPolicy) approves the script for 2.5 kg and rejects it for 120 kg
-    foreach (string question in new[] { "How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id.", "How much does it cost to ship a 120 kg parcel to Germany? Give me the quote id." })
+    foreach (string question in new[] { Questions.QuoteFor2Point5Kg, Questions.QuoteFor120Kg })
     {
         ColoredConsole.WriteUserLine($"User: {question}");
         AgentSession session = await agent.CreateSessionAsync();

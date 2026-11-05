@@ -38,6 +38,7 @@ Lab13-AIAgentInAspNetCoreApi/
 ├── README.md
 ├── Start/                              <-- Your working folder
 │   ├── Program.cs                      <-- Complete the TODOs here (the API; the scenarios are provided)
+│   ├── LabPrompts.cs                   <-- Provided: name and instructions of the agent, messages of the scenarios
 │   ├── Tools/EmployeeDirectory.cs      <-- Provided: the tool get_my_profile (user from the token)
 │   ├── Storage/ConversationStore.cs    <-- Provided: where the serialized sessions are kept (in memory)
 │   ├── Auth/DevTokenIssuer.cs          <-- Provided: development tokens for the lab users (stands in for Entra ID)
@@ -92,6 +93,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the name and the instructions of the agent behind the API (`Agents.IntranetAssistant`) and the messages that the scenarios send to the API (`Questions.HelloWhichTeam`, `Questions.WhichTeamAndRememberFavoriteRoom`, `Questions.WhichRoomDoIPrefer`, `Questions.WhichRoomAndWhichTeam`, already used by the provided scenario code).
 - `Tools/EmployeeDirectory.cs` — `GetMyProfile(IServiceProvider services)`, the tool `get_my_profile`. It has **no user parameter**: it reads the user id (`sub` claim) of the HTTP request from `IHttpContextAccessor`, so the model cannot ask for someone else's profile. The `IServiceProvider` parameter is filled by the framework and hidden from the model (Lab 03, scenario 3).
 - `Storage/ConversationStore.cs` — `TryGet(key, out serializedSession)` and `Save(key, serializedSession)`: the serialized sessions (`JsonElement`) in a `ConcurrentDictionary`. In production, the same two operations go to a database.
 - `Auth/DevTokenIssuer.cs` — creates signed JWT tokens (`CreateToken("alice")`) with a random key, and gives the API the matching `TokenValidationParameters`. It stands in for an identity provider so that the lab runs without setup: **never issue tokens yourself in production**.
@@ -100,6 +102,8 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs. The program already starts the API and plays the scenarios: until TODO 9 the API has no endpoint, so every scenario gets `404 NotFound`.
+
+The name and the instructions of the agent are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.IntranetAssistant.Name`, `Agents.IntranetAssistant.Instructions`) instead of writing your own texts. The messages of the scenarios (`Questions.WhichTeamAndRememberFavoriteRoom`...) are provided there too, and already sent by the scenario code. Everyone works with the same agent and gets comparable answers, and you can focus on the Agent Framework and ASP.NET Core code.
 
 ---
 
@@ -119,7 +123,7 @@ Same as Lab 01.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Register the agent in dependency injection | • `builder.Services.AddHttpContextAccessor();` (used by the tool) <br> • `builder.Services.AddSingleton<AIAgent>(serviceProvider => chatClient.AsAIAgent(instructions: "You are the assistant of the company intranet. Answer in one or two sentences. Use get_my_profile for any question about the user's team or office.", name: "IntranetAssistant", tools: [AIFunctionFactory.Create(EmployeeDirectory.GetMyProfile, "get_my_profile")], services: serviceProvider));` <br> • A **singleton**: the agent holds no conversation, the sessions do (official sample `Agent_Step06_DependencyInjection` registers it the same way) |
+| **TODO 4** | Register the agent in dependency injection | • `builder.Services.AddHttpContextAccessor();` (used by the tool) <br> • `builder.Services.AddSingleton<AIAgent>(serviceProvider => chatClient.AsAIAgent(instructions: Agents.IntranetAssistant.Instructions, name: Agents.IntranetAssistant.Name, tools: [AIFunctionFactory.Create(EmployeeDirectory.GetMyProfile, "get_my_profile")], services: serviceProvider));` <br> • A **singleton**: the agent holds no conversation, the sessions do (official sample `Agent_Step06_DependencyInjection` registers it the same way) |
 | **TODO 5** | Register the conversation store | • `builder.Services.AddSingleton<ConversationStore>();` |
 | **TODO 6** | Register the authentication and the authorization | • `builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => { options.MapInboundClaims = false; options.TokenValidationParameters = tokenIssuer.ValidationParameters; });` <br> • `builder.Services.AddAuthorization();` <br> • `MapInboundClaims = false` keeps the claim names of the token: the user id stays `sub` |
 | **TODO 7** | Return errors as problem details | • `builder.Services.AddProblemDetails();` |
@@ -340,6 +344,7 @@ The ids are random; the wording and the number of events vary. In scenario 4, Bo
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Name and instructions of the agent, and messages of the scenarios, the same for everyone
 - `AIAgentWebApi.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs`, `AzureOpenAISettings.cs`, `WebApiSettings.cs` - Configuration
 - `Tools/EmployeeDirectory.cs` - The tool of the agent

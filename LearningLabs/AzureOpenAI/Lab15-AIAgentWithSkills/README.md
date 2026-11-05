@@ -35,6 +35,7 @@ Lab15-AIAgentWithSkills/
 ├── README.md
 ├── Start/                                  <-- Your working folder
 │   ├── Program.cs                          <-- Complete the TODOs here
+│   ├── LabPrompts.cs                       <-- Provided: names, instructions and questions of the agents, the code-defined skill
 │   ├── skills/                             <-- Provided: the file-based skills (scenario 1)
 │   │   ├── expense-policy/
 │   │   │   ├── SKILL.md
@@ -89,6 +90,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names and the instructions of the agents (`Agents.EmployeeAssistant` for scenario 1, `Agents.ShippingAssistant` for scenarios 2 and 3), the name, the description and the instructions of the code-defined skill (`Skills.ShippingQuote`) and the questions of the scenarios (`Questions`). The file-based skills are not in this file: they are the `SKILL.md` files of `skills/`.
 - `skills/` — two file-based skills, copied next to the program by the `.csproj`. Each skill is a folder with a `SKILL.md`:
 
   ```markdown
@@ -117,6 +119,8 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 Open `Start/Program.cs` and complete the TODOs.
 
+The names, the instructions and the questions of the agents, and the texts of the code-defined skill, are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.EmployeeAssistant.Name`, `Agents.EmployeeAssistant.Instructions`, `Skills.ShippingQuote.Description`, `Questions.HotelNightInParis`...) instead of writing your own texts. Everyone works with the same agents and skills and gets comparable answers, and you can focus on the Agent Framework code.
+
 ---
 
 #### Setup: Configuration and Client Initialization
@@ -138,9 +142,9 @@ Same as Lab 01.
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 4** | Create the skills provider | • `AgentSkillsProvider skillsProvider = new(skillsPath);` — it discovers each sub-folder that contains a `SKILL.md` |
-| **TODO 5** | Create the agent and display the skills | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "EmployeeAssistant", ChatOptions = new() { Instructions = "You are the assistant of Contoso employees. Use the available skills when they match the question." }, AIContextProviders = [skillsProvider] }).AsBuilder().Use(TraceSkillCall).UseToolApproval(new ToolApprovalAgentOptions { AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] }).Build();` <br> • `await WriteFileSkillsAsync(skillsPath, agent);` |
-| **TODO 6** | Ask a question that matches a skill | • `const string ExpenseQuestion = "What is the maximum I can spend on a hotel night in Paris for a business trip?";` and `ColoredConsole.WriteUserLine($"User: {ExpenseQuestion}");` <br> • `int callsBefore = SkillCallCount;` <br> • `AgentResponse expenseResponse = await agent.RunAsync(ExpenseQuestion, await agent.CreateSessionAsync());` — **no** `.WithSpinner()`: `TraceSkillCall` writes during the run <br> • `ColoredConsole.WriteAssistantLine($"Agent: {expenseResponse.Text}");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Skill tools run for this question: {SkillCallCount - callsBefore}");` |
-| **TODO 7** | Ask a question that no skill covers | • `"What is the capital of Italy?"`, the same steps as TODO 6 (`callsBefore = SkillCallCount;`) <br> • Expect **0** skill tools: the instructions of the skills never reach the model |
+| **TODO 5** | Create the agent and display the skills | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.EmployeeAssistant.Name, ChatOptions = new() { Instructions = Agents.EmployeeAssistant.Instructions }, AIContextProviders = [skillsProvider] }).AsBuilder().Use(TraceSkillCall).UseToolApproval(new ToolApprovalAgentOptions { AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] }).Build();` <br> • `await WriteFileSkillsAsync(skillsPath, agent);` |
+| **TODO 6** | Ask a question that matches a skill | • `const string ExpenseQuestion = Questions.HotelNightInParis;` and `ColoredConsole.WriteUserLine($"User: {ExpenseQuestion}");` <br> • `int callsBefore = SkillCallCount;` <br> • `AgentResponse expenseResponse = await agent.RunAsync(ExpenseQuestion, await agent.CreateSessionAsync());` — **no** `.WithSpinner()`: `TraceSkillCall` writes during the run <br> • `ColoredConsole.WriteAssistantLine($"Agent: {expenseResponse.Text}");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Skill tools run for this question: {SkillCallCount - callsBefore}");` |
+| **TODO 7** | Ask a question that no skill covers | • `const string OtherQuestion = Questions.CapitalOfItaly;`, the same steps as TODO 6 (`callsBefore = SkillCallCount;`) <br> • Expect **0** skill tools: the instructions of the skills never reach the model |
 
 ---
 
@@ -150,9 +154,9 @@ A skill can be built in code: useful when its content comes from your applicatio
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 8** | Define the skill in code | • `AgentInlineSkill shippingSkill = new AgentInlineSkill(name: "shipping-quote", description: "Quotes the cost of shipping a parcel. Use when asked how much it costs to send a parcel, or for a shipping quote.", instructions: """...""")` with these instructions: *"Use this skill to quote the shipping cost of a parcel. 1. Read the rates resource to find the zone of the destination. 2. Read the validity resource to know until when the quote is valid. 3. Run the quote script with the weight in kg and the zone, and give the quote id and the price it returns."* <br> • `.AddResource("rates", ShippingRates.RatesTable)` (static), `.AddResource("validity", ShippingRates.Validity)` (a delegate: computed at each read), `.AddScript("quote", ShippingRates.Quote);` |
-| **TODO 9** | Create the agent | • `AgentSkillsProvider skillsProvider = new(shippingSkill);` <br> • As TODO 5, with `Name = "ShippingAssistant"`, `Instructions = "You are the shipping assistant of an online store. Use the available skills."`, and `AutoApprovalRules = [AgentSkillsProvider.AllToolsAutoApprovalRule]` — this skill is your own code: the script is auto-approved too |
-| **TODO 10** | Ask for a quote | • `const string QuoteQuestion = "How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id and until when it is valid.";` <br> • `ColoredConsole.WriteUserLine(...)`, `await agent.RunAsync(QuoteQuestion, await agent.CreateSessionAsync());`, `ColoredConsole.WriteAssistantLine($"Agent: {response.Text}");` |
+| **TODO 8** | Define the skill in code | • `AgentInlineSkill shippingSkill = new AgentInlineSkill(name: Skills.ShippingQuote.Name, description: Skills.ShippingQuote.Description, instructions: Skills.ShippingQuote.Instructions)` — the name (`shipping-quote`) and the description are advertised to the model; the instructions (read the rates, read the validity, run the quote script) are sent only when it loads the skill <br> • `.AddResource("rates", ShippingRates.RatesTable)` (static), `.AddResource("validity", ShippingRates.Validity)` (a delegate: computed at each read), `.AddScript("quote", ShippingRates.Quote);` |
+| **TODO 9** | Create the agent | • `AgentSkillsProvider skillsProvider = new(shippingSkill);` <br> • As TODO 5, with `Name = Agents.ShippingAssistant.Name`, `Instructions = Agents.ShippingAssistant.Instructions`, and `AutoApprovalRules = [AgentSkillsProvider.AllToolsAutoApprovalRule]` — this skill is your own code: the script is auto-approved too |
+| **TODO 10** | Ask for a quote | • `const string QuoteQuestion = Questions.QuoteWithValidity;` <br> • `ColoredConsole.WriteUserLine(...)`, `await agent.RunAsync(QuoteQuestion, await agent.CreateSessionAsync());`, `ColoredConsole.WriteAssistantLine($"Agent: {response.Text}");` |
 
 ---
 
@@ -162,15 +166,15 @@ Skills are instructions and code that run in your agent: **the three skill tools
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 11** | Prepare the provider and the agent options | • A provider for the same skill as scenario 2: `AgentSkillsProvider skillsProvider = new(new AgentInlineSkill(...)...);` <br> • `ChatClientAgentOptions agentOptions = new() { Name = "ShippingAssistant", ChatOptions = new() { Instructions = "You are the shipping assistant of an online store. Use the available skills." }, AIContextProviders = [skillsProvider] };` |
-| **TODO 12** | See the default: every skill tool waits for an approval | • `AIAgent strictAgent = chatClient.AsAIAgent(agentOptions).AsBuilder().Use(TraceSkillCall).UseToolApproval().Build();` <br> • `AgentResponse pending = await strictAgent.RunAsync("How much does it cost to ship a 2.5 kg parcel to Germany?", await strictAgent.CreateSessionAsync());` <br> • `foreach (ToolApprovalRequestContent request in pending.Messages.SelectMany(message => message.Contents).OfType<ToolApprovalRequestContent>())` → `ColoredConsole.WriteWarningLine($"Without auto-approval, approval requested for {FormatCall((FunctionCallContent)request.ToolCall)}");` |
+| **TODO 11** | Prepare the provider and the agent options | • A provider for the same skill as scenario 2: `AgentSkillsProvider skillsProvider = new(new AgentInlineSkill(...)...);` <br> • `ChatClientAgentOptions agentOptions = new() { Name = Agents.ShippingAssistant.Name, ChatOptions = new() { Instructions = Agents.ShippingAssistant.Instructions }, AIContextProviders = [skillsProvider] };` |
+| **TODO 12** | See the default: every skill tool waits for an approval | • `AIAgent strictAgent = chatClient.AsAIAgent(agentOptions).AsBuilder().Use(TraceSkillCall).UseToolApproval().Build();` <br> • `AgentResponse pending = await strictAgent.RunAsync(Questions.CostFor2Point5Kg, await strictAgent.CreateSessionAsync());` <br> • `foreach (ToolApprovalRequestContent request in pending.Messages.SelectMany(message => message.Contents).OfType<ToolApprovalRequestContent>())` → `ColoredConsole.WriteWarningLine($"Without auto-approval, approval requested for {FormatCall((FunctionCallContent)request.ToolCall)}");` |
 | **TODO 13** | Auto-approve the read-only tools only | • `AIAgent agent = chatClient.AsAIAgent(agentOptions).AsBuilder().Use(TraceSkillCall).UseToolApproval(new ToolApprovalAgentOptions { AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] }).Build();` <br> • `load_skill` and `read_skill_resource` now run without a request; `run_skill_script` still asks |
 | **TODO 14** | Let the policy decide for two parcels | See the code below |
 
 **TODO 14:**
 
 ```csharp
-foreach (string question in new[] { "How much does it cost to ship a 2.5 kg parcel to Germany? Give me the quote id.", "How much does it cost to ship a 120 kg parcel to Germany? Give me the quote id." })
+foreach (string question in new[] { Questions.QuoteFor2Point5Kg, Questions.QuoteFor120Kg })
 {
     ColoredConsole.WriteUserLine($"User: {question}");
     AgentSession session = await agent.CreateSessionAsync();
@@ -351,6 +355,7 @@ The wording varies; the order of the skill tools and the decisions do not. The m
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, and texts of the code-defined skill, the same for everyone
 - `AIAgentWithSkills.csproj` - Project file with all required dependencies (and the copy of `skills/`)
 - `ConfigurationHelper.cs`, `AzureOpenAISettings.cs` - Configuration
 - `skills/` - The file-based skills

@@ -36,6 +36,7 @@ Lab11-AIAgentWithCustomHttpTransport/
 ├── README.md
 ├── Start/                                  <-- Your working folder
 │   ├── Program.cs                          <-- Complete the TODOs here (setup, scenarios and the HTTP handler)
+│   ├── LabPrompts.cs                       <-- Provided: names, instructions and questions of the agents
 │   ├── HttpConsole.cs                      <-- Provided: display helpers (headers with masked credentials, JSON bodies)
 │   ├── TraceConsole.cs                     <-- Provided: displays the OpenTelemetry spans as a tree (scenario 3)
 │   ├── Tools/WeatherTools.cs               <-- Provided: the function tool of scenario 2
@@ -85,6 +86,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names and the instructions of the agents (`Agents.Weather`, used in scenarios 2 and 3, with the description of scenario 3, and `Agents.TravelAssistant`) and the questions of the scenarios (`Questions.CapitalOfFrance`, `Questions.WeatherInAmsterdam`, `Questions.UmbrellaInAmsterdam`, already in the `prompt` variable of each scenario). The basic agent of scenario 1 has no name and no instructions on purpose.
 - `HttpConsole.cs` — display helpers, imported with `using static` so you can call them directly:
   - `WriteHeaders(headers, content)` writes the headers of a request or a response, then the headers of its content (`Content-Type`, `Content-Length`). The value of `Authorization` and `api-key` is **always masked** (`Bearer [MASKED]`): with the OpenAI SDK, your API key itself travels in `Authorization: Bearer <key>`;
   - `await WriteBodyAsync(content, cancellationToken)` reads the body and writes it (indented when it is JSON). It does not read a streamed response (`text/event-stream`);
@@ -97,6 +99,8 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Weather.Name`, `Agents.Weather.Instructions`, `Agents.Weather.Description`, `Agents.TravelAssistant.Instructions`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The question of each scenario is already in its `prompt` variable.
 
 The HTTP handler is the class `HttpLoggingHandler` at the **bottom** of `Program.cs` (TODO 11–14). You can do the TODOs in order: after TODO 1–10 the agent already answers through your transport, but nothing is logged yet (the handler only forwards the requests, and counts them). Complete TODO 11–14 to see the traffic, then scenario 3 (TODO 15–19, placed before the handler in the file).
 
@@ -118,7 +122,7 @@ The HTTP handler is the class `HttpLoggingHandler` at the **bottom** of `Program
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 5** | Create a basic AI Agent | • `AIAgent basicAgent = chatClient.AsAIAgent();` |
-| **TODO 6** | Run the agent, counting the HTTP requests of the run | • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse basicResponse = await basicAgent.RunAsync(prompt);` <br> • No `.WithSpinner()` in this lab: the spinner would write over the HTTP log printed by the handler |
+| **TODO 6** | Run the agent, counting the HTTP requests of the run | • `prompt` is `Questions.CapitalOfFrance` <br> • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse basicResponse = await basicAgent.RunAsync(prompt);` <br> • No `.WithSpinner()` in this lab: the spinner would write over the HTTP log printed by the handler |
 | **TODO 7** | Display the answer, the number of requests and the token usage | • `ColoredConsole.WritePrimaryLogLine("Agent answer:");` <br> • `ColoredConsole.WriteAssistantLine(basicResponse.Text);` <br> • `ColoredConsole.WritePrimaryLogLine($"HTTP requests sent by this run: {loggingHandler.RequestCount - requestsBefore}");` <br> • `WriteTokenUsage(basicResponse);` |
 
 ---
@@ -127,8 +131,8 @@ The HTTP handler is the class `HttpLoggingHandler` at the **bottom** of `Program
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 8** | Create an agent with a function tool | • `AIAgent weatherAgent = chatClient.AsAIAgent(instructions: "You are a helpful assistant. Use the tools to answer.", name: "WeatherAgent", tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]);` <br> • The instructions and the tool will appear in the body of the request: a `system` message and the `tools` array |
-| **TODO 9** | Run the agent, counting the HTTP requests of the run | • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse weatherResponse = await weatherAgent.RunAsync(prompt);` |
+| **TODO 8** | Create an agent with a function tool | • `AIAgent weatherAgent = chatClient.AsAIAgent(instructions: Agents.Weather.Instructions, name: Agents.Weather.Name, tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]);` <br> • The instructions and the tool will appear in the body of the request: a `system` message and the `tools` array |
+| **TODO 9** | Run the agent, counting the HTTP requests of the run | • `prompt` is `Questions.WeatherInAmsterdam` <br> • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse weatherResponse = await weatherAgent.RunAsync(prompt);` |
 | **TODO 10** | Display the answer, the number of requests and the token usage | • Same as TODO 7 with `weatherResponse`: `ColoredConsole.WritePrimaryLogLine("Agent answer:");`, `ColoredConsole.WriteAssistantLine(weatherResponse.Text);`, `ColoredConsole.WritePrimaryLogLine($"HTTP requests sent by this run: {loggingHandler.RequestCount - requestsBefore}");`, `WriteTokenUsage(weatherResponse);` <br> • Expect **2** requests and a usage equal to the total of the two `usage` objects of the responses |
 
 ---
@@ -143,9 +147,9 @@ The HTTP log shows the bytes; a trace shows the **steps**, as the agent sees the
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 15** | Create the tracer provider | • `const string TelemetrySourceName = "AIAgentWithCustomHttpTransport";` <br> • `List<Activity> spans = [];` <br> • `using TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder().AddSource(TelemetrySourceName).AddInMemoryExporter(spans).Build();` <br> • `AddSource` must use the same name as `UseOpenTelemetry`; the in-memory exporter keeps the finished spans in `spans` so that the lab can display them |
-| **TODO 16** | Create the weather agent, instrumented at two levels | • `AIAgent weatherAgent = chatClient.AsAIAgent(instructions: "You are a helpful assistant. Use the tools to answer.", name: "WeatherAgent", description: "Gives the weather forecast for a city.", tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")], clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build()).AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build();` <br> • `EnableSensitiveData` stays `false` (the default): the spans hold no prompt, answer or tool argument |
-| **TODO 17** | Create the travel assistant, with the weather agent as a tool | • `AIAgent travelAgent = chatClient.AsAIAgent(instructions: "You help travelers prepare their trips. Use your tools, then answer in two sentences.", name: "TravelAssistant", tools: [weatherAgent.AsAIFunction()], clientFactory: ...same as TODO 16...).AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build();` |
-| **TODO 18** | Run it without the HTTP log | • `loggingHandler.WriteTraffic = false;` <br> • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse travelResponse = await travelAgent.RunAsync(prompt).WithSpinner("Running the travel assistant");` — the spinner is fine here: nothing else writes during the run <br> • `loggingHandler.WriteTraffic = true;` |
+| **TODO 16** | Create the weather agent, instrumented at two levels | • `AIAgent weatherAgent = chatClient.AsAIAgent(instructions: Agents.Weather.Instructions, name: Agents.Weather.Name, description: Agents.Weather.Description, tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")], clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build()).AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build();` <br> • `EnableSensitiveData` stays `false` (the default): the spans hold no prompt, answer or tool argument |
+| **TODO 17** | Create the travel assistant, with the weather agent as a tool | • `AIAgent travelAgent = chatClient.AsAIAgent(instructions: Agents.TravelAssistant.Instructions, name: Agents.TravelAssistant.Name, tools: [weatherAgent.AsAIFunction()], clientFactory: ...same as TODO 16...).AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build();` |
+| **TODO 18** | Run it without the HTTP log | • `prompt` is `Questions.UmbrellaInAmsterdam` <br> • `loggingHandler.WriteTraffic = false;` <br> • `int requestsBefore = loggingHandler.RequestCount;` <br> • `AgentResponse travelResponse = await travelAgent.RunAsync(prompt).WithSpinner("Running the travel assistant");` — the spinner is fine here: nothing else writes during the run <br> • `loggingHandler.WriteTraffic = true;` |
 | **TODO 19** | Display the answer, the spans, the requests and the token usage | • `ColoredConsole.WritePrimaryLogLine("Agent answer:");` and `ColoredConsole.WriteAssistantLine(travelResponse.Text);` <br> • `WriteSpanTree(spans);` <br> • The `HTTP requests sent by this run` line, then `WriteTokenUsage(travelResponse);` (as TODO 7) |
 
 ---
@@ -473,6 +477,7 @@ The JSON bodies above are shortened to one line per message; the real output is 
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, the same for everyone
 - `AIAgentWithCustomHttpTransport.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

@@ -48,15 +48,8 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 // TODO 3: Get a ChatClient (Chat Completions API) for the deployment
 // ChatClient chatClient = ...
 
-// Step 4: The instructions of the support agent under test (the "reference" version)
-const string ReferenceInstructions = """
-    You are the customer support assistant of an online store.
-    For any question about an order, call get_order_status with the order number, and answer with the facts it returns:
-    tracking number, carrier, locker code, dates.
-    Returns are accepted within 30 days of delivery.
-    Answer in at most three sentences.
-    """;
-ColoredConsole.WriteSecondaryLogLine($"Instructions of the agent under test:\n{ReferenceInstructions}");
+// Step 4: The instructions of the support agent under test (the "reference" version: Agents.Support.Instructions, provided in LabPrompts.cs)
+ColoredConsole.WriteSecondaryLogLine($"Instructions of the agent under test:\n{Agents.Support.Instructions}");
 
 #endregion
 
@@ -67,8 +60,9 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: Evaluate an agent with deterministic checks ===");
 
-    // TODO 4: Create the agent under test: instructions ReferenceInstructions, name "SupportAgent", and the tool get_order_status
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: ..., tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")])
+    // TODO 4: Create the agent under test with the instructions and the name of Agents.Support (provided in LabPrompts.cs),
+    // and the tool get_order_status
+    // Hint: chatClient.AsAIAgent(instructions: Agents.Support.Instructions, name: Agents.Support.Name, tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")])
     // AIAgent supportAgent = ...
 
     // TODO 5: Create a local evaluator with four checks: EvalChecks.NonEmpty(), EvalChecks.ContainsExpected(),
@@ -94,7 +88,7 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Score the answers with an LLM judge ===");
 
-    // TODO 8: Create the same agent as in TODO 4, run it once per question and keep the responses
+    // TODO 8: Create the same agent as in TODO 4 (Agents.Support), run it once per question and keep the responses
     // Hint: List<AgentResponse> responses = []; for each question: responses.Add(await supportAgent.RunAsync(question).WithSpinner("Running the agent"));
 
     // TODO 9: Create the judge: a ChatConfiguration over the chat client of the deployment, and say which model judges
@@ -115,8 +109,8 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Catch a regression of the instructions ===");
 
-    // TODO 11: Create the reference agent (ReferenceInstructions) and the candidate agent (the candidate instructions of the README),
-    // with the same name and the same tool
+    // TODO 11: Create the reference agent (Agents.Support.Instructions) and the candidate agent (Agents.Support.CandidateInstructions,
+    // provided in LabPrompts.cs), with the same name (Agents.Support.Name) and the same tool
     // AIAgent referenceAgent = ...
     // AIAgent candidateAgent = ...
 

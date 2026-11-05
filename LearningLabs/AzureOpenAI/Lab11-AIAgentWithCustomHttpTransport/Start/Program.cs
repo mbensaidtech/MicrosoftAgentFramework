@@ -66,13 +66,14 @@ if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: See the HTTP traffic of an agent run ===");
-    string prompt = "Hello, what is the capital of France?";
+    string prompt = Questions.CapitalOfFrance;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // TODO 5: Create a basic AI Agent from the ChatClient (no instructions, no name)
     // AIAgent basicAgent = ...
 
-    // TODO 6: Run the agent with the prompt, counting the HTTP requests sent by the handler during the run
+    // TODO 6: Run the agent with the prompt (Questions.CapitalOfFrance, provided in LabPrompts.cs),
+    // counting the HTTP requests sent by the handler during the run
     // Hint: read loggingHandler.RequestCount before the run; no spinner here (it would write over the HTTP log)
     // int requestsBefore = ...
     // AgentResponse basicResponse = ...
@@ -89,14 +90,16 @@ if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: One agent run, several HTTP requests (function calling) ===");
-    string prompt = "What is the weather like in Amsterdam?";
+    string prompt = Questions.WeatherInAmsterdam;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
-    // TODO 8: Create an agent with instructions, a name and the function tool WeatherTools.GetWeather (Tools/WeatherTools.cs)
-    // Hint: tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]
+    // TODO 8: Create an agent with the instructions and the name of Agents.Weather (provided in LabPrompts.cs)
+    // and the function tool WeatherTools.GetWeather (Tools/WeatherTools.cs)
+    // Hint: instructions: Agents.Weather.Instructions, name: Agents.Weather.Name,
+    //       tools: [AIFunctionFactory.Create(WeatherTools.GetWeather, "get_weather")]
     // AIAgent weatherAgent = ...
 
-    // TODO 9: Run the agent with the prompt, counting the HTTP requests (same as TODO 6)
+    // TODO 9: Run the agent with the prompt (Questions.WeatherInAmsterdam), counting the HTTP requests (same as TODO 6)
     // int requestsBefore = ...
     // AgentResponse weatherResponse = ...
 
@@ -111,7 +114,7 @@ if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Observe an agent with OpenTelemetry ===");
-    string prompt = "I am going to Amsterdam tomorrow. Do I need an umbrella?";
+    string prompt = Questions.UmbrellaInAmsterdam;
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // TODO 15: Create the tracer provider: it listens to the activity source "AIAgentWithCustomHttpTransport"
@@ -119,15 +122,18 @@ if (ShouldRunScenario(3))
     // Hint: const string TelemetrySourceName = "AIAgentWithCustomHttpTransport"; List<Activity> spans = [];
     //       using TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder().AddSource(...).AddInMemoryExporter(spans).Build();
 
-    // TODO 16: Create the weather agent of scenario 2 (with a description), instrumented at the chat client level and at the agent level
-    // Hint: chatClient.AsAIAgent(..., clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
+    // TODO 16: Create the weather agent of scenario 2 (Agents.Weather) with its description (Agents.Weather.Description),
+    // instrumented at the chat client level and at the agent level
+    // Hint: chatClient.AsAIAgent(..., description: Agents.Weather.Description, ..., clientFactory: innerClient => innerClient.AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build())
     //       .AsBuilder().UseOpenTelemetry(sourceName: TelemetrySourceName).Build()
     // AIAgent weatherAgent = ...
 
-    // TODO 17: Create a travel assistant with the weather agent as a tool (weatherAgent.AsAIFunction()), instrumented the same way
+    // TODO 17: Create the travel assistant with the instructions and the name of Agents.TravelAssistant
+    // and the weather agent as a tool (weatherAgent.AsAIFunction()), instrumented the same way
     // AIAgent travelAgent = ...
 
-    // TODO 18: Run the travel assistant with the HTTP log turned off, counting the HTTP requests
+    // TODO 18: Run the travel assistant with the prompt (Questions.UmbrellaInAmsterdam) and the HTTP log turned off,
+    // counting the HTTP requests
     // Hint: loggingHandler.WriteTraffic = false; then the run (as TODO 6, a spinner is fine here); then loggingHandler.WriteTraffic = true;
     // AgentResponse travelResponse = ...
 

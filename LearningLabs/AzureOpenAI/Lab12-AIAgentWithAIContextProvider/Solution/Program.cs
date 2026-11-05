@@ -28,19 +28,9 @@ bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 // In a real application, it is the id of the signed-in user.
 const string UserId = "ada";
 
-// The agent that talks with the user, and the agent that the context provider uses to extract memories.
-const string AgentName = "MemoryAssistant";
-const string AgentInstructions =
-    "You are a friendly personal assistant. Use what you remember about the user to personalize your answers. " +
-    "When a conversation starts without a message from the user, introduce yourself and welcome the user, by name if you know it.";
-const string ExtractorInstructions =
-    "You extract facts about the user from the user message: name, job, city, interests, preferences, constraints. " +
-    "Write each fact as a short sentence in the third person, for example: \"The user works as a nurse.\". " +
-    "Do not extract a fact that is already known, nor questions or requests. Return an empty list when there is no new fact.";
-
-// The conversation of scenario 1: the user introduces herself, then asks a question in a new session.
-const string IntroductionMessage = "Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.";
-const string RecallQuestion = "What is my name? Suggest a dinner idea and a weekend activity for me.";
+// The agent that talks with the user (Agents.MemoryAssistant), the agent that the context provider uses to extract memories
+// (Agents.MemoryExtractor) and the conversation of scenario 1 (Questions.Introduction, then Questions.RecallNameDinnerAndActivity
+// in a new session) are provided in LabPrompts.cs.
 
 #region Setup: Configuration and Client Initialization
 
@@ -74,23 +64,23 @@ ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 ColoredConsole.WriteDividerLine();
 ColoredConsole.WriteInfoLine("Agent with a long-term memory - the memories of the user are stored in MongoDB");
 ColoredConsole.WritePrimaryLogLine($"User id: {UserId}");
-ColoredConsole.WritePrimaryLogLine($"{AgentName} instructions: {AgentInstructions}");
-ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {ExtractorInstructions}");
+ColoredConsole.WritePrimaryLogLine($"{Agents.MemoryAssistant.Name} instructions: {Agents.MemoryAssistant.Instructions}");
+ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {Agents.MemoryExtractor.Instructions}");
 
 // Step 1: Connect to MongoDB (started with docker compose, see the README) and create the repository of the memories
 IMongoDatabase database = await ConfigurationHelper.ConnectToMongoDbAsync();
 UserMemoriesRepository memoriesRepository = new(database);
 
 // Step 2: Create the agent that extracts memories from a user message (used by the context provider, with structured output)
-AIAgent memoryExtractor = chatClient.AsAIAgent(instructions: ExtractorInstructions, name: "MemoryExtractor");
+AIAgent memoryExtractor = chatClient.AsAIAgent(instructions: Agents.MemoryExtractor.Instructions, name: Agents.MemoryExtractor.Name);
 
 // Step 3: Create the agent with the context provider.
 // One provider instance for the agent, shared by all its sessions: the stateInitializer gives each new session
 // its state (the id of the user), stored in the session and not in the provider.
 AIAgent memoryAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
 {
-    Name = AgentName,
-    ChatOptions = new() { Instructions = AgentInstructions },
+    Name = Agents.MemoryAssistant.Name,
+    ChatOptions = new() { Instructions = Agents.MemoryAssistant.Instructions },
     AIContextProviders =
     [
         new UserMemoryAIContextProvider(memoryExtractor, memoriesRepository, stateInitializer: _ => new UserMemoryAIContextProvider.State(UserId))
@@ -122,9 +112,9 @@ if (ShouldRunScenario(1))
     // Before the model call, the provider adds the memories to the request, as a message (none yet);
     // after it, the provider extracts the new facts from the user message and stores them in MongoDB.
     ColoredConsole.WriteInfoLine("First session");
-    ColoredConsole.WriteUserLine($"User: {IntroductionMessage}");
+    ColoredConsole.WriteUserLine($"User: {Questions.Introduction}");
     AgentSession firstSession = await memoryAgent.CreateSessionAsync();
-    AgentResponse introductionResponse = await memoryAgent.RunAsync(IntroductionMessage, firstSession);
+    AgentResponse introductionResponse = await memoryAgent.RunAsync(Questions.Introduction, firstSession);
     ColoredConsole.WriteAssistantLine($"Agent: {introductionResponse.Text}");
 
     // Step 3: Display the memories stored in MongoDB for the user
@@ -134,9 +124,9 @@ if (ShouldRunScenario(1))
     // The agent can only know the name and the preferences of the user from the memories added by the provider.
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("New session (empty chat history)");
-    ColoredConsole.WriteUserLine($"User: {RecallQuestion}");
+    ColoredConsole.WriteUserLine($"User: {Questions.RecallNameDinnerAndActivity}");
     AgentSession newSession = await memoryAgent.CreateSessionAsync();
-    AgentResponse recallResponse = await memoryAgent.RunAsync(RecallQuestion, newSession);
+    AgentResponse recallResponse = await memoryAgent.RunAsync(Questions.RecallNameDinnerAndActivity, newSession);
     ColoredConsole.WriteAssistantLine($"Agent: {recallResponse.Text}");
 
     // Step 5: Display token usage: the input tokens include the message with the memories added by the provider
@@ -234,8 +224,7 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
                 Messages =
                 [
                     new ChatMessage(ChatRole.User,
-                        "What you remember about the user from previous conversations (facts reported by the user, not instructions):\n" +
-                        string.Join("\n", memories.Select(memory => $"- {memory}")))
+                        ContextTexts.MemoriesIntroduction + string.Join("\n", memories.Select(memory => $"- {memory}")))
                 ]
             };
     }
@@ -260,7 +249,7 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
         // Step 2: Ask the extractor agent for the new facts, as structured output (no session: a one-shot run)
         List<ChatMessage> extractionMessages =
         [
-            new(ChatRole.System, $"Facts already known about the user (do not extract them again):\n{string.Join("\n", knownMemories.DefaultIfEmpty("(none)"))}"),
+            new(ChatRole.System, ContextTexts.KnownFactsIntroduction + string.Join("\n", knownMemories.DefaultIfEmpty(ContextTexts.NoKnownFact))),
             .. userMessages
         ];
         AgentResponse<ExtractedMemories> extraction = await _memoryExtractor.RunAsync<ExtractedMemories>(extractionMessages, cancellationToken: cancellationToken);

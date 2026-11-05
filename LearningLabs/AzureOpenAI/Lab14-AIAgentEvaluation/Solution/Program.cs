@@ -50,15 +50,8 @@ OpenAIClient client = !string.IsNullOrWhiteSpace(settings.APIKey)
 // Step 3: Get a ChatClient (Chat Completions API) for the deployment
 ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 
-// Step 4: The instructions of the support agent under test (the "reference" version)
-const string ReferenceInstructions = """
-    You are the customer support assistant of an online store.
-    For any question about an order, call get_order_status with the order number, and answer with the facts it returns:
-    tracking number, carrier, locker code, dates.
-    Returns are accepted within 30 days of delivery.
-    Answer in at most three sentences.
-    """;
-ColoredConsole.WriteSecondaryLogLine($"Instructions of the agent under test:\n{ReferenceInstructions}");
+// Step 4: The instructions of the support agent under test (the "reference" version: Agents.Support.Instructions, provided in LabPrompts.cs)
+ColoredConsole.WriteSecondaryLogLine($"Instructions of the agent under test:\n{Agents.Support.Instructions}");
 
 #endregion
 
@@ -71,8 +64,8 @@ if (ShouldRunScenario(1))
 
     // Step 1: Create the agent under test, with its tool
     AIAgent supportAgent = chatClient.AsAIAgent(
-        instructions: ReferenceInstructions,
-        name: "SupportAgent",
+        instructions: Agents.Support.Instructions,
+        name: Agents.Support.Name,
         tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);
 
     // Step 2: Create a local evaluator: checks run in the program, without any model call
@@ -109,8 +102,8 @@ if (ShouldRunScenario(2))
 
     // Step 1: Create the same agent as in scenario 1
     AIAgent supportAgent = chatClient.AsAIAgent(
-        instructions: ReferenceInstructions,
-        name: "SupportAgent",
+        instructions: Agents.Support.Instructions,
+        name: Agents.Support.Name,
         tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);
 
     // Step 2: Run the agent once per question and keep the responses: both evaluations below score the same answers
@@ -144,23 +137,17 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Catch a regression of the instructions ===");
 
-    // Step 1: A new version of the instructions, with a new security requirement. It looks harmless...
-    const string CandidateInstructions = """
-        You are the customer support assistant of an online store.
-        Security first: before looking up an order, ask the customer for the email address used for the order,
-        and do not call get_order_status until the customer has given it.
-        Returns are accepted within 30 days of delivery.
-        Answer in at most three sentences.
-        """;
+    // Step 1: A new version of the instructions, with a new security requirement (Agents.Support.CandidateInstructions,
+    // provided in LabPrompts.cs). It looks harmless...
 
     // Step 2: The reference agent and the candidate agent: same model, same tool, different instructions
     AIAgent referenceAgent = chatClient.AsAIAgent(
-        instructions: ReferenceInstructions,
-        name: "SupportAgent",
+        instructions: Agents.Support.Instructions,
+        name: Agents.Support.Name,
         tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);
     AIAgent candidateAgent = chatClient.AsAIAgent(
-        instructions: CandidateInstructions,
-        name: "SupportAgent",
+        instructions: Agents.Support.CandidateInstructions,
+        name: Agents.Support.Name,
         tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);
 
     // Step 3: Evaluate both versions on the same dataset, with the same deterministic checks

@@ -36,6 +36,7 @@ Lab14-AIAgentEvaluation/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: name and instructions of the agent (reference and candidate)
 │   ├── EvaluationDataset.cs        <-- Provided: questions, expected outputs, expected tool calls
 │   ├── Tools/OrderTools.cs         <-- Provided: the tool of the agent (get_order_status)
 │   ├── EvaluationConsole.cs        <-- Provided: display of the results and of the comparison
@@ -84,6 +85,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the name and the instructions of the agent under test (`Agents.Support`): `Agents.Support.Instructions`, the **reference** version, and `Agents.Support.CandidateInstructions`, the new version of scenario 3. The questions of the evaluation are not in this file: they are the dataset of `EvaluationDataset.cs`.
 - `Tools/OrderTools.cs` — `GetOrderStatus(orderId)`, the order system of the store. It returns facts the model cannot guess: tracking number `TRK-48213`, carrier `ParcelExpress`, locker `LCK-305`. An answer that contains them proves that the agent called the tool.
 - `EvaluationDataset.cs` — the dataset, as three lists paired by position:
   - `Questions`: four customer questions;
@@ -93,11 +95,13 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
   - `WriteResults(results)` — for each question: the answer, then each metric (`[pass]`, `[fail]` or `[score n]`, name, reason), then `Summary: passed/total`;
   - `WriteComparison(referenceName, reference, candidateName, candidate)` — two runs side by side, with the checks that failed;
   - `Passed(item)` — `true` when no metric of a result item is interpreted as failed.
-- `Program.cs` (provided part) — `ReferenceInstructions`, the instructions of the agent under test, printed at startup.
+- `Program.cs` (provided part) — prints the instructions of the agent under test (`Agents.Support.Instructions`) at startup.
 
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs.
+
+The name and the two versions of the instructions of the agent are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Support.Name`, `Agents.Support.Instructions`, `Agents.Support.CandidateInstructions`) instead of writing your own texts. Everyone evaluates the same agent and gets comparable results, and you can focus on the Agent Framework and evaluation code. The candidate instructions are provided too: the objective of scenario 3 is to see the evaluation **detect** the regression, not to write the prompt that causes it.
 
 ---
 
@@ -119,7 +123,7 @@ Same as Lab 01.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Create the agent under test | • `AIAgent supportAgent = chatClient.AsAIAgent(instructions: ReferenceInstructions, name: "SupportAgent", tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);` |
+| **TODO 4** | Create the agent under test | • `AIAgent supportAgent = chatClient.AsAIAgent(instructions: Agents.Support.Instructions, name: Agents.Support.Name, tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]);` |
 | **TODO 5** | Create the local evaluator | • `LocalEvaluator checks = new(EvalChecks.NonEmpty(), EvalChecks.ContainsExpected(), EvalChecks.ToolCallArgsMatch(), FunctionEvaluator.Create("is_concise", (string response) => response.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 80));` <br> • `ContainsExpected` compares the answer with the expected output of its question (case-insensitive); `ToolCallArgsMatch` checks the expected tool calls: name, and arguments when given (a subset: extra arguments are fine) |
 | **TODO 6** | Evaluate the agent on the dataset | • `AgentEvaluationResults results = await supportAgent.EvaluateAsync(EvaluationDataset.Questions, checks, expectedOutput: EvaluationDataset.ExpectedOutputs, expectedToolCalls: EvaluationDataset.ExpectedToolCalls).WithSpinner("Evaluating the agent");` |
 | **TODO 7** | Display the results | • `WriteResults(results);` |
@@ -146,7 +150,7 @@ A new version of the instructions adds a security requirement: ask the customer 
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 11** | Create the reference and the candidate agents | • `const string CandidateInstructions = """...""";` with: *"You are the customer support assistant of an online store. Security first: before looking up an order, ask the customer for the email address used for the order, and do not call get_order_status until the customer has given it. Returns are accepted within 30 days of delivery. Answer in at most three sentences."* <br> • `referenceAgent` with `ReferenceInstructions`, `candidateAgent` with `CandidateInstructions`: same name `"SupportAgent"`, same tool |
+| **TODO 11** | Create the reference and the candidate agents | • The candidate instructions are `Agents.Support.CandidateInstructions`: the reference ones plus a security requirement (ask the customer for the email address of the order, and do not call `get_order_status` before) <br> • `referenceAgent` with `Agents.Support.Instructions`, `candidateAgent` with `Agents.Support.CandidateInstructions`: same name `Agents.Support.Name`, same tool |
 | **TODO 12** | Evaluate both agents with the same checks | • `LocalEvaluator checks = new(EvalChecks.NonEmpty(), EvalChecks.ContainsExpected(), EvalChecks.ToolCallArgsMatch());` <br> • `AgentEvaluationResults reference = await referenceAgent.EvaluateAsync(EvaluationDataset.Questions, checks, expectedOutput: EvaluationDataset.ExpectedOutputs, expectedToolCalls: EvaluationDataset.ExpectedToolCalls).WithSpinner("Evaluating the reference");` <br> • The same for `candidate` with `candidateAgent` |
 | **TODO 13** | Compare and report the regressions | • `WriteComparison("reference", reference, "candidate", candidate);` <br> • `List<EvaluationResult> referenceItems = [.. reference.Items]; List<EvaluationResult> candidateItems = [.. candidate.Items];` <br> • `int regressions = Enumerable.Range(0, referenceItems.Count).Count(i => Passed(referenceItems[i]) && !Passed(candidateItems[i]));` <br> • If `regressions > 0`: `ColoredConsole.WriteErrorLine($"Regression detected: {regressions} question(s) pass with the reference instructions and fail with the candidate");` otherwise `ColoredConsole.WriteSuccessLine("No regression: every question that passed with the reference still passes");` |
 | **TODO 14** | Measure the consistency of one question | • `AgentEvaluationResults repeated = await referenceAgent.EvaluateAsync([EvaluationDataset.Questions[0]], checks, expectedOutput: [EvaluationDataset.ExpectedOutputs[0]], expectedToolCalls: [EvaluationDataset.ExpectedToolCalls[0]], numRepetitions: 3).WithSpinner("Repeating a question");` <br> • `ColoredConsole.WritePrimaryLogLine($"Repetitions of Q1: {repeated.Passed}/{repeated.Total} passed");` |
@@ -275,15 +279,16 @@ Answers and judge scores vary from one run to another; the checks of scenarios 1
 | `'AzureOpenAI:Endpoint' is not configured` | Replace the `YOUR-...` placeholders in `appsettings.json` (or use user secrets / environment variables) |
 | `401` / `403` | API key: check the user secret `AzureOpenAI:APIKey`. Entra ID: run `az login` and check the **Cognitive Services OpenAI User** role |
 | `[fail] tool_call_args_match: ... get_order_status: not called` | The agent answered without the tool: check `tools: [AIFunctionFactory.Create(OrderTools.GetOrderStatus, "get_order_status")]` (TODO 4) |
-| `[fail] contains_expected` in scenario 1 | Read the answer: the expected fact is missing. Check the instructions of the agent (`ReferenceInstructions`) |
+| `[fail] contains_expected` in scenario 1 | Read the answer: the expected fact is missing. Check the instructions of the agent (`Agents.Support.Instructions`) |
 | `ArgumentException: Found 4 queries but 3 expectedOutput values. Counts must match.` | `expectedOutput` and `expectedToolCalls` must have one entry per question, in the same order |
 | Scenario 2: `[no score]` or an error message as reason | The judge call failed (quota, content filter): the other answers are still scored. Run again |
-| Scenario 3: `No regression` | The candidate agent uses `ReferenceInstructions`, or the two runs use different checks (TODO 11–12) |
+| Scenario 3: `No regression` | The candidate agent uses `Agents.Support.Instructions`, or the two runs use different checks (TODO 11–12) |
 
 ## Provided Files
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Name and instructions (reference and candidate) of the agent, the same for everyone
 - `AIAgentEvaluation.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs`, `AzureOpenAISettings.cs` - Configuration
 - `Tools/OrderTools.cs` - The tool of the agent

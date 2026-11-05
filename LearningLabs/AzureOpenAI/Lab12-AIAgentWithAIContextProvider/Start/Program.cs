@@ -28,19 +28,9 @@ bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 // In a real application, it is the id of the signed-in user.
 const string UserId = "ada";
 
-// The agent that talks with the user, and the agent that the context provider uses to extract memories.
-const string AgentName = "MemoryAssistant";
-const string AgentInstructions =
-    "You are a friendly personal assistant. Use what you remember about the user to personalize your answers. " +
-    "When a conversation starts without a message from the user, introduce yourself and welcome the user, by name if you know it.";
-const string ExtractorInstructions =
-    "You extract facts about the user from the user message: name, job, city, interests, preferences, constraints. " +
-    "Write each fact as a short sentence in the third person, for example: \"The user works as a nurse.\". " +
-    "Do not extract a fact that is already known, nor questions or requests. Return an empty list when there is no new fact.";
-
-// The conversation of scenario 1: the user introduces herself, then asks a question in a new session.
-const string IntroductionMessage = "Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.";
-const string RecallQuestion = "What is my name? Suggest a dinner idea and a weekend activity for me.";
+// The agent that talks with the user (Agents.MemoryAssistant), the agent that the context provider uses to extract memories
+// (Agents.MemoryExtractor) and the conversation of scenario 1 (Questions.Introduction, then Questions.RecallNameDinnerAndActivity
+// in a new session) are provided in LabPrompts.cs.
 
 #region Setup: Configuration and Client Initialization
 
@@ -72,21 +62,23 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 ColoredConsole.WriteDividerLine();
 ColoredConsole.WriteInfoLine("Agent with a long-term memory - the memories of the user are stored in MongoDB");
 ColoredConsole.WritePrimaryLogLine($"User id: {UserId}");
-ColoredConsole.WritePrimaryLogLine($"{AgentName} instructions: {AgentInstructions}");
-ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {ExtractorInstructions}");
+ColoredConsole.WritePrimaryLogLine($"{Agents.MemoryAssistant.Name} instructions: {Agents.MemoryAssistant.Instructions}");
+ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {Agents.MemoryExtractor.Instructions}");
 
 // TODO 4: Connect to MongoDB (start it first, see the README) and create the repository of the memories
 // Hint: await ConfigurationHelper.ConnectToMongoDbAsync(), then new UserMemoriesRepository(database)
 // IMongoDatabase database = ...
 // UserMemoriesRepository memoriesRepository = ...
 
-// TODO 5: Create the agent that extracts memories from a user message (the context provider will use it)
-// Hint: chatClient.AsAIAgent(instructions: ExtractorInstructions, name: "MemoryExtractor")
+// TODO 5: Create the agent that extracts memories from a user message (the context provider will use it),
+// with the instructions and the name of Agents.MemoryExtractor (provided in LabPrompts.cs)
+// Hint: chatClient.AsAIAgent(instructions: Agents.MemoryExtractor.Instructions, name: Agents.MemoryExtractor.Name)
 // AIAgent memoryExtractor = ...
 
 // TODO 6: Create the agent with the context provider (UserMemoryAIContextProvider, at the bottom of this file)
 // Hint: chatClient.AsAIAgent(new ChatClientAgentOptions { ... }) with:
-//   - Name = AgentName and ChatOptions = new() { Instructions = AgentInstructions }
+//   - the name and the instructions of Agents.MemoryAssistant:
+//     Name = Agents.MemoryAssistant.Name and ChatOptions = new() { Instructions = Agents.MemoryAssistant.Instructions }
 //   - AIContextProviders = [new UserMemoryAIContextProvider(memoryExtractor, memoriesRepository,
 //         stateInitializer: _ => new UserMemoryAIContextProvider.State(UserId))]
 //   - ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { StorageInputRequestMessageFilter = ... })
@@ -106,9 +98,9 @@ if (ShouldRunScenario(1))
     // Hint: await memoriesRepository.DeleteMemoriesAsync(UserId)
 
     ColoredConsole.WriteInfoLine("First session");
-    ColoredConsole.WriteUserLine($"User: {IntroductionMessage}");
+    ColoredConsole.WriteUserLine($"User: {Questions.Introduction}");
 
-    // TODO 8: Create a session, run the agent with IntroductionMessage in it and display the answer ("Agent: ...")
+    // TODO 8: Create a session, run the agent with Questions.Introduction in it and display the answer ("Agent: ...")
     // Before the model call, the provider adds the memories to the request (a message); after it, it extracts and stores the new ones.
 
     // TODO 9: Display the memories stored in MongoDB for the user
@@ -116,9 +108,9 @@ if (ShouldRunScenario(1))
 
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("New session (empty chat history)");
-    ColoredConsole.WriteUserLine($"User: {RecallQuestion}");
+    ColoredConsole.WriteUserLine($"User: {Questions.RecallNameDinnerAndActivity}");
 
-    // TODO 10: Create a NEW session, run the agent with RecallQuestion in it, display the answer, then WriteTokenUsage(...)
+    // TODO 10: Create a NEW session, run the agent with Questions.RecallNameDinnerAndActivity in it, display the answer, then WriteTokenUsage(...)
     // The chat history of this session is empty: what the agent knows about the user comes from the provider.
 }
 
@@ -186,7 +178,8 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
         // TODO 13: Give the memories of the user to the model
         // - get the id of the user from the state of the session: _sessionState.GetOrInitializeState(context.Session).UserId
         // - load the memories of the user from MongoDB and display them with WriteMemoriesProvided(userId, memories)
-        // - return a new AIContext whose Messages contain one user message that lists the memories, framed as data
+        // - return a new AIContext whose Messages contain one user message that lists the memories, framed as data:
+        //   ContextTexts.MemoriesIntroduction (provided in LabPrompts.cs) followed by one "- memory" line per memory
         //   (or an empty AIContext when there is none). Not Instructions: they are sent as the system message.
         // Replace the last line of this method.
 
@@ -205,6 +198,8 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
 
         // TODO 15: Ask the memory extractor for the new facts, as structured output: RunAsync<ExtractedMemories>(messages)
         // with a system message that lists the facts already known, followed by the user messages
+        // Hint: the system message is ContextTexts.KnownFactsIntroduction followed by the known facts, one per line
+        //       (ContextTexts.NoKnownFact when there is none: knownMemories.DefaultIfEmpty(ContextTexts.NoKnownFact))
 
         // TODO 16: Store the new memories in MongoDB (skip the empty and already known ones),
         // then display them with WriteMemoriesExtracted(userId, newMemories, extraction.Usage)

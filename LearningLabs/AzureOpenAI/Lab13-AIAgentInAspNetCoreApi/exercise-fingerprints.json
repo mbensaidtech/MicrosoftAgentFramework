@@ -5,19 +5,19 @@
   },
   "scenarios": {
     "1": {
-      "fingerprint": "3ac56f33431a17e1",
+      "fingerprint": "e3fe75d62b6abe7b",
       "provided": true
     },
     "2": {
-      "fingerprint": "0d71281a29389be3",
+      "fingerprint": "c4055b30a2a15604",
       "provided": true
     },
     "3": {
-      "fingerprint": "e1b3a3801964756b",
+      "fingerprint": "447ca5c59f6bb36f",
       "provided": true
     },
     "4": {
-      "fingerprint": "a9848b870653a2f1",
+      "fingerprint": "55afb2c7a37b1462",
       "provided": true
     }
   },
