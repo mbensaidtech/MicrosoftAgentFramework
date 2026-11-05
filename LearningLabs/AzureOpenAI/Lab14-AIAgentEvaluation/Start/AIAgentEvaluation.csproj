@@ -12,7 +12,7 @@
   <ItemGroup>
     <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively).
          The evaluation API (EvaluateAsync, LocalEvaluator, EvalChecks) is part of Microsoft.Agents.AI. -->
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.27.0" />
     <!-- LLM-as-judge evaluators: RelevanceEvaluator, CoherenceEvaluator (scenario 2). -->
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.11.0" />
     <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->

@@ -522,7 +522,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.26.0) |
+| Before (preview) | Now (1.27.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
 | `chatClient.CreateAIAgent(...)`, variables typed `ChatClientAgent` | `chatClient.AsAIAgent(...)`, variables typed `AIAgent` |
@@ -547,9 +547,9 @@ The following files should be modified:
 - [Session](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/session?pivots=programming-language-csharp)
 - [Producing Structured Outputs with agents](https://learn.microsoft.com/agent-framework/agents/structured-output?pivots=programming-language-csharp)
 - [Microsoft Agent Framework documentation](https://learn.microsoft.com/agent-framework/overview/?pivots=programming-language-csharp)
-- [Official sample `04_memory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/01-get-started/04_memory)
-- [Official sample `Agent_Step17_AdditionalAIContext`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/Agents/Agent_Step17_AdditionalAIContext)
-- [Official samples `AgentWithMemory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/AgentWithMemory)
+- [Official sample `04_memory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/01-get-started/04_memory)
+- [Official sample `Agent_Step17_AdditionalAIContext`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/Agents/Agent_Step17_AdditionalAIContext)
+- [Official samples `AgentWithMemory`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/AgentWithMemory)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 
 ## Solution

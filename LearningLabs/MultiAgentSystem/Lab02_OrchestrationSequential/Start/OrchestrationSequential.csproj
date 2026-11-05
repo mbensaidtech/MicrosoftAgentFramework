@@ -11,12 +11,12 @@
 
   <ItemGroup>
     <!-- Agent Framework + OpenAI integration (brings OpenAI and Microsoft.Extensions.AI transitively). -->
-    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.27.0" />
     <!-- Workflows: AgentWorkflowBuilder, InProcessExecution, the workflow events. -->
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.27.0" />
     <!-- 10.11.0 fixes the streaming of Azure OpenAI deployments that use the asynchronous content filter
          (dotnet/extensions#7790): the agents of a workflow are streamed when the TurnToken asks for events.
-         Agent Framework 1.26.0 only brings 10.10.x. -->
+         Agent Framework 1.27.0 only brings 10.10.x. -->
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
     <!-- DefaultAzureCredential for Microsoft Entra ID authentication. -->
     <PackageReference Include="Azure.Identity" Version="1.21.0" />

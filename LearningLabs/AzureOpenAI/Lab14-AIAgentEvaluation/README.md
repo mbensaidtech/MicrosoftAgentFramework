@@ -324,7 +324,7 @@ Every package is stable.
 ## Useful Links
 
 - [Evaluation in Agent Framework](https://learn.microsoft.com/agent-framework/agents/evaluation?pivots=programming-language-csharp)
-- [Official samples `02-agents/Evaluation`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/Evaluation) (`Evaluation_ExpectedOutputs`, `Evaluation_CustomEvals`, `Evaluation_SimpleEval`)
+- [Official samples `02-agents/Evaluation`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/Evaluation) (`Evaluation_ExpectedOutputs`, `Evaluation_CustomEvals`, `Evaluation_SimpleEval`)
 - [Microsoft.Extensions.AI.Evaluation libraries](https://learn.microsoft.com/dotnet/ai/evaluation/libraries)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 

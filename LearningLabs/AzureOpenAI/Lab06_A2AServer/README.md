@@ -11,7 +11,7 @@ A2A is an open protocol that lets agents call each other over HTTP, whatever fra
 
 The next lab, **Lab06_A2AClient**, connects to this server.
 
-> **Preview packages**: the A2A packages of Agent Framework (`Microsoft.Agents.AI.Hosting.A2A.AspNetCore`) and the A2A SDK they use (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.26.0 (`1.26.0-preview.261023.1`). Every other package is stable.
+> **Preview packages**: the A2A packages of Agent Framework (`Microsoft.Agents.AI.Hosting.A2A.AspNetCore`) and the A2A SDK they use (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.27.0 (`1.27.0-preview.261030.1`). Every other package is stable.
 
 ## What You Will Learn
 
@@ -200,12 +200,12 @@ POST /a2a/authAgent/message:send                              └─▶ AIAgent 
 
 ## Conversations: the session store
 
-**By default, the server keeps no conversation.** When no session store is registered for an agent, the A2A hosting uses a `NoopAgentSessionStore`, which stores nothing (Agent Framework 1.26.0 source: the store is looked up with `GetKeyedService<AgentSessionStore>(agent.Name)`, and `NoopAgentSessionStore` is the fallback). Every request then starts a new conversation, even when the client sends the same `contextId`. Scenario 4 of Lab06_A2AClient shows it: without a store, the client sends the same `contextId` on both turns, but the AuthAgent no longer knows the key it generated in turn 1 — it generates a new one and calls it valid.
+**By default, the server keeps no conversation.** When no session store is registered for an agent, the A2A hosting uses a `NoopAgentSessionStore`, which stores nothing (Agent Framework 1.27.0 source: the store is looked up with `GetKeyedService<AgentSessionStore>(agent.Name)`, and `NoopAgentSessionStore` is the fallback). Every request then starts a new conversation, even when the client sends the same `contextId`. Scenario 4 of Lab06_A2AClient shows it: without a store, the client sends the same `contextId` on both turns, but the AuthAgent no longer knows the key it generated in turn 1 — it generates a new one and calls it valid.
 
 TODO 8 registers an `InMemoryAgentSessionStore` for each agent, under the agent name. Things to know:
 
 - **Development only**: the sessions live in the memory of the process. They are lost when the server stops, and they are not shared between several instances of the server. In production, use a persistent implementation of `AgentSessionStore`.
-- **Experimental**: `AgentSessionStore` and `InMemoryAgentSessionStore` are flagged `[Experimental("MAAI001")]` in Agent Framework 1.26.0 (the A2A hosting packages are previews anyway). The lab disables the warning only around the two lines.
+- **Experimental**: `AgentSessionStore` and `InMemoryAgentSessionStore` are flagged `[Experimental("MAAI001")]` in Agent Framework 1.27.0 (the A2A hosting packages are previews anyway). The lab disables the warning only around the two lines.
 - **A `contextId` is not an identity**: anyone who knows a `contextId` can continue its conversation. The official guide says: *"Never use a caller-supplied context or task ID as proof of ownership."* See *Security* below.
 
 ## Key Concepts
@@ -313,7 +313,7 @@ The following files should be modified:
 | Package | Why |
 |---------|-----|
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` (brings `OpenAI` and `Microsoft.Extensions.AI`) |
-| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.26.0 still brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The A2A hosting always streams, so the server needs it |
+| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.27.0 still brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends when the deployment uses the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The A2A hosting always streams, so the server needs it |
 | `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (preview) | `AddA2AServer`, `MapA2AJsonRpc`, `MapA2AHttpJson`; brings the A2A SDK v1 (`A2A`, `A2A.AspNetCore`) and `Microsoft.Extensions.Configuration.*` |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 
@@ -325,7 +325,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.26.0 / A2A v1) |
+| Before (preview) | Now (1.27.0 / A2A v1) |
 |------------------|------------------|
 | A2A protocol **v0.3** (`A2A` 0.3.3-preview) | A2A protocol **v1** (`A2A` 1.0.0-preview3). **Not compatible**: a v1 client cannot call a v0.3 server (*"'method' field is not a valid A2A method"*). Migrate the client (Lab06_A2AClient) at the same time |
 | `app.MapA2A(agent, path, agentCard, taskManager => app.MapWellKnownAgentCard(taskManager, path))` | `builder.AddA2AServer(agent)` + `app.MapA2AJsonRpc(agent, path)` / `app.MapA2AHttpJson(agent, path)` + `app.MapWellKnownAgentCard(card, path)` |

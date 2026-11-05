@@ -47,7 +47,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code (C# Dev Kit), Visual Studio 2026 (18.0+) or Rider | Editing the exercises | Any editor works with the `dotnet` CLI. Visual Studio 2022 cannot target `net10.0`. |
 
-> **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.26.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25). The 3 **MultiAgentSystem** labs (*Delegate a Task to Another Agent*, *Sequential Orchestration*, *Concurrent Orchestration*) target 1.26.0 too. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
+> **Agent Framework version:** the 16 **AzureOpenAI** labs target the stable release of Microsoft Agent Framework **1.27.0** (migrated from the previews to 1.22.0, then upgraded to 1.26.0 on 2026-10-25 and to 1.27.0 on 2026-11-05). The 3 **MultiAgentSystem** labs (*Delegate a Task to Another Agent*, *Sequential Orchestration*, *Concurrent Orchestration*) target 1.27.0 too. See [Migration/Migration-Plan.md](Migration/Migration-Plan.md).
 > Only the migrated labs are available in the dashboard; every lab runs with the CLI.
 
 ---
@@ -141,7 +141,7 @@ The first `dotnet run` restores the NuGet packages and builds the project (inclu
 To only check that your code compiles: `dotnet build LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start`.
 
 > **Lab06 (A2A)** has two separate labs: start `Lab06_A2AServer` in one terminal (it listens on `http://localhost:5000` until `Ctrl+C`), then `Lab06_A2AClient` in another.
-> Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.26.0): a migrated client cannot call an old v0.3 server.
+> Both use the **A2A protocol v1** (preview packages aligned on Agent Framework 1.27.0): a migrated client cannot call an old v0.3 server.
 
 #### 3. Choose the scenarios to run
 
@@ -493,7 +493,7 @@ This lab is split into two parts: start the server, then run the client.
 
 This part focuses on building **multi-agent systems** where multiple agents collaborate to solve complex problems. You will learn how to orchestrate agents, use agents as tools, and build sophisticated AI workflows.
 
-> The three labs target Agent Framework **1.26.0** (stable APIs only) and are available in the Lab Bench dashboard.
+> The three labs target Agent Framework **1.27.0** (stable APIs only) and are available in the Lab Bench dashboard.
 
 ---
 

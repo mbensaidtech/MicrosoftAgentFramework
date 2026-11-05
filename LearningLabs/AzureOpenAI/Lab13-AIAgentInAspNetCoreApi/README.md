@@ -364,7 +364,7 @@ The following files should be modified:
 |---------|-----|
 | `Microsoft.AspNetCore.App` (framework reference) | ASP.NET Core: `WebApplication`, minimal APIs, `TypedResults.ServerSentEvents`, problem details |
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` (brings `OpenAI` and `Microsoft.Extensions.AI`) |
-| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.26.0 still brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends with the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The API streams every answer |
+| `Microsoft.Extensions.AI.OpenAI` 10.11.0 | Streaming fix: Agent Framework 1.27.0 still brings 10.10.x, which fails on the annotation chunks without `delta` that Azure sends with the asynchronous content filter ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). The API streams every answer |
 | `Microsoft.AspNetCore.Authentication.JwtBearer` | JWT bearer authentication (brings `Microsoft.IdentityModel.JsonWebTokens`, used by `DevTokenIssuer`) |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 
@@ -383,7 +383,7 @@ Every package is stable.
 
 - [Step 7: Host your agent](https://learn.microsoft.com/agent-framework/get-started/hosting?pivots=programming-language-csharp)
 - [Session](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/session?pivots=programming-language-csharp) and [Storage](https://learn.microsoft.com/agent-framework/concepts/agents/conversations/storage?pivots=programming-language-csharp)
-- Official samples [`Agent_Step06_DependencyInjection`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/Agents/Agent_Step06_DependencyInjection) and [`Agent_Step03_PersistedConversations`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/Agents/Agent_Step03_PersistedConversations)
+- Official samples [`Agent_Step06_DependencyInjection`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/Agents/Agent_Step06_DependencyInjection) and [`Agent_Step03_PersistedConversations`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/Agents/Agent_Step03_PersistedConversations)
 - [Minimal APIs](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis) and [Server-Sent Events in minimal APIs](https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis/responses#server-sent-events-serversentevents)
 - [Configure JWT bearer authentication in ASP.NET Core](https://learn.microsoft.com/aspnet/core/security/authentication/configure-jwt-bearer-authentication)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)

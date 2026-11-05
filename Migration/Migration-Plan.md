@@ -11,7 +11,7 @@
 2. **Phase 0 — composants communs**, en même temps que le premier lab qui en a besoin (et non avant, pour ne pas casser les labs non migrés).
 3. **Migration par vagues**, dans l'ordre pédagogique, en regroupant les labs qui partagent un même changement conceptuel.
 4. Chaque lab n'est « migré » qu'après la checklist §5 et la stratégie de test du manuel (§7).
-5. Version **figée à 1.22.0** pendant toute la migration (voir le risque « cadence de release » dans le manuel), puis **montée en 1.26.0 le 2026-10-25** dans une vague dédiée (manuel §3 bis).
+5. Version **figée à 1.22.0** pendant toute la migration (voir le risque « cadence de release » dans le manuel), puis **montée en 1.26.0 le 2026-10-25** et **en 1.27.0 le 2026-11-06**, chacune dans une vague dédiée (manuel §3 bis, §3 ter).
 
 ## 2. Composants communs
 
@@ -46,7 +46,7 @@
 
 Commune à tous (cocher dans la PR du lab) :
 
-- [ ] `.csproj` Start = Solution ; MAF = version cible (1.26.0) ; aucune préversion hors exception documentée ; `UserSecretsId` ; plus de `Azure.AI.OpenAI`, `Microsoft.Extensions.Hosting` (si console)
+- [ ] `.csproj` Start = Solution ; MAF = version cible (1.27.0) ; aucune préversion hors exception documentée ; `UserSecretsId` ; plus de `Azure.AI.OpenAI`, `Microsoft.Extensions.Hosting` (si console)
 - [ ] `ConfigurationHelper.cs`, `AzureOpenAISettings.cs`, `appsettings.json` identiques Start/Solution, sans secret
 - [ ] Client : `OpenAIClient` + `AzureOpenAIEndpoint.ToV1Uri` + clé API **ou** `BearerTokenPolicy`
 - [ ] `AsAIAgent`, `AIAgent`, `AgentResponse`, `AgentSession` (si applicable)

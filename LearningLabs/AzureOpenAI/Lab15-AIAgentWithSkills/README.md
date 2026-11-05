@@ -390,7 +390,7 @@ Every package is stable.
 ## Useful Links
 
 - [Agent Skills in Agent Framework](https://learn.microsoft.com/agent-framework/agents/skills?pivots=programming-language-csharp) and the [Agent Skills specification](https://agentskills.io/)
-- [Official samples `02-agents/AgentSkills`](https://github.com/microsoft/agent-framework/tree/dotnet-1.26.0/dotnet/samples/02-agents/AgentSkills)
+- [Official samples `02-agents/AgentSkills`](https://github.com/microsoft/agent-framework/tree/dotnet-1.27.0/dotnet/samples/02-agents/AgentSkills)
 - [Tool approval](https://learn.microsoft.com/agent-framework/agents/tools/tool-approval?pivots=programming-language-csharp)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 

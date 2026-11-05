@@ -361,7 +361,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.26.0) |
+| Before (preview) | Now (1.27.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
 | `AgentFactory` / `AgentBuilder` and one section per agent in `appsettings.json` | `chatClient.AsAIAgent(instructions: ..., name: ...)` written in `Program.cs`, with the texts provided in `LabPrompts.cs` |

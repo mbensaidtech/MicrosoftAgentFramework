@@ -98,7 +98,7 @@ if (ShouldRunScenario(1))
     // conversation of each contextId. Without a store, it uses a NoopAgentSessionStore, which keeps nothing: every
     // request starts a new conversation, even with the same contextId.
     // InMemoryAgentSessionStore is for development: the conversations are lost when the server stops.
-    // AgentSessionStore and InMemoryAgentSessionStore are flagged [Experimental] (MAAI001) in Agent Framework 1.26.0.
+    // AgentSessionStore and InMemoryAgentSessionStore are flagged [Experimental] (MAAI001) in Agent Framework 1.27.0.
 #pragma warning disable MAAI001
     builder.Services.AddKeyedSingleton<AgentSessionStore>(authAgent.Name, new InMemoryAgentSessionStore());
     builder.Services.AddKeyedSingleton<AgentSessionStore>(customerToneAgent.Name, new InMemoryAgentSessionStore());

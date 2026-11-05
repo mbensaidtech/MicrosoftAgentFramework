@@ -1,6 +1,6 @@
 # Manuel de migration — Microsoft Agent Framework (.NET)
 
-> Référence commune à tous les exercices du lab. Analyse faite le **2026-09-26**. **Mise à jour du 2026-10-25 : montée de 1.22.0 vers 1.26.0** (§1, §3 bis).
+> Référence commune à tous les exercices du lab. Analyse faite le **2026-09-26**. **Mise à jour du 2026-10-25 : montée de 1.22.0 vers 1.26.0** (§1, §3 bis). **Mise à jour du 2026-11-06 : montée de 1.26.0 vers 1.27.0** (§1, §3 ter).
 > Sources : NuGet.org (versions), dépôt officiel [`microsoft/agent-framework`](https://github.com/microsoft/agent-framework) au tag `dotnet-1.22.0` (samples + sources), release notes GitHub `dotnet-*`, et la documentation Microsoft Learn ([Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-csharp), [Azure OpenAI v1 API](https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle)).
 
 ---
@@ -9,10 +9,10 @@
 
 | Élément | Version retenue | Justification |
 |---|---|---|
-| **Microsoft Agent Framework** (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) | **1.26.0** (stable, publiée le 2026-10-23) — 1.22.0 jusqu'au 2026-10-25 | Dernière version stable sur NuGet. GA atteinte avec 1.0.0 le 2026-04-02 ; livraisons mineures ~hebdomadaires depuis. Montée 1.22.0 → 1.26.0 : §3 bis. |
+| **Microsoft Agent Framework** (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) | **1.27.0** (stable, publiée le 2026-10-30) — 1.22.0 jusqu'au 2026-10-25, 1.26.0 jusqu'au 2026-11-06 | Dernière version stable sur NuGet. GA atteinte avec 1.0.0 le 2026-04-02 ; livraisons mineures ~hebdomadaires depuis. Montées 1.22.0 → 1.26.0 : §3 bis ; 1.26.0 → 1.27.0 : §3 ter. |
 | **.NET** | **net10.0** (SDK 10.0.100+) | Version LTS actuelle ; c'est la TFM des samples officiels (`<TargetFrameworks>net10.0</TargetFrameworks>`). Le lab cible déjà `net10.0`. |
-| `OpenAI` (SDK officiel) | **2.14.0** (transitif via `Microsoft.Agents.AI.OpenAI` 1.26.0) | Version testée par MAF 1.26.0 (`Directory.Packages.props` officiel, #8730). Pas de référence explicite nécessaire. (2.13.0 avec MAF 1.22.0.) |
-| `Microsoft.Extensions.AI` / `.Abstractions` / `.OpenAI` | **10.10.0** / **10.10.1** / **10.10.1** (transitif) ; `Microsoft.Extensions.AI.OpenAI` **10.11.0** **explicite** dans Lab01, Lab02 et Lab06_A2AServer | Dépendances directes de MAF 1.26.0. Exception : correctif du streaming Azure (#7790), absent de 10.10.x et non apporté par MAF 1.26.0 (§8). |
+| `OpenAI` (SDK officiel) | **2.14.0** (transitif via `Microsoft.Agents.AI.OpenAI` 1.27.0) | Version testée par MAF 1.26.0 et 1.27.0 (`Directory.Packages.props` officiel, #8730). Pas de référence explicite nécessaire. (2.13.0 avec MAF 1.22.0.) |
+| `Microsoft.Extensions.AI` / `.Abstractions` / `.OpenAI` | **10.10.0** / **10.10.1** / **10.10.1** (transitif) ; `Microsoft.Extensions.AI.OpenAI` **10.11.0** **explicite** dans Lab01, Lab02, Lab06_A2AServer, Lab13 et MAS-Lab02/03 | Dépendances directes de MAF 1.26.0 et 1.27.0. Exception : correctif du streaming Azure (#7790), absent de 10.10.x et non apporté par MAF 1.27.0 (§8). |
 | `Azure.Identity` | **1.21.0** | Stable ; même version que le dépôt officiel. |
 | `Microsoft.Extensions.Configuration.*` | **10.0.12** | Stable, alignée sur .NET 10 et sur le dépôt officiel. |
 | `ModelContextProtocol` / `.AspNetCore` | **2.2.0** (stable) | Pour Lab04 (`ModelContextProtocol`) / Lab10 (`ModelContextProtocol.AspNetCore`, qui apporte `ModelContextProtocol` et le framework partagé ASP.NET Core). Version du `Directory.Packages.props` 1.22.0 ; une 2.3.0 est publiée depuis (constaté le 2026-10-25), non retenue : version figée. |
@@ -24,8 +24,8 @@
 
 | Package | Dernière version | Labs concernés | Décision |
 |---|---|---|---|
-| `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A(.AspNetCore)`, `Microsoft.Agents.AI.Hosting` | `1.26.0-preview.261023.1` (`1.22.0-preview.260918.1` jusqu'au 2026-10-25) | Lab06 (client/serveur) | Aucune version stable n'existe : utiliser la préversion **alignée** sur la version cible et le signaler dans le README du lab. **Appliqué (Lab06)** : le client référence `Microsoft.Agents.AI.A2A`, le serveur `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (qui apporte `.Hosting.A2A`, `.Hosting`, `.Hosting.AspNetCore`, `A2A.AspNetCore` et `Microsoft.Extensions.Configuration.*` 10.0.12). |
-| `A2A` (SDK) | `1.0.0-preview3` (`1.0.0-preview2` avec MAF 1.22.0, #9386) | Lab06 | Idem (dépendance du précédent). |
+| `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A(.AspNetCore)`, `Microsoft.Agents.AI.Hosting` | `1.27.0-preview.261030.1` (`1.22.0-preview.260918.1` jusqu'au 2026-10-25, `1.26.0-preview.261023.1` jusqu'au 2026-11-06) | Lab06 (client/serveur) | Aucune version stable n'existe : utiliser la préversion **alignée** sur la version cible et le signaler dans le README du lab. **Appliqué (Lab06)** : le client référence `Microsoft.Agents.AI.A2A`, le serveur `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (qui apporte `.Hosting.A2A`, `.Hosting`, `.Hosting.AspNetCore`, `A2A.AspNetCore` et `Microsoft.Extensions.Configuration.*` 10.0.12). |
+| `A2A` (SDK) | `1.0.0-preview3` (`1.0.0-preview2` avec MAF 1.22.0, #9386 ; inchangé avec MAF 1.27.0) | Lab06 | Idem (dépendance du précédent). |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | `1.74.0-preview` | Lab05, Lab07 | **Remplacés** (Lab05, cf. §4.11) : `CommunityToolkit.VectorData.InMemory` 1.0.1 (stable, samples officiels) et, pour MongoDB, un `ChatHistoryProvider` sur le driver officiel `MongoDB.Driver` 3.12.0 (aucun connecteur `VectorData` MongoDB stable). **Lab07 (recherche vectorielle) : `InMemoryVectorStore`** (cf. §4.13) — le vector store des samples RAG officiels ; MongoDB Atlas abandonné (aucun connecteur `VectorData` MongoDB stable, et le lab reste exécutable avec la seule CLI `dotnet`). |
 | `Microsoft.Agents.AI.Foundry` | stable 1.5.0 seulement ; 1.26.0 en `-preview` | aucun aujourd'hui | Non utilisé : le lab cible Azure OpenAI, pas Foundry Agent Service. |
 
@@ -112,6 +112,22 @@ Changements des notes de version `dotnet-1.23.0` → `dotnet-1.26.0` qui concern
 **Vérifié le 2026-10-25** : build des 26 projets sans erreur ni warning (hors 4 `CS0219` de Lab05/Start, déjà présents en 1.22.0) ; graphe : MAF 1.26.0 partout, pas d'`Azure.AI.OpenAI`, aucune vulnérabilité ; exécution des 13 Solutions avec clé API **et** Entra ID contre les attentes du dashboard (Entra ID 127/127 ; clé API 124/127 au premier passage, puis 100 % après correction de Lab07 et re-run de Lab08, voir le rapport) ; les 13 Start livrés s'exécutent sans exception ; `dotnet test` du dashboard 207/207.
 
 ---
+
+### 3 ter. Montée de version 1.26.0 → 1.27.0 (2026-11-06)
+
+Vague unique sur **tout le catalogue** : 16 labs AzureOpenAI et 3 labs MultiAgentSystem (38 projets, Start **et** Solution), sans changement de code. Rapport : [Upgrade-1.27.0-Report.md](Upgrade-1.27.0-Report.md).
+
+| Paquet | Avant | Après |
+|---|---|---|
+| `Microsoft.Agents.AI.OpenAI` (38 projets) | 1.26.0 | **1.27.0** |
+| `Microsoft.Agents.AI.Workflows` (MAS-Lab02, MAS-Lab03) | 1.26.0 | **1.27.0** |
+| `Microsoft.Agents.AI.A2A`, `Microsoft.Agents.AI.Hosting.A2A.AspNetCore` (Lab06) | 1.26.0-preview.261023.1 | **1.27.0-preview.261030.1** (SDK `A2A` 1.0.0-preview3, inchangé) |
+| `OpenAI` (transitif) / `Microsoft.Extensions.AI.OpenAI` (transitif) | 2.14.0 / 10.10.1 | Inchangés ; **10.11.0 explicite conservé** (MAF 1.27.0 n'apporte toujours que 10.10.1, §8) |
+| Autres paquets figés | — | Inchangés : le `Directory.Packages.props` officiel de 1.27.0 ne change que des paquets non utilisés par les labs (`Azure.AI.AgentServer.*`, `Azure.AI.Projects`, `Azure.AI.Extensions.OpenAI`, `Azure.Core`, `System.ClientModel`, `Microsoft.Identity.Client.Extensions.Msal`) |
+
+Notes de version `dotnet-1.27.0` : deux `[BREAKING]` — dépendances AgentServer / `AddFoundryResponses` (#9721) et `DefaultHttpRequestHandler` (#9711) — **aucun lab ne les utilise** (recherche dans le code). Corrections Workflows (#9845, #9826, #9830, #9749, #9797, #9585) : déclaratif, Magentic, initialisation d'executor ; aucun effet observé sur MAS-Lab02/03. `AgentSessionStore` / `InMemoryAgentSessionStore` restent `[Experimental]` (`MAAI001`, Lab06 serveur) ; `A2AServerServiceCollectionExtensions.cs` identique entre les deux tags.
+
+**Vérifié le 2026-11-06** : build `-warnaserror` des 38 projets sans erreur ni warning ; graphe : MAF 1.27.0 partout, pas d'`Azure.AI.OpenAI`, aucune vulnérabilité ; exécution des 19 Solutions **par le dashboard** (attentes de `labs.json`) avec clé API **et** Entra ID : 19/19 et 19/19, toutes les attentes passent ; 19 Start livrés : exit 0, aucune exception ; `dotnet test` du dashboard 670/670.
 
 ## 4. Mapping ancien → nouveau
 
@@ -615,7 +631,7 @@ Points découverts :
 - **Chaque tentative passe par le handler** (vérifié hors ligne : `503` puis `200` → 2 passages pour un seul `RunAsync`). Délai dépassé : `ClientRetryPolicy` par défaut → 4 tentatives puis `AggregateException: Retry failed after 4 tries. (The operation was cancelled because it exceeded the configured timeout of …)` (vérifié) ; sans retry, `TaskCanceledException` avec le même message. `InnerHandler` absent : `InvalidOperationException: The inner handler has not been assigned.` (vérifié).
 - **Lire les corps** : `ReadAsStringAsync` met le contenu en mémoire tampon, le SDK le relit ensuite (requête `MessageBodyAdapter` et réponse, vérifié). Ne pas lire un corps `text/event-stream` (streaming) : le handler attendrait la fin du flux.
 - **Le jeton Entra ID n'est pas obtenu par ce `HttpClient`** (`DefaultAzureCredential` a ses propres moyens) : seules les requêtes Azure OpenAI sont journalisées.
-- **`User-Agent`** : `OpenAI/2.14.0 (…),MEAI/10.10.1 agent-framework-dotnet/1.26.0 (…)` (1.26.0 ; `OpenAI/2.13.0 … MEAI/10.10.0 … 1.22.0` avant) — chaque couche s'identifie (utile pédagogiquement).
+- **`User-Agent`** : `OpenAI/2.14.0 (…),MEAI/10.10.1 agent-framework-dotnet/1.27.0 (feat=…)` (1.27.0 ; `… 1.26.0` puis `OpenAI/2.13.0 … MEAI/10.10.0 … 1.22.0` avant) — chaque couche s'identifie (utile pédagogiquement).
 - **Alternatives vérifiées, citées en « Going further »** : journalisation intégrée `ClientPipelineOptions.ClientLoggingOptions` (`LoggerFactory`, `EnableMessageContentLogging`, stable ; en-têtes hors `AllowedHeaderNames` écrits `REDACTED`, `Authorization` compris — vérifié avec `Microsoft.Extensions.Logging.Console`) ; `PipelinePolicy` + `AddPolicy(policy, PipelinePosition.BeforeTransport)` (samples d'hébergement Foundry ; voit déjà `Authorization` — vérifié) ; `IHttpClientFactory` + `AddHttpMessageHandler` ; `UseOpenTelemetry` (`Agent_Step05_Observability`).
 - **Écho de `x-ms-client-request-id`** : Azure OpenAI renvoie en réponse la valeur envoyée (observé), mais ce comportement n'est pas documenté pour Azure OpenAI : non enseigné.
 - **Spinner** : pas de `WithSpinner()` dans un lab dont le handler écrit sur la console (les deux s'entremêleraient).
@@ -725,7 +741,7 @@ Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
 - **Piège du type d'entrée** : `RunStreamingAsync<TInput>` déclare le type **statique** de l'entrée ; une variable typée `object` n'est acceptée par aucun agent et l'entrée est **ignorée sans erreur** (`EnqueueMessageAsync` renvoie `false`) : le premier agent répond « please provide the transcript ». Constaté pendant le prototype (d'abord pris pour une concurrence entrée/`TurnToken`, infirmé : le modèle documenté fonctionne avec `List<ChatMessage>`).
 - **Approbation** : un outil `ApprovalRequiredAIFunction` met le workflow en pause (`RequestInfoEvent`, statut `PendingRequests`) ; `SendResponseAsync` le reprend (nouveau `WorkflowStartedEvent`), statut final `Idle`. **Limite constatée** : si l'agent demande **plusieurs** appels approuvables en parallèle et que le code répond un par un, la première réponse relance l'agent et les autres demandes sont rejetées automatiquement (1.25.0, #9152) ; la réponse suivante échoue (`InvalidOperationException: The agent did not return a function call and result for approval request ...`). Le lab demande un seul appel (`send_email` « exactly once ») ; le sample officiel `GroupChatToolApproval` n'a lui aussi qu'un appel approuvable.
 - **Tags de sortie** (`OutputTag.Intermediate`, `WithIntermediateOutputFrom`) : présents dans l'API publiée, mais les événements observés en 1.26.0 n'ont aucun tag (comportement activé derrière un « Futures scope » dans les tests officiels) : non enseignés.
-- **1.27.0** (publiée le 2026-10-30, non retenue : version figée à 1.26.0, §8) : aucune rupture dans Workflows hors déclaratif / Magentic d'après les notes de version ; un prototype avec les mêmes appels (séquentiel, `chainOnlyAgentResponses`, approbation) donne les mêmes résultats en 1.27.0 qu'en 1.26.0 (vérifié le 2026-11-05).
+- **1.27.0** (publiée le 2026-10-30, adoptée le 2026-11-06, §3 ter) : aucune rupture dans Workflows hors déclaratif / Magentic d'après les notes de version ; un prototype avec les mêmes appels (séquentiel, `chainOnlyAgentResponses`, approbation) donne les mêmes résultats en 1.27.0 qu'en 1.26.0 (vérifié le 2026-11-05).
 
 ### 4.20 Workflows : orchestration concurrente (validé sur MAS-Lab03)
 
@@ -792,7 +808,7 @@ Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
 
 ## 6. Bonnes pratiques à appliquer à chaque exercice
 
-1. **Une seule version MAF** pour tout le lab : la version cible du §1, `1.26.0` (Start **et** Solution identiques ; plus de mélange de previews).
+1. **Une seule version MAF** pour tout le lab : la version cible du §1, `1.27.0` (Start **et** Solution identiques ; plus de mélange de previews).
 2. **Référencer le package le plus haut niveau utile** (`Microsoft.Agents.AI.OpenAI`) et laisser `OpenAI` / `Microsoft.Extensions.AI` venir en transitif, sauf besoin explicite d'API plus récente ou de correctif (cas de `Microsoft.Extensions.AI.OpenAI` 10.11.0, §8).
 3. **Programmer contre `AIAgent`**, pas contre `ChatClientAgent`, sauf si une API propre à `ChatClientAgent` est enseignée.
 4. **Endpoint v1 + SDK `OpenAI`** pour Azure OpenAI ; auth par clé API **ou** `DefaultAzureCredential` via `BearerTokenPolicy` (scope `https://ai.azure.com/.default`). Garder l'avertissement officiel : en production, préférer une credential spécifique (`ManagedIdentityCredential`).
@@ -833,7 +849,7 @@ Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
 - **RBAC Entra ID** : la voie `DefaultAzureCredential` exige le rôle *Cognitive Services OpenAI User* sur la ressource ; sans lui, erreur 401/403 — à documenter dans chaque README.
 - **Modèles** : les samples officiels utilisent `gpt-5.4-mini`. Le lab reste agnostique (nom de déploiement en configuration) ; certains modèles de raisonnement ignorent `temperature` etc. (labs futurs).
 - **Collision `ChatMessage`** : `OpenAI.Chat.ChatMessage` et `Microsoft.Extensions.AI.ChatMessage` coexistent dès qu'on importe `OpenAI.Chat` (nécessaire pour `ChatClient` et `AsAIAgent`). Conserver l'alias `AIExtensions` enseigné depuis Lab01.
-- **Cadence de release** : MAF publie ~1 version/semaine avec des `[BREAKING]` dans les zones Skills, Harness, Hosting, A2A, MCP. Figer la version cible (1.22.0 pendant la migration, 1.26.0 depuis le 2026-10-25) ; ne monter de version que dans une vague dédiée, testée sur tous les labs (§3 bis).
+- **Cadence de release** : MAF publie ~1 version/semaine avec des `[BREAKING]` dans les zones Skills, Harness, Hosting, A2A, MCP. Figer la version cible (1.22.0 pendant la migration, 1.26.0 du 2026-10-25 au 2026-11-06, 1.27.0 depuis) ; ne monter de version que dans une vague dédiée, testée sur tous les labs (§3 bis, §3 ter).
 - **Lab06 (A2A)** : packages uniquement en préversion → exception à la règle « stable ».
 - **Régression streaming Azure OpenAI (constatée le 2026-09-28, résolue le 2026-10-25)** : quand le déploiement utilise le filtre de contenu **asynchrone**, Azure envoie en streaming Chat Completions des annotations **sans `delta`** ; `Microsoft.Extensions.AI.OpenAI` 10.10.x lève alors `InvalidOperationException: The requested operation requires an element of type 'Object', but the target element has type 'Null'` ([dotnet/extensions#7790](https://github.com/dotnet/extensions/issues/7790)). Impact : tout `RunStreamingAsync` (Lab01 scénario 5, Lab02 scénario 4) et l'hébergement A2A, qui exécute toujours en streaming (*"Agent handler did not produce any response events"*). **Correctif** : #7790 fermé le 2026-10-12 par [dotnet/extensions#7815](https://github.com/dotnet/extensions/pull/7815), qui s'appuie sur `OpenAI` 2.14.0, publié dans `Microsoft.Extensions.AI.OpenAI` **10.11.0** (2026-10-15). MAF 1.22.0 (et encore 1.26.0) n'apporte que 10.10.x : **Lab01, Lab02 et Lab06_A2AServer référencent explicitement 10.11.0** (Start et Solution), qui apporte `OpenAI` 2.14.0 et `Microsoft.Extensions.AI.Abstractions` 10.11.0. `StreamingWorkaround.cs` et le TODO 4 de Lab06_A2AServer sont supprimés ; les agents sont créés avec `chatClient.AsAIAgent(...)`. **Vérifié le 2026-10-25** (CLI, attentes du dashboard) avec clé API **et** Entra ID : Lab01 7/7, Lab02 9/9, Lab06 serveur 10/10 et client 9/9, aucune exception côté serveur. À cette date, le déploiement de test n'émettait plus de chunks sans `delta` (capture SSE : 0 sur 106) : la référence 10.11.0 protège les déploiements qui utilisent le filtre asynchrone, en particulier ceux des apprenants. Lors de la montée de version de MAF, la garder tant que MAF n'apporte pas 10.11.0 ou plus.
 - **Analyse graphify** : l'extracteur AST échoue sur 5 `Program.cs` à top-level statements (Lab01/02/03/04/07 Solution) ; sans impact sur la compilation, mais ces fichiers sont sous-représentés dans la carte.

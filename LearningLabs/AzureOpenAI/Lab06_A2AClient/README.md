@@ -13,7 +13,7 @@ You will implement four scenarios:
 - **Scenario 3**: Give the remote AuthAgent to a **local** Azure OpenAI agent as a **function tool**
 - **Scenario 4**: Have a **conversation** with the remote AuthAgent: a session keeps the same A2A `contextId`, and the server keeps the history
 
-> **Preview packages**: the A2A package of Agent Framework (`Microsoft.Agents.AI.A2A`) and the A2A SDK it uses (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.26.0 (`1.26.0-preview.261023.1`). Every other package is stable.
+> **Preview packages**: the A2A package of Agent Framework (`Microsoft.Agents.AI.A2A`) and the A2A SDK it uses (`A2A` 1.0.0-preview3) have **no stable version yet**. The lab uses the preview aligned on Agent Framework 1.27.0 (`1.27.0-preview.261030.1`). Every other package is stable.
 
 ## What You Will Learn
 
@@ -397,7 +397,7 @@ The following files should be modified:
 
 ## Coming from an older version of the lab?
 
-| Before (preview) | Now (1.26.0 / A2A v1) |
+| Before (preview) | Now (1.27.0 / A2A v1) |
 |------------------|------------------|
 | A2A protocol **v0.3** (`A2A` 0.3.x) | A2A protocol **v1** (`A2A` 1.0.0-preview3): the client needs the migrated Lab06_A2AServer |
 | `new A2A.A2AClient(uri).GetAIAgent()` | `new A2A.A2AClient(uri).AsAIAgent(name: ..., description: ...)` |
