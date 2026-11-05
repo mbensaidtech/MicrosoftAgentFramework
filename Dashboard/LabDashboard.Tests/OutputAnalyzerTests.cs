@@ -2781,6 +2781,178 @@ public class OutputAnalyzerTests
             usage.Reports.Select(r => r.Label));
     }
 
+    // Standard output of the MultiAgentSystem Lab03 solution (real run).
+    private static readonly string[] MultiAgentLab03SolutionOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Customer: Hello, I received my order ORD-2087 yesterday, but the charger of the laptop is missing. I also want to return the laptop sleeve: it is the wrong color.",
+        ">>> Scenarios to run: 1, 2, 3 (the implemented ones)",
+        ">>> Running scenario 1: A concurrent workflow - fan out, then aggregate",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A concurrent workflow - fan out, then aggregate ===",
+        "Workflow after-sales: Start -> [ReturnsSpecialist | RefundSpecialist | ShippingSpecialist] -> [Batcher/ReturnsSpecialist | Batcher/RefundSpecialist | Batcher/ShippingSpecialist] -> ConcurrentEnd",
+        "Workflow output (3 messages):",
+        "  [assistant] ShippingSpecialist: Delivery: We can ship the missing charger or provide a partial refund; please report it within 7 days. For the wrong-colored laptop sleeve, free return shipping will be arranged, and the correct item will be sent to you; please report this within 14 days.",
+        "  [assistant] RefundSpecialist: Refund: For the missing charger, you can receive a partial refund or have the item shipped to you; please report this within 7 days. For the laptop sleeve return, a refund is eligible if the product is unused, in original packaging, and with the original receipt, and processing takes 5-10 days.",
+        "  [assistant] ReturnsSpecialist: Return/exchange: You can return the laptop sleeve within 30 days as long as it is unused, in original packaging, with the original receipt, and tags attached. For the missing charger, please report the issue within 7 days, and we will arrange to ship the missing item or provide a partial refund.",
+        ">>> Running scenario 2: Follow the parallel run - time, context and cost of each agent",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Follow the parallel run - time, context and cost of each agent ===",
+        "[0.0 s] ShippingSpecialist starts its turn",
+        "[0.0 s] RefundSpecialist starts its turn",
+        "[0.0 s] ReturnsSpecialist starts its turn",
+        "[0.6 s] ShippingSpecialist has answered",
+        "[0.8 s] RefundSpecialist has answered",
+        "[1.0 s] ReturnsSpecialist has answered",
+        "[Context] ShippingSpecialist received 1 message: user",
+        "  Turn: from 0.0 s to 0.6 s (0.6 s)",
+        "  Token Usage (ShippingSpecialist):",
+        "    Input tokens: 809",
+        "    Output tokens: 39",
+        "    Total tokens: 848",
+        "[Context] RefundSpecialist received 1 message: user",
+        "  Turn: from 0.0 s to 0.8 s (0.8 s)",
+        "  Token Usage (RefundSpecialist):",
+        "    Input tokens: 803",
+        "    Output tokens: 57",
+        "    Total tokens: 860",
+        "[Context] ReturnsSpecialist received 1 message: user",
+        "  Turn: from 0.0 s to 1.0 s (1.0 s)",
+        "  Token Usage (ReturnsSpecialist):",
+        "    Input tokens: 809",
+        "    Output tokens: 52",
+        "    Total tokens: 861",
+        "[Timing] Run: 1.0 s; the same turns one after the other: about 2.4 s",
+        "[Timing] All the agents worked at the same time: yes",
+        "Workflow output (3 messages, in the order they arrived): ShippingSpecialist, RefundSpecialist, ReturnsSpecialist",
+        ">>> Running scenario 3: Combine the answers - a custom aggregator, then one reply",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Combine the answers - a custom aggregator, then one reply ===",
+        "Workflow after-sales-merged: Start -> [ReturnsSpecialist | RefundSpecialist | ShippingSpecialist] -> [Batcher/ReturnsSpecialist | Batcher/RefundSpecialist | Batcher/ShippingSpecialist] -> ConcurrentEnd",
+        "Workflow output (1 message):",
+        "  [user] Specialists: Answers of the specialists:",
+        "",
+        "      ReturnsSpecialist: Return/exchange: You can return the laptop sleeve within 30 days, ensuring it is unused, in its original packaging, and has the tags attached. For the missing charger, please contact us directly as it falls under a delivery issue.",
+        "",
+        "      RefundSpecialist: Refund: You can receive a partial refund for the missing charger, and you can request a refund for the laptop sleeve within 30 days if it is unused and in original packaging with the original receipt. Processing takes 5-10 days.",
+        "",
+        "      ShippingSpecialist: Delivery: We will ship the missing charger to you or provide a partial refund if you report it within 7 days. For the laptop sleeve, please follow the return policy for exchanges, but note that returns are handled by the separate department.",
+        "",
+        "⠋ Running the reply writer... [00:00]",
+        "⠙ Running the reply writer... [00:00]",
+        "⠹ Running the reply writer... [00:00]",
+        "⠸ Running the reply writer... [00:00]",
+        "⠼ Running the reply writer... [00:00]",
+        "⠴ Running the reply writer... [00:00]",
+        "⠦ Running the reply writer... [00:00]",
+        "⠧ Running the reply writer... [00:00]",
+        "⠇ Running the reply writer... [00:00]",
+        "⠏ Running the reply writer... [00:00]",
+        "⠋ Running the reply writer... [00:00]",
+        "⠙ Running the reply writer... [00:00]",
+        "⠹ Running the reply writer... [00:00]",
+        "⠸ Running the reply writer... [00:01]",
+        "⠼ Running the reply writer... [00:01]",
+        "⠴ Running the reply writer... [00:01]",
+        "⠦ Running the reply writer... [00:01]",
+        "",
+        "ReplyWriter: Hello,",
+        "",
+        "Thank you for reaching out. I'm sorry to hear that your charger is missing. Please contact us within 7 days so we can either ship the missing charger to you or issue a partial refund. Regarding the laptop sleeve, you can return it within 30 days as long as it is unused, in its original packaging, and has the tags attached. A refund will be processed within 5-10 days once we receive the item.",
+        "",
+        "If you have any further questions, feel free to ask.",
+        "",
+        "Token Usage (ReplyWriter):",
+        "  Input tokens: 286",
+        "  Output tokens: 104",
+        "  Total tokens: 390",
+    ];
+
+    // Standard output of the MultiAgentSystem Lab03 exercise as delivered (TODOs not done yet).
+    private static readonly string[] MultiAgentLab03StartOutput =
+    [
+        "Endpoint: https://example.openai.azure.com/",
+        "Deployment: gpt-4o-mini",
+        "Customer: Hello, I received my order ORD-2087 yesterday, but the charger of the laptop is missing. I also want to return the laptop sleeve: it is the wrong color.",
+        ">>> Scenarios to run: 1, 2, 3 (the implemented ones)",
+        ">>> Running scenario 1: A concurrent workflow - fan out, then aggregate",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 1: A concurrent workflow - fan out, then aggregate ===",
+        ">>> Running scenario 2: Follow the parallel run - time, context and cost of each agent",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 2: Follow the parallel run - time, context and cost of each agent ===",
+        ">>> Running scenario 3: Combine the answers - a custom aggregator, then one reply",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 3: Combine the answers - a custom aggregator, then one reply ===",
+    ];
+
+    [Fact]
+    public void Every_multiagent_lab03_check_passes_on_the_solution_output_and_only_config_on_the_delivered_exercise()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab03")!;
+
+        Assert.All(Evaluate(lab.Expectations, MultiAgentLab03SolutionOutput), r => Assert.True(r.Passed, r.Id));
+        Assert.Equal(
+            ["config"],
+            Evaluate(lab.Expectations, MultiAgentLab03StartOutput).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Multiagent_lab03_checks_fail_when_the_agents_run_one_after_the_other_and_the_answers_are_not_merged()
+    {
+        LabDefinition lab = LabCatalogTests.LoadRealCatalog().Find("multiagent-lab03")!;
+        // The specialists were chained in a sequential workflow (each one saw the previous answers, the turns did not overlap,
+        // the output kept the input), and the default aggregator was kept in scenario 3.
+        string[] output =
+        [
+            "Endpoint: https://example.openai.azure.com/",
+            ">>> Running scenario 1: A concurrent workflow - fan out, then aggregate",
+            "Workflow after-sales: ReturnsSpecialist -> RefundSpecialist -> ShippingSpecialist -> OutputMessages",
+            "Workflow output (4 messages):",
+            "  [user] (no author): Hello, I received my order ORD-2087 yesterday, but the charger of the laptop is missing.",
+            "  [assistant] ReturnsSpecialist: Return/exchange: You can return the laptop sleeve within 30 days.",
+            "  [assistant] RefundSpecialist: Refund: A partial refund is possible for the missing charger.",
+            "  [assistant] ShippingSpecialist: Delivery: We will ship the missing charger.",
+            ">>> Running scenario 2: Follow the parallel run - time, context and cost of each agent",
+            "[Context] ReturnsSpecialist received 1 message: user",
+            "[Context] RefundSpecialist received 2 messages: user, ReturnsSpecialist",
+            "[Context] ShippingSpecialist received 3 messages: user, ReturnsSpecialist, RefundSpecialist",
+            "[Timing] Run: 3.1 s; the same turns one after the other: about 3.0 s",
+            "[Timing] All the agents worked at the same time: no",
+            ">>> Running scenario 3: Combine the answers - a custom aggregator, then one reply",
+            "Workflow output (3 messages):",
+            "  [assistant] ShippingSpecialist: Delivery: We will ship the missing charger.",
+            "  [assistant] ReturnsSpecialist: Return/exchange: You can return the laptop sleeve within 30 days.",
+            "  [assistant] RefundSpecialist: Refund: A partial refund is possible for the missing charger.",
+        ];
+
+        Assert.Equal(["config"], Evaluate(lab.Expectations, output).Where(r => r.Passed).Select(r => r.Id));
+    }
+
+    [Fact]
+    public void Labels_the_multiagent_lab03_token_usage_with_the_agent_of_each_turn()
+    {
+        TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(MultiAgentLab03SolutionOutput));
+
+        // Scenario 2: one report per specialist, in the order of the trace; scenario 3: the reply writer
+        Assert.Equal(4, usage.Reports.Count);
+        Assert.All(usage.Reports.Take(3), r => Assert.Matches(@"^Scenario 2 · Token Usage \((Returns|Refund|Shipping)Specialist\)$", r.Label));
+        Assert.Equal("Scenario 3 · Token Usage (ReplyWriter)", usage.Reports[3].Label);
+    }
+
     // Standard output of the Lab13 solution (real run): the API, then the four scenarios that call it.
     private static readonly string[] Lab13SolutionOutput =
     [
@@ -3163,6 +3335,7 @@ public class OutputAnalyzerTests
         ["azureopenai-lab15"] = Lab15SolutionOutput,
         ["multiagent-lab01"] = MultiAgentLab01SolutionOutput,
         ["multiagent-lab02"] = MultiAgentLab02SolutionOutput,
+        ["multiagent-lab03"] = MultiAgentLab03SolutionOutput,
     };
 
     public static TheoryData<string> CatalogLabs() => [.. LabCatalogTests.LoadRealCatalog().Labs.Select(lab => lab.Id)];

@@ -69,10 +69,10 @@ Extraits des release notes officielles `dotnet-*` ; seuls ceux qui touchent le l
 | preview.260205.1 | Suppression de `UserInputRequests` | #3682 | Lab09 ✅ |
 | 1.14.0 | **Liaison des réponses d'approbation** aux demandes surfacées (`[BREAKING]`) ; `ToolApprovalAgent` sorti d'expérimental | #7111, #7107 | Lab09 ✅ (session obligatoire) |
 | **1.22.0** | **Liaison des approbations renforcée** (`[BREAKING]`, replay) : seules les demandes enregistrées par le framework dans la session font foi ; liaison aussi pour les réponses « always approve » | #8375, #8432 | Lab09 ✅ |
-| preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 | aucun pour MAS-Lab02 ✅ (aucun executor personnalisé : `BuildSequential` seulement) ; MAS-Lab03 à vérifier |
+| preview.260205.1 | `ReflectingExecutor` obsolète (remplacé par source generator) | #3380 aucun pour MAS-Lab02 et MAS-Lab03 ✅ (aucun executor personnalisé : `BuildSequential` / `BuildConcurrent` seulement) |
 | preview.260205.1 | Agent et session fournis à `AIContextProvider` / `ChatHistoryProvider` | #3695 | Lab05, Lab12 ✅ |
 | rc1 | Session `StateBag`, plusieurs providers par agent, composition au lieu d'héritage typé ; `AIContextProviderFactory` → `AIContextProviders` ; `InvokingAsync` / `InvokedAsync` deviennent non virtuels (on surcharge `ProvideAIContextAsync` / `StoreAIContextAsync`) | #3806, #3988 | Lab05, Lab12 ✅ (§4.18) |
-| rc1 | Événements `AgentResponse[Update]` unifiés en `WorkflowOutputEvent` ; renommages API Workflows (`InProcessExecution.StreamAsync` → `RunStreamingAsync`) | #3441, #4090 | MAS-Lab02 ✅ (§4.19), MAS-Lab03 |
+| rc1 | Événements `AgentResponse[Update]` unifiés en `WorkflowOutputEvent` ; renommages API Workflows (`InProcessExecution.StreamAsync` → `RunStreamingAsync`) | #3441, #4090 | MAS-Lab02 ✅ (§4.19), MAS-Lab03 ✅ (§4.20) |
 | rc1 | Améliorations Structured Output | #3761 | Lab02 |
 | 1.0.0 | Suppression de `OpenAIAssistantClientExtensions` ; `Microsoft.Agents.AI.AzureAI` → `Microsoft.Agents.AI.Foundry` | #5058, #5042 | aucun |
 | 1.19.0 | Support MCP long-running tasks migré | #7774 | aucun (Lab04 n'utilise pas l'extension Tasks ; cité dans « Going further ») |
@@ -727,6 +727,28 @@ Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
 - **Tags de sortie** (`OutputTag.Intermediate`, `WithIntermediateOutputFrom`) : présents dans l'API publiée, mais les événements observés en 1.26.0 n'ont aucun tag (comportement activé derrière un « Futures scope » dans les tests officiels) : non enseignés.
 - **1.27.0** (publiée le 2026-10-30, non retenue : version figée à 1.26.0, §8) : aucune rupture dans Workflows hors déclaratif / Magentic d'après les notes de version ; un prototype avec les mêmes appels (séquentiel, `chainOnlyAgentResponses`, approbation) donne les mêmes résultats en 1.27.0 qu'en 1.26.0 (vérifié le 2026-11-05).
 
+### 4.20 Workflows : orchestration concurrente (validé sur MAS-Lab03)
+
+**Ancienne approche** : `BuildConcurrent(workflowName:, agents:)` + `InProcessExecution.StreamAsync` + cast de `Data`, puis filtrage des messages `User` ; un agent « follow-up » rédigeait la réponse **en parallèle** des spécialistes (sans pouvoir connaître leurs réponses).
+
+**Nouvelle approche** (1.26.0, page Learn « Concurrent orchestration », samples `03_AgentWorkflowPatterns`, `Concurrent/Concurrent`)
+```csharp
+Workflow workflow = AgentWorkflowBuilder.BuildConcurrent("name", agents);                       // ou (name, agents, aggregator)
+await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, messages);
+await run.TrySendMessageAsync(new TurnToken(emitEvents: false));
+// boucle d'événements identique au séquentiel (§4.19)
+List<ChatMessage> Aggregate(IList<List<ChatMessage>> results) => ...;                            // une liste par agent : entrée reçue puis réponse
+```
+
+Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
+- **Graphe** : `Start` (`ChatForwardingExecutor`) → *fan-out* vers un executor par agent → un `Batcher/<id>` par agent → *fan-in barrier* → `ConcurrentEnd`, qui appelle l'agrégateur et produit la sortie.
+- **Parallélisme réel** : les executors d'un même *superstep* s'exécutent ensemble (`Task.WhenAll`) ; mesuré : 3 agents en ≈ 1,0–1,4 s contre ≈ 2,4–3,4 s cumulés (prototype sans les règles : ≈ 4,3 s appelés un par un par le code, ≈ 1,7–2,0 s en concurrent).
+- **Indépendance** : chaque agent ne reçoit que l'entrée (≈ 800 tokens chacun avec les règles) ; il ne voit pas les autres réponses → recouvrements et contradictions possibles (housse « mauvaise couleur » : échange 30 jours chez l'un, « wrong item » 14 jours chez l'autre).
+- **Agrégateur par défaut** : le dernier message de chaque agent, dans l'ordre **d'arrivée** (variable d'une exécution à l'autre), **sans** le message d'entrée. L'exemple C# de la page Learn (mise à jour du 2026-10-28) affiche une ligne `User:` dans la sortie : non conforme au code 1.26.0. Le commentaire XML de `BuildConcurrent` est, lui, exact.
+- **Agrégateur personnalisé** : `Func<IList<List<ChatMessage>>, List<ChatMessage>>` **synchrone** (contrairement à Python, il ne peut pas appeler un agent) ; chaque liste = message reçu par l'agent puis sa réponse (`ForwardIncomingMessages = true`). Synthèse par un agent : après le workflow, par le code (choix du lab).
+- **Échec** : un agent en échec (`ExecutorFailedEvent` puis `WorkflowErrorEvent`) arrête tout : statut `Ended`, aucune sortie, réponses des autres perdues.
+- **Workflow comme agent** (`AsAIAgent`) dans un `BuildSequential` : fonctionne, mais l'agent renvoie les messages des agents internes (ordre d'arrivée) et non la sortie d'un agrégateur personnalisé (dépend de `includeWorkflowOutputsInResponse` et de drapeaux « Futures ») : non enseigné, cité en « Going further » avec cette réserve.
+
 ## 5. APIs / packages supprimés ou remplacés
 
 | Nom | Statut | Impact | Remplacement recommandé | Exercices touchés |
@@ -749,8 +771,8 @@ Faits vérifiés (sources `dotnet-1.26.0` et exécutions réelles) :
 | `Microsoft.Extensions.DependencyInjection` (transitif via Hosting) | N'est plus apporté une fois Hosting retiré (MAF n'apporte que `.Abstractions`) | Compilation (`ServiceCollection`) | Référence explicite `Microsoft.Extensions.DependencyInjection` 10.0.12 | Lab03 (et tout lab console qui construit un `ServiceCollection` : MAS) ; inutile pour Lab10 (framework partagé ASP.NET Core via `ModelContextProtocol.AspNetCore`) |
 | `UserInputRequests`, `UserInputRequestContent` | Supprimés | Compilation + concept | `response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>()` + boucle `while` ; session obligatoire (§4.15) | Lab09 ✅ |
 | `FunctionApprovalRequestContent` (`.FunctionCall`) | Renommé (MEAI 10.x) | Compilation | `ToolApprovalRequestContent` (`.ToolCall` à caster en `FunctionCallContent`), `CreateResponse(approved, reason)` (§4.15) | Lab09 ✅ |
-| `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02 : non concerné ✅ ; MAS-Lab03 (à vérifier) |
-| `InProcessExecution.StreamAsync(workflow, input)` ; `(List<ChatMessage>)evt.Data!` | Supprimé (rc1) ; cast remplacé | Compilation | `InProcessExecution.RunStreamingAsync(workflow, input)` (+ `await using`) ; `WorkflowOutputEvent.As<List<ChatMessage>>()` (§4.19) | MAS-Lab02 ✅ |
+| `ReflectingExecutor` | Obsolète | Warning puis suppression | Executors source-générés | MAS-Lab02, MAS-Lab03 : non concernés ✅ |
+| `InProcessExecution.StreamAsync(workflow, input)` ; `(List<ChatMessage>)evt.Data!` | Supprimé (rc1) ; cast remplacé | Compilation | `InProcessExecution.RunStreamingAsync(workflow, input)` (+ `await using`) ; `WorkflowOutputEvent.As<List<ChatMessage>>()` (§4.19) | MAS-Lab02 ✅, MAS-Lab03 ✅ |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` | Toujours en préversion | Viole la règle « stable uniquement » | `CommunityToolkit.VectorData.InMemory` (stable) ; MongoDB : `ChatHistoryProvider` sur `MongoDB.Driver` 3.12.0 (Lab05) ; recherche vectorielle : `InMemoryVectorStore` (Lab07, §4.13) | Lab05 ✅, Lab07 ✅ |
 | `MongoVectorStore` (SK) + MongoDB Atlas Vector Search | Préversion, service externe | Lab07 non exécutable sans compte Atlas | `InMemoryVectorStore` ; tout connecteur `Microsoft.Extensions.VectorData` stable en « Going further » (§4.13) | Lab07 ✅ |
 | `Microsoft.Extensions.VectorData.Abstractions` 9.7.0 (référence explicite) | Remplacé | Version | 10.10.0 transitif via MAF 1.22.0 | Lab05 ✅, Lab07 ✅ |

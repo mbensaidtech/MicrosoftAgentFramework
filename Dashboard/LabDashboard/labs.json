@@ -1167,6 +1167,100 @@
       }
     },
     {
+      "id": "multiagent-lab03",
+      "number": "03",
+      "track": "Multi-Agent System",
+      "title": "Concurrent Orchestration: Agents in Parallel",
+      "summary": "Run agents in parallel on the same input with AgentWorkflowBuilder.BuildConcurrent: read the aggregated answers, measure the time saved and what each agent receives, then combine the answers with your own aggregator and a reply writer.",
+      "level": "Intermediate",
+      "objectives": [
+        "Build a concurrent workflow of agents with AgentWorkflowBuilder.BuildConcurrent: fan-out to every agent, fan-in to an aggregator",
+        "Run it with InProcessExecution.RunStreamingAsync and a TurnToken, and read the aggregated output (one answer per agent)",
+        "Handle the errors of a run: one failing agent stops the whole workflow",
+        "Show with the events that the agents work at the same time, each with the input only, and measure their time and cost",
+        "Write a custom aggregator: one list per agent, in the order they finished, turned into the output you need",
+        "Combine the independent answers into one reply with an agent that runs once they have all answered"
+      ],
+      "path": "LearningLabs/MultiAgentSystem/Lab03_OrchestrationConcurrent",
+      "startProject": "Start/OrchestrationConcurrent.csproj",
+      "solutionProject": "Solution/OrchestrationConcurrent.csproj",
+      "timeoutSeconds": 240,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-graph",
+          "description": "Scenario 1 - the concurrent workflow fans out from Start to the three specialists, then fans in to ConcurrentEnd",
+          "pattern": "^Workflow after-sales: Start -> \\[ReturnsSpecialist \\| RefundSpecialist \\| ShippingSpecialist\\] -> \\[Batcher/ReturnsSpecialist \\| Batcher/RefundSpecialist \\| Batcher/ShippingSpecialist\\] -> ConcurrentEnd$"
+        },
+        {
+          "id": "scenario1-output",
+          "description": "Scenario 1 - the aggregated output contains one answer per specialist, and not the input",
+          "pattern": "^Workflow output \\(3 messages\\):\\n  \\[assistant\\] (\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(?!\\2:)\\w+Specialist: "
+        },
+        {
+          "id": "scenario2-context",
+          "description": "Scenario 2 - each specialist received only the customer message: the agents do not see each other's answers",
+          "pattern": "(?s)(?=.*^\\[Context\\] ReturnsSpecialist received 1 message: user$)(?=.*^\\[Context\\] RefundSpecialist received 1 message: user$)(?=.*^\\[Context\\] ShippingSpecialist received 1 message: user$)"
+        },
+        {
+          "id": "scenario2-parallel",
+          "description": "Scenario 2 - the turns of the agents overlapped: they worked at the same time",
+          "pattern": "^\\[Timing\\] All the agents worked at the same time: yes$"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage of each specialist displayed",
+          "pattern": "(?s)(?:Token Usage \\((?:Returns|Refund|Shipping)Specialist\\):\\n\\s*Input tokens: \\d+.*?){3}"
+        },
+        {
+          "id": "scenario2-order",
+          "description": "Scenario 2 - the output lists the three answers in the order they arrived",
+          "pattern": "^Workflow output \\(3 messages, in the order they arrived\\): \\w+Specialist, \\w+Specialist, \\w+Specialist$"
+        },
+        {
+          "id": "scenario3-merged",
+          "description": "Scenario 3 - the custom aggregator merged the three answers into one message, in the order of the specialists",
+          "pattern": "(?s)^Workflow output \\(1 message\\):\\n  \\[user\\] Specialists: [^\\n]*\\n.*?^      ReturnsSpecialist: .*?^      RefundSpecialist: .*?^      ShippingSpecialist: "
+        },
+        {
+          "id": "scenario3-reply",
+          "description": "Scenario 3 - the reply writer answered the customer about the missing charger, with its token usage",
+          "pattern": "(?s)^ReplyWriter: .*?(?i:charger).*?^Token Usage \\(ReplyWriter\\):\\n\\s*Input tokens: \\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Système multi-agents",
+          "title": "Orchestration concurrente : des agents en parallèle",
+          "level": "Intermédiaire",
+          "summary": "Faites travailler des agents en parallèle sur la même entrée avec AgentWorkflowBuilder.BuildConcurrent : lisez les réponses agrégées, mesurez le temps gagné et ce que reçoit chaque agent, puis combinez les réponses avec votre propre agrégateur et un agent rédacteur.",
+          "objectives": [
+            "Construire un workflow concurrent d'agents avec AgentWorkflowBuilder.BuildConcurrent : diffusion vers chaque agent, regroupement vers un agrégateur",
+            "L'exécuter avec InProcessExecution.RunStreamingAsync et un TurnToken, et lire la sortie agrégée (une réponse par agent)",
+            "Traiter les erreurs d'une exécution : un seul agent en échec arrête tout le workflow",
+            "Montrer avec les événements que les agents travaillent en même temps, chacun avec la seule entrée, et mesurer leur temps et leur coût",
+            "Écrire un agrégateur personnalisé : une liste par agent, dans l'ordre où ils ont fini, transformée en la sortie voulue",
+            "Combiner les réponses indépendantes en une seule réponse avec un agent qui s'exécute une fois qu'ils ont tous répondu"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-graph": "Scénario 1 - le workflow concurrent diffuse de Start vers les trois spécialistes, puis regroupe vers ConcurrentEnd",
+            "scenario1-output": "Scénario 1 - la sortie agrégée contient une réponse par spécialiste, et pas l'entrée",
+            "scenario2-context": "Scénario 2 - chaque spécialiste n'a reçu que le message du client : les agents ne voient pas les réponses des autres",
+            "scenario2-parallel": "Scénario 2 - les tours des agents se sont chevauchés : ils ont travaillé en même temps",
+            "scenario2-usage": "Scénario 2 - consommation de tokens de chaque spécialiste affichée",
+            "scenario2-order": "Scénario 2 - la sortie liste les trois réponses dans leur ordre d'arrivée",
+            "scenario3-merged": "Scénario 3 - l'agrégateur personnalisé a fusionné les trois réponses en un message, dans l'ordre des spécialistes",
+            "scenario3-reply": "Scénario 3 - le rédacteur a répondu au client à propos du chargeur manquant, avec sa consommation de tokens"
+          }
+        }
+      }
+    },
+    {
       "id": "azureopenai-lab06-server",
       "number": "06",
       "track": "Azure OpenAI",
