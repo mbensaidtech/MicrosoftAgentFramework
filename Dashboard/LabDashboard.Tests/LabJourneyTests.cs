@@ -8,11 +8,11 @@ public class LabJourneyTests
 {
     private static readonly DateTimeOffset Day = new(2026, 10, 25, 9, 0, 0, TimeSpan.Zero);
 
-    private static LabDefinition Lab(string id, string level = "Beginner", int checks = 4) => new()
+    private static LabDefinition Lab(string id, string level = "Beginner", int checks = 4, string track = "Azure OpenAI") => new()
     {
         Id = id,
         Number = id[^2..],
-        Track = "Azure OpenAI",
+        Track = track,
         Title = id,
         Summary = "",
         Level = level,
@@ -204,6 +204,33 @@ public class LabJourneyTests
         Assert.Equal(175 + 125 + 38, journey.Xp); // lab03: 150 × 0.5 × 2/4 = 37.5, rounded up
         Assert.Equal((2, 50), (journey.Completed, journey.Percent));
         Assert.Equal(new JourneyNextMission("lab03", JourneyState.InProgress), journey.Next);
+    }
+
+    [Fact]
+    public void Each_track_is_its_own_learning_path_whatever_the_catalog_order()
+    {
+        // The Multi-Agent System labs sit between Azure OpenAI labs in the catalog, as in labs.json.
+        const string Mas = "Multi-Agent System";
+        LabDefinition[] labs =
+        [
+            Lab("aoai01"), Lab("aoai02", "Intermediate"), Lab("mas01", "Intermediate", track: Mas),
+            Lab("mas02", "Intermediate", track: Mas), Lab("aoai03", "Intermediate"),
+        ];
+        Dictionary<string, RunRecord[]> runs = new()
+        {
+            ["aoai01"] = History(Start(RunStatus.Passed)),
+            ["aoai02"] = History(Start(RunStatus.Passed)),
+        };
+
+        JourneyModel journey = LearningJourney.Build(labs, id => runs.GetValueOrDefault(id, []), activeLabId: null);
+
+        Assert.Equal(["aoai01", "aoai02", "aoai03", "mas01", "mas02"], journey.Labs.Select(lab => lab.Id));
+        Assert.Equal(
+            [("Azure OpenAI", "Beginner", 1), ("Azure OpenAI", "Intermediate", 2), (Mas, "Intermediate", 2)],
+            journey.Milestones.Select(m => (m.Track, m.Level, m.Total)));
+        Assert.Equal(["aoai02", "aoai03"], journey.Milestones[1].LabIds);
+        // The next exercise to start follows the path of the first track before the next track begins.
+        Assert.Equal(new JourneyNextMission("aoai03", JourneyState.NotStarted), journey.Next);
     }
 
     [Fact]

@@ -189,27 +189,47 @@ async function applyLanguage(lang) {
 function renderRail() {
   const list = document.getElementById("lab-list");
   document.getElementById("lab-count").textContent = String(state.labs.length);
-  // The catalog order is the learning path: the list shows the step in it; the lab number (its folder) comes second.
-  list.replaceChildren(...state.labs.map((lab, index) => {
-    const step = index + 1;
-    const item = el("button", "lab-item");
-    item.type = "button";
-    item.setAttribute("aria-current", String(lab.id === state.currentId));
-    item.setAttribute("aria-label", t("rail.select", { step, title: labText(lab, "title"), number: lab.number }));
-    item.append(el("span", "lab-item-num", String(step)), el("span", "lab-item-title", labText(lab, "title")));
-
-    const meta = el("span", "lab-item-meta");
-    meta.append(lab.activeRunId ? pill("running", t("status.running")) : pill(lab.progress, t(`progress.${lab.progress}`)));
-    const last = latestRun(lab);
-    if (last) meta.append(el("span", "num", fmtDuration(last.durationMs)));
-    meta.append(el("span", "lab-item-ref", t("lab.kicker", { number: lab.number })));
-    item.append(meta);
-
-    item.addEventListener("click", () => selectLab(lab.id));
-    return item;
+  // One learning path per track (the server sends the labs grouped by track): each group shows the step in its own path,
+  // from 1; the lab number (its folder) comes second.
+  list.replaceChildren(...trackGroups(state.labs).map((group) => {
+    const section = el("section", "lab-group");
+    const title = el("h3", "lab-group-title caps", labText(group.labs[0], "track"));
+    title.id = `lab-group-${group.index}`;
+    section.setAttribute("aria-labelledby", title.id);
+    section.append(title, ...group.labs.map((lab, index) => renderRailItem(lab, index + 1)));
+    return section;
   }));
   // The journey column shows the same labs: same titles, language and open lab.
   renderJourney({ labs: state.labs, currentId: state.currentId });
+}
+
+/** The labs in runs of the same track, in the order received (the server groups them by track). */
+function trackGroups(labs) {
+  const groups = [];
+  for (const lab of labs) {
+    const last = groups.at(-1);
+    if (last && last.track === lab.track.trim().toLowerCase()) last.labs.push(lab);
+    else groups.push({ index: groups.length, track: lab.track.trim().toLowerCase(), labs: [lab] });
+  }
+  return groups;
+}
+
+function renderRailItem(lab, step) {
+  const item = el("button", "lab-item");
+  item.type = "button";
+  item.setAttribute("aria-current", String(lab.id === state.currentId));
+  item.setAttribute("aria-label", t("rail.select", { step, title: labText(lab, "title"), number: lab.number }));
+  item.append(el("span", "lab-item-num", String(step)), el("span", "lab-item-title", labText(lab, "title")));
+
+  const meta = el("span", "lab-item-meta");
+  meta.append(lab.activeRunId ? pill("running", t("status.running")) : pill(lab.progress, t(`progress.${lab.progress}`)));
+  const last = latestRun(lab);
+  if (last) meta.append(el("span", "num", fmtDuration(last.durationMs)));
+  meta.append(el("span", "lab-item-ref", t("lab.kicker", { number: lab.number })));
+  item.append(meta);
+
+  item.addEventListener("click", () => selectLab(lab.id));
+  return item;
 }
 
 function latestRun(summary) {

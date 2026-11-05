@@ -12,9 +12,12 @@ public class LabCatalogTests
     {
         LabCatalog catalog = LoadRealCatalog();
 
-        // Catalog order = the essential learning path (root README), then the optional labs (Lab10, Lab08)
-        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab09", "azureopenai-lab07", "azureopenai-lab12", "azureopenai-lab15", "multiagent-lab01", "multiagent-lab02", "multiagent-lab03", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab11", "azureopenai-lab14", "azureopenai-lab13", "azureopenai-lab10", "azureopenai-lab08"],
+        // Catalog order = one track after the other (the order published to the admin dashboard): Azure OpenAI, its essential
+        // learning path (root README) then the optional labs (Lab10, Lab08), then Multi-Agent System.
+        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab09", "azureopenai-lab07", "azureopenai-lab12", "azureopenai-lab15", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab11", "azureopenai-lab14", "azureopenai-lab13", "azureopenai-lab10", "azureopenai-lab08", "multiagent-lab01", "multiagent-lab02", "multiagent-lab03"],
             catalog.Labs.Select(lab => lab.Id));
+        // The tracks are not interleaved: the published order is the learning path of the dashboard.
+        Assert.Equal(catalog.Labs, catalog.LearningPath);
         foreach (LabDefinition lab in catalog.Labs)
         {
             Assert.True(File.Exists(catalog.ProjectPath(lab, RunTarget.Start)));
@@ -24,6 +27,20 @@ public class LabCatalogTests
             {
                 Assert.True(File.Exists(catalog.CompanionProjectPath(lab)));
             }
+        }
+    }
+
+    [Fact]
+    public void The_learning_path_groups_the_labs_by_track_and_keeps_the_catalog_order_inside_each_track()
+    {
+        LabCatalog catalog = LoadRealCatalog();
+
+        // Azure OpenAI (first track of the catalog) then Multi-Agent System: each track is its own path, numbered from 1.
+        Assert.Equal(["azureopenai-lab01", "azureopenai-lab02", "azureopenai-lab03", "azureopenai-lab04", "azureopenai-lab05", "azureopenai-lab09", "azureopenai-lab07", "azureopenai-lab12", "azureopenai-lab15", "azureopenai-lab06-server", "azureopenai-lab06-client", "azureopenai-lab11", "azureopenai-lab14", "azureopenai-lab13", "azureopenai-lab10", "azureopenai-lab08", "multiagent-lab01", "multiagent-lab02", "multiagent-lab03"],
+            catalog.LearningPath.Select(lab => lab.Id));
+        foreach (IGrouping<string, LabDefinition> track in catalog.Labs.GroupBy(lab => lab.Track))
+        {
+            Assert.Equal(track.Select(lab => lab.Id), catalog.LearningPath.Where(lab => lab.Track == track.Key).Select(lab => lab.Id));
         }
     }
 

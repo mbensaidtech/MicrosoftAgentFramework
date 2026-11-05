@@ -31,8 +31,10 @@ public static class LearningJourney
         _ => 100,
     };
 
-    public static JourneyModel Build(IReadOnlyList<LabDefinition> labs, Func<string, IReadOnlyList<RunRecord>> history, string? activeLabId)
+    /// <summary>The journey over the labs grouped by track (<see cref="LabCatalog.ByTrack"/>): one learning path per track.</summary>
+    public static JourneyModel Build(IReadOnlyList<LabDefinition> catalogLabs, Func<string, IReadOnlyList<RunRecord>> history, string? activeLabId)
     {
+        IReadOnlyList<LabDefinition> labs = LabCatalog.ByTrack(catalogLabs);
         List<LabJourney> journeys = labs
             .Select(lab => ForLab(lab, history(lab.Id), string.Equals(lab.Id, activeLabId, StringComparison.OrdinalIgnoreCase)))
             .ToList();
@@ -80,7 +82,7 @@ public static class LearningJourney
             ? xp
             : baseXp + (attempts.All(r => r.Status == RunStatus.Passed) ? FirstTryBonus : 0) + (runs.Any(r => r.Target == RunTarget.Solution) ? 0 : SoloBonus);
 
-        return new LabJourney(lab.Id, lab.Number, lab.Level, state, running, attempts.Length, bestChecks, totalChecks, xp, potentialXp,
+        return new LabJourney(lab.Id, lab.Number, lab.Track, lab.Level, state, running, attempts.Length, bestChecks, totalChecks, xp, potentialXp,
             firstTry, solo, persistence, firstPassed?.StartedAt, startRuns.FirstOrDefault()?.StartedAt);
     }
 
@@ -95,13 +97,15 @@ public static class LearningJourney
 
     private static bool IsDone(LabJourney lab) => lab.State is JourneyState.Completed or JourneyState.ToResume;
 
-    /// <summary>One milestone per run of consecutive catalog labs sharing the same level.</summary>
+    /// <summary>One milestone per run of consecutive labs sharing the same track and level: the levels of a track never mix with another's.</summary>
     private static List<JourneyMilestone> Milestones(IReadOnlyList<LabJourney> labs)
     {
         List<List<LabJourney>> groups = [];
         foreach (LabJourney lab in labs)
         {
-            if (groups.Count == 0 || !string.Equals(groups[^1][0].Level, lab.Level, StringComparison.OrdinalIgnoreCase))
+            if (groups.Count == 0
+                || !string.Equals(groups[^1][0].Track.Trim(), lab.Track.Trim(), StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(groups[^1][0].Level, lab.Level, StringComparison.OrdinalIgnoreCase))
             {
                 groups.Add([]);
             }
@@ -113,6 +117,7 @@ public static class LearningJourney
         {
             bool cleared = members.All(IsDone);
             return new JourneyMilestone(
+                members[0].Track,
                 members[0].Level,
                 members.Select(lab => lab.Id).ToList(),
                 members.Count(IsDone),
@@ -145,7 +150,7 @@ public static class LearningJourney
         ];
     }
 
-    /// <summary>The exercise being worked on, else one to fix, else the next one to start (catalog order).</summary>
+    /// <summary>The exercise being worked on, else one to fix, else the next one to start (learning path order, track by track).</summary>
     private static JourneyNextMission? NextMission(IReadOnlyList<LabJourney> labs)
     {
         LabJourney? current = labs.Where(lab => lab.State == JourneyState.InProgress).MaxBy(lab => lab.LastStartAt);
@@ -189,6 +194,7 @@ public sealed record JourneyRankStep(string Id, int MinXp);
 public sealed record LabJourney(
     string Id,
     string Number,
+    string Track,
     string Level,
     string State,
     bool Running,
@@ -203,7 +209,7 @@ public sealed record LabJourney(
     DateTimeOffset? CompletedAt,
     DateTimeOffset? LastStartAt);
 
-public sealed record JourneyMilestone(string Level, IReadOnlyList<string> LabIds, int Completed, int Total, bool Cleared, DateTimeOffset? ClearedAt);
+public sealed record JourneyMilestone(string Track, string Level, IReadOnlyList<string> LabIds, int Completed, int Total, bool Cleared, DateTimeOffset? ClearedAt);
 
 public sealed record JourneyBadge(string Id, bool Unlocked, DateTimeOffset? EarnedAt, string? LabId);
 

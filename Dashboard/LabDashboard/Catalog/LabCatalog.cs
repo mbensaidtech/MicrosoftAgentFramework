@@ -119,12 +119,24 @@ public sealed partial class LabCatalog
     {
         RepositoryRoot = repositoryRoot;
         Labs = labs;
+        LearningPath = ByTrack(labs);
         _labs = labs.ToDictionary(lab => lab.Id, StringComparer.OrdinalIgnoreCase);
     }
 
     public string RepositoryRoot { get; }
 
+    /// <summary>The labs in the order of labs.json (the order published to the admin dashboard).</summary>
     public IReadOnlyList<LabDefinition> Labs { get; }
+
+    /// <summary>The labs as the learner follows them: one learning path per track (see <see cref="ByTrack"/>).</summary>
+    public IReadOnlyList<LabDefinition> LearningPath { get; }
+
+    /// <summary>
+    /// Groups the labs by track, in the order each track first appears in the catalog, keeping the catalog order inside a track:
+    /// every track (Azure OpenAI, Multi-Agent System...) is its own learning path, numbered from 1, whatever the labs of the others.
+    /// </summary>
+    public static IReadOnlyList<LabDefinition> ByTrack(IEnumerable<LabDefinition> labs) =>
+        labs.GroupBy(lab => lab.Track.Trim(), StringComparer.OrdinalIgnoreCase).SelectMany(track => track).ToList();
 
     public LabDefinition? Find(string id) => _labs.GetValueOrDefault(id);
 

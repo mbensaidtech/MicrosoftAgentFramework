@@ -931,336 +931,6 @@
       }
     },
     {
-      "id": "multiagent-lab01",
-      "number": "01",
-      "track": "Multi-Agent System",
-      "title": "Delegate a Task to Another Agent",
-      "summary": "Make agents work together: delegate by code to a reviewer agent and decide with its typed review, let a front desk agent delegate to specialist agents turned into tools, and keep the context of a specialist with a session.",
-      "level": "Intermediate",
-      "objectives": [
-        "Delegate by code: call another agent directly with RunAsync<T> and decide with its typed result",
-        "Check a result returned by a model before the code uses it",
-        "Delegate by the model: turn agents into tools with AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
-        "Read the delegations of a run: the query written by the model and the text returned",
-        "Keep the context of a specialist across calls with AsAIFunction(session: ...)",
-        "Know the limits of an agent used as a tool: single query, text only, hidden token usage, approvals that do not come back"
-      ],
-      "path": "LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool",
-      "startProject": "Start/UseAgentAsTool.csproj",
-      "solutionProject": "Solution/UseAgentAsTool.csproj",
-      "timeoutSeconds": 240,
-      "expectations": [
-        {
-          "id": "config",
-          "description": "Configuration loaded",
-          "pattern": "^Endpoint: \\S+"
-        },
-        {
-          "id": "scenario1-answer",
-          "description": "Scenario 1 - the after-sales expert answered the customer",
-          "pattern": "(?s)^AfterSalesExpert: \\S"
-        },
-        {
-          "id": "scenario1-approved",
-          "description": "Scenario 1 - the reviewer scored the answer of the expert and the code sent it to the customer",
-          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review: (?:[7-9]|10)/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\bsent\\b"
-        },
-        {
-          "id": "scenario1-held-back",
-          "description": "Scenario 1 - the wrong answer written by hand was held back by the decision of the code",
-          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review:[^\\n]*\\n(?:(?!^Quality review:).)*^Quality review: [1-6]/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\b(?:held|hold|human)\\b"
-        },
-        {
-          "id": "scenario1-usage",
-          "description": "Scenario 1 - token usage of each agent displayed",
-          "pattern": "(?is)\\bAfterSalesExpert\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+.*?\\bQualityReviewer\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+"
-        },
-        {
-          "id": "scenario2-tool-schema",
-          "description": "Scenario 2 - an agent turned into a tool takes a single query parameter",
-          "pattern": "^Tool ask_order_specialist: \\S[^\\n]*\\n\\s*Parameters: \\{[^\\n]*\\\"properties\\\":\\{\\\"query\\\":\\{[^{}]*\\}\\}"
-        },
-        {
-          "id": "scenario2-order",
-          "description": "Scenario 2 - the front desk asked the order specialist with a query that contains the order number",
-          "pattern": "(?im)^\\[Delegation\\] ask_order_specialist(?! returned)[^\\n]*\\bORD-1042\\b"
-        },
-        {
-          "id": "scenario2-after-sales",
-          "description": "Scenario 2 - the front desk asked the after-sales expert, who returned a text",
-          "pattern": "^\\[Delegation\\] ask_after_sales_expert returned: \\S"
-        },
-        {
-          "id": "scenario2-answer",
-          "description": "Scenario 2 - the front desk answered with the options given by the rules (replacement or refund)",
-          "pattern": "(?s)^FrontDesk: .*?(?i:replacement|refund)"
-        },
-        {
-          "id": "scenario2-usage",
-          "description": "Scenario 2 - token usage of the front desk displayed",
-          "pattern": "(?i)\\binput tokens:?\\s*\\d+"
-        },
-        {
-          "id": "scenario3-tool",
-          "description": "Scenario 3 - without options, the tool takes the name and the description of the agent",
-          "pattern": "^Tool TicketSpecialist: Keeps the support ticket"
-        },
-        {
-          "id": "scenario3-without-session",
-          "description": "Scenario 3 - with a new session for each call, the ticket lost the order number given in the first call",
-          "pattern": "^Ticket after the second call - a new session for each call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: no$"
-        },
-        {
-          "id": "scenario3-with-session",
-          "description": "Scenario 3 - with one session for every call, the ticket kept the order number given in the first call",
-          "pattern": "^Ticket after the second call - one session for every call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: yes$"
-        }
-      ],
-      "translations": {
-        "fr": {
-          "track": "Système multi-agents",
-          "title": "Confier une tâche à un autre agent",
-          "level": "Intermédiaire",
-          "summary": "Faites travailler des agents ensemble : déléguez par le code à un agent relecteur et décidez avec sa revue typée, laissez un agent d'accueil déléguer à des agents spécialistes transformés en outils, et gardez le contexte d'un spécialiste avec une session.",
-          "objectives": [
-            "Déléguer par le code : appeler directement un autre agent avec RunAsync<T> et décider avec son résultat typé",
-            "Vérifier un résultat renvoyé par un modèle avant que le code ne l'utilise",
-            "Déléguer par le modèle : transformer des agents en outils avec AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
-            "Lire les délégations d'une exécution : la requête écrite par le modèle et le texte renvoyé",
-            "Garder le contexte d'un spécialiste d'un appel à l'autre avec AsAIFunction(session: ...)",
-            "Connaître les limites d'un agent utilisé comme outil : une seule requête, du texte seulement, tokens invisibles, approbations qui ne remontent pas"
-          ],
-          "checks": {
-            "config": "Configuration chargée",
-            "scenario1-answer": "Scénario 1 - l'expert après-vente a répondu au client",
-            "scenario1-approved": "Scénario 1 - le relecteur a noté la réponse de l'expert et le code l'a envoyée au client",
-            "scenario1-held-back": "Scénario 1 - la réponse fausse écrite à la main a été retenue par la décision du code",
-            "scenario1-usage": "Scénario 1 - consommation de tokens de chaque agent affichée",
-            "scenario2-tool-schema": "Scénario 2 - un agent transformé en outil prend un seul paramètre query",
-            "scenario2-order": "Scénario 2 - l'accueil a interrogé le spécialiste des commandes avec une requête qui contient le numéro de commande",
-            "scenario2-after-sales": "Scénario 2 - l'accueil a interrogé l'expert après-vente, qui a renvoyé un texte",
-            "scenario2-answer": "Scénario 2 - l'accueil a répondu avec les options prévues par les règles (remplacement ou remboursement)",
-            "scenario2-usage": "Scénario 2 - consommation de tokens de l'accueil affichée",
-            "scenario3-tool": "Scénario 3 - sans options, l'outil reprend le nom et la description de l'agent",
-            "scenario3-without-session": "Scénario 3 - avec une nouvelle session à chaque appel, le ticket a perdu le numéro de commande donné au premier appel",
-            "scenario3-with-session": "Scénario 3 - avec une seule session pour tous les appels, le ticket a gardé le numéro de commande donné au premier appel"
-          }
-        }
-      }
-    },
-    {
-      "id": "multiagent-lab02",
-      "number": "02",
-      "track": "Multi-Agent System",
-      "title": "Sequential Orchestration: a Pipeline of Agents",
-      "summary": "Chain agents in a sequential workflow: build it with AgentWorkflowBuilder.BuildSequential, run it and follow its events, control the context each agent receives, and pause the pipeline until a tool call is approved.",
-      "level": "Intermediate",
-      "objectives": [
-        "Build a sequential workflow of agents with AgentWorkflowBuilder.BuildSequential",
-        "Run it with InProcessExecution.RunStreamingAsync and a TurnToken, and read its output from the WorkflowOutputEvent",
-        "Handle the errors of a run: ExecutorFailedEvent and WorkflowErrorEvent",
-        "Follow a run with its events: ExecutorInvokedEvent, AgentResponseUpdateEvent and the token usage of each agent",
-        "Choose the context passed between agents: the whole conversation (default) or the previous agent only (chainOnlyAgentResponses)",
-        "Pause the pipeline on a tool that requires an approval (RequestInfoEvent) and resume it with SendResponseAsync"
-      ],
-      "path": "LearningLabs/MultiAgentSystem/Lab02_OrchestrationSequential",
-      "startProject": "Start/OrchestrationSequential.csproj",
-      "solutionProject": "Solution/OrchestrationSequential.csproj",
-      "timeoutSeconds": 300,
-      "expectations": [
-        {
-          "id": "config",
-          "description": "Configuration loaded",
-          "pattern": "^Endpoint: \\S+"
-        },
-        {
-          "id": "scenario1-pipeline",
-          "description": "Scenario 1 - the sequential workflow runs the summarizer, then the action items extractor, then the output executor",
-          "pattern": "^Workflow meeting-notes: MeetingSummarizer -> ActionItemsExtractor -> OutputMessages$"
-        },
-        {
-          "id": "scenario1-output",
-          "description": "Scenario 1 - the output of the workflow is the conversation: the transcript, then the message of each agent in order",
-          "pattern": "(?s)^Workflow meeting-notes: .*?^Workflow output \\(3 messages\\):\\n  \\[user\\] \\(input\\): Meeting Transcript[^\\n]*\\n  \\[assistant\\] MeetingSummarizer: \\S.*?^  \\[assistant\\] ActionItemsExtractor: 1\\. \\S"
-        },
-        {
-          "id": "scenario2-full-context",
-          "description": "Scenario 2 - by default, the last agent received the whole conversation: the input and the messages of the two previous agents",
-          "pattern": "^\\[Context\\] Translator received 3 messages: user, ActionItemsExtractor, FollowUpWriter$"
-        },
-        {
-          "id": "scenario2-full-output",
-          "description": "Scenario 2 - by default, the output of the workflow contains the whole conversation",
-          "pattern": "^Workflow output \\(4 messages\\): user, ActionItemsExtractor, FollowUpWriter, Translator$"
-        },
-        {
-          "id": "scenario2-chained-context",
-          "description": "Scenario 2 - with chainOnlyAgentResponses, each agent received only the messages of the previous agent",
-          "pattern": "^\\[Context\\] FollowUpWriter received 1 message: ActionItemsExtractor\\n(?:[^\\n]*\\n){4}\\[Context\\] Translator received 1 message: FollowUpWriter$"
-        },
-        {
-          "id": "scenario2-chained-output",
-          "description": "Scenario 2 - with chainOnlyAgentResponses, the output of the workflow contains only the messages of the last agent",
-          "pattern": "^Workflow output \\(1 message\\): Translator$"
-        },
-        {
-          "id": "scenario2-translation",
-          "description": "Scenario 2 - the last agent translated the follow-up email into French",
-          "pattern": "(?s)^Translator:\\n.*?(?i:\\b(?:objet|cordialement|équipe|réunion)\\b)"
-        },
-        {
-          "id": "scenario2-usage",
-          "description": "Scenario 2 - token usage of each agent displayed, for the two runs",
-          "pattern": "(?s)Token Usage \\(Translator\\):\\n\\s*Input tokens: \\d+.*?Token Usage \\(Translator\\):\\n\\s*Input tokens: \\d+"
-        },
-        {
-          "id": "scenario3-pipeline",
-          "description": "Scenario 3 - the sender is the last step of the pipeline",
-          "pattern": "^Workflow meeting-minutes: ActionItemsExtractor -> FollowUpWriter -> MinutesSender -> OutputMessages$"
-        },
-        {
-          "id": "scenario3-paused",
-          "description": "Scenario 3 - the call of send_email waited for an approval, and the run paused for it",
-          "pattern": "^\\[Approval\\] send_email\\(to: \"[^\"\\n]+\"[^\\n]*\\) waits for an approval\\nRun status: PendingRequests$"
-        },
-        {
-          "id": "scenario3-sent",
-          "description": "Scenario 3 - once approved, the workflow resumed and the email was sent",
-          "pattern": "(?s)^\\[Approval\\] send_email: approved$.*?^  \\[tool\\] MinutesSender: \\(result: Email sent to "
-        },
-        {
-          "id": "scenario3-done",
-          "description": "Scenario 3 - the run has nothing left to do after the output",
-          "pattern": "(?s)\\(result: Email sent to .*?^Run status: Idle$"
-        }
-      ],
-      "translations": {
-        "fr": {
-          "track": "Système multi-agents",
-          "title": "Orchestration séquentielle : un pipeline d'agents",
-          "level": "Intermédiaire",
-          "summary": "Enchaînez des agents dans un workflow séquentiel : construisez-le avec AgentWorkflowBuilder.BuildSequential, exécutez-le et suivez ses événements, choisissez le contexte que reçoit chaque agent, et mettez le pipeline en pause jusqu'à l'approbation d'un appel d'outil.",
-          "objectives": [
-            "Construire un workflow séquentiel d'agents avec AgentWorkflowBuilder.BuildSequential",
-            "L'exécuter avec InProcessExecution.RunStreamingAsync et un TurnToken, et lire sa sortie dans le WorkflowOutputEvent",
-            "Traiter les erreurs d'une exécution : ExecutorFailedEvent et WorkflowErrorEvent",
-            "Suivre une exécution par ses événements : ExecutorInvokedEvent, AgentResponseUpdateEvent et la consommation de tokens de chaque agent",
-            "Choisir le contexte transmis entre agents : toute la conversation (par défaut) ou l'agent précédent seulement (chainOnlyAgentResponses)",
-            "Mettre le pipeline en pause sur un outil soumis à approbation (RequestInfoEvent) et le reprendre avec SendResponseAsync"
-          ],
-          "checks": {
-            "config": "Configuration chargée",
-            "scenario1-pipeline": "Scénario 1 - le workflow séquentiel exécute le résumeur, puis l'extracteur d'actions, puis l'exécuteur de sortie",
-            "scenario1-output": "Scénario 1 - la sortie du workflow est la conversation : la transcription, puis le message de chaque agent dans l'ordre",
-            "scenario2-full-context": "Scénario 2 - par défaut, le dernier agent a reçu toute la conversation : l'entrée et les messages des deux agents précédents",
-            "scenario2-full-output": "Scénario 2 - par défaut, la sortie du workflow contient toute la conversation",
-            "scenario2-chained-context": "Scénario 2 - avec chainOnlyAgentResponses, chaque agent n'a reçu que les messages de l'agent précédent",
-            "scenario2-chained-output": "Scénario 2 - avec chainOnlyAgentResponses, la sortie du workflow ne contient que les messages du dernier agent",
-            "scenario2-translation": "Scénario 2 - le dernier agent a traduit l'e-mail de suivi en français",
-            "scenario2-usage": "Scénario 2 - consommation de tokens de chaque agent affichée, pour les deux exécutions",
-            "scenario3-pipeline": "Scénario 3 - l'expéditeur est la dernière étape du pipeline",
-            "scenario3-paused": "Scénario 3 - l'appel de send_email a attendu une approbation, et l'exécution s'est mise en pause",
-            "scenario3-sent": "Scénario 3 - une fois approuvé, le workflow a repris et l'e-mail a été envoyé",
-            "scenario3-done": "Scénario 3 - l'exécution n'a plus rien à faire après la sortie"
-          }
-        }
-      }
-    },
-    {
-      "id": "multiagent-lab03",
-      "number": "03",
-      "track": "Multi-Agent System",
-      "title": "Concurrent Orchestration: Agents in Parallel",
-      "summary": "Run agents in parallel on the same input with AgentWorkflowBuilder.BuildConcurrent: read the aggregated answers, measure the time saved and what each agent receives, then combine the answers with your own aggregator and a reply writer.",
-      "level": "Intermediate",
-      "objectives": [
-        "Build a concurrent workflow of agents with AgentWorkflowBuilder.BuildConcurrent: fan-out to every agent, fan-in to an aggregator",
-        "Run it with InProcessExecution.RunStreamingAsync and a TurnToken, and read the aggregated output (one answer per agent)",
-        "Handle the errors of a run: one failing agent stops the whole workflow",
-        "Show with the events that the agents work at the same time, each with the input only, and measure their time and cost",
-        "Write a custom aggregator: one list per agent, in the order they finished, turned into the output you need",
-        "Combine the independent answers into one reply with an agent that runs once they have all answered"
-      ],
-      "path": "LearningLabs/MultiAgentSystem/Lab03_OrchestrationConcurrent",
-      "startProject": "Start/OrchestrationConcurrent.csproj",
-      "solutionProject": "Solution/OrchestrationConcurrent.csproj",
-      "timeoutSeconds": 240,
-      "expectations": [
-        {
-          "id": "config",
-          "description": "Configuration loaded",
-          "pattern": "^Endpoint: \\S+"
-        },
-        {
-          "id": "scenario1-graph",
-          "description": "Scenario 1 - the concurrent workflow fans out from Start to the three specialists, then fans in to ConcurrentEnd",
-          "pattern": "^Workflow after-sales: Start -> \\[ReturnsSpecialist \\| RefundSpecialist \\| ShippingSpecialist\\] -> \\[Batcher/ReturnsSpecialist \\| Batcher/RefundSpecialist \\| Batcher/ShippingSpecialist\\] -> ConcurrentEnd$"
-        },
-        {
-          "id": "scenario1-output",
-          "description": "Scenario 1 - the aggregated output contains one answer per specialist, and not the input",
-          "pattern": "^Workflow output \\(3 messages\\):\\n  \\[assistant\\] (\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(?!\\2:)\\w+Specialist: "
-        },
-        {
-          "id": "scenario2-context",
-          "description": "Scenario 2 - each specialist received only the customer message: the agents do not see each other's answers",
-          "pattern": "(?s)(?=.*^\\[Context\\] ReturnsSpecialist received 1 message: user$)(?=.*^\\[Context\\] RefundSpecialist received 1 message: user$)(?=.*^\\[Context\\] ShippingSpecialist received 1 message: user$)"
-        },
-        {
-          "id": "scenario2-parallel",
-          "description": "Scenario 2 - the turns of the agents overlapped: they worked at the same time",
-          "pattern": "^\\[Timing\\] All the agents worked at the same time: yes$"
-        },
-        {
-          "id": "scenario2-usage",
-          "description": "Scenario 2 - token usage of each specialist displayed",
-          "pattern": "(?s)(?:Token Usage \\((?:Returns|Refund|Shipping)Specialist\\):\\n\\s*Input tokens: \\d+.*?){3}"
-        },
-        {
-          "id": "scenario2-order",
-          "description": "Scenario 2 - the output lists the three answers in the order they arrived",
-          "pattern": "^Workflow output \\(3 messages, in the order they arrived\\): \\w+Specialist, \\w+Specialist, \\w+Specialist$"
-        },
-        {
-          "id": "scenario3-merged",
-          "description": "Scenario 3 - the custom aggregator merged the three answers into one message, in the order of the specialists",
-          "pattern": "(?s)^Workflow output \\(1 message\\):\\n  \\[user\\] Specialists: [^\\n]*\\n.*?^      ReturnsSpecialist: .*?^      RefundSpecialist: .*?^      ShippingSpecialist: "
-        },
-        {
-          "id": "scenario3-reply",
-          "description": "Scenario 3 - the reply writer answered the customer about the missing charger, with its token usage",
-          "pattern": "(?s)^ReplyWriter: .*?(?i:charger).*?^Token Usage \\(ReplyWriter\\):\\n\\s*Input tokens: \\d+"
-        }
-      ],
-      "translations": {
-        "fr": {
-          "track": "Système multi-agents",
-          "title": "Orchestration concurrente : des agents en parallèle",
-          "level": "Intermédiaire",
-          "summary": "Faites travailler des agents en parallèle sur la même entrée avec AgentWorkflowBuilder.BuildConcurrent : lisez les réponses agrégées, mesurez le temps gagné et ce que reçoit chaque agent, puis combinez les réponses avec votre propre agrégateur et un agent rédacteur.",
-          "objectives": [
-            "Construire un workflow concurrent d'agents avec AgentWorkflowBuilder.BuildConcurrent : diffusion vers chaque agent, regroupement vers un agrégateur",
-            "L'exécuter avec InProcessExecution.RunStreamingAsync et un TurnToken, et lire la sortie agrégée (une réponse par agent)",
-            "Traiter les erreurs d'une exécution : un seul agent en échec arrête tout le workflow",
-            "Montrer avec les événements que les agents travaillent en même temps, chacun avec la seule entrée, et mesurer leur temps et leur coût",
-            "Écrire un agrégateur personnalisé : une liste par agent, dans l'ordre où ils ont fini, transformée en la sortie voulue",
-            "Combiner les réponses indépendantes en une seule réponse avec un agent qui s'exécute une fois qu'ils ont tous répondu"
-          ],
-          "checks": {
-            "config": "Configuration chargée",
-            "scenario1-graph": "Scénario 1 - le workflow concurrent diffuse de Start vers les trois spécialistes, puis regroupe vers ConcurrentEnd",
-            "scenario1-output": "Scénario 1 - la sortie agrégée contient une réponse par spécialiste, et pas l'entrée",
-            "scenario2-context": "Scénario 2 - chaque spécialiste n'a reçu que le message du client : les agents ne voient pas les réponses des autres",
-            "scenario2-parallel": "Scénario 2 - les tours des agents se sont chevauchés : ils ont travaillé en même temps",
-            "scenario2-usage": "Scénario 2 - consommation de tokens de chaque spécialiste affichée",
-            "scenario2-order": "Scénario 2 - la sortie liste les trois réponses dans leur ordre d'arrivée",
-            "scenario3-merged": "Scénario 3 - l'agrégateur personnalisé a fusionné les trois réponses en un message, dans l'ordre des spécialistes",
-            "scenario3-reply": "Scénario 3 - le rédacteur a répondu au client à propos du chargeur manquant, avec sa consommation de tokens"
-          }
-        }
-      }
-    },
-    {
       "id": "azureopenai-lab06-server",
       "number": "06",
       "track": "Azure OpenAI",
@@ -2053,6 +1723,336 @@
             "comparison-tool-result": "Comparaison - le résultat d'outil CSV est plus petit que le JSON",
             "comparison-input": "Comparaison - le run CSV a consommé moins de tokens d'entrée que le run JSON",
             "comparison-output": "Comparaison - le run CSV a consommé moins de tokens de sortie que le run JSON"
+          }
+        }
+      }
+    },
+    {
+      "id": "multiagent-lab01",
+      "number": "01",
+      "track": "Multi-Agent System",
+      "title": "Delegate a Task to Another Agent",
+      "summary": "Make agents work together: delegate by code to a reviewer agent and decide with its typed review, let a front desk agent delegate to specialist agents turned into tools, and keep the context of a specialist with a session.",
+      "level": "Intermediate",
+      "objectives": [
+        "Delegate by code: call another agent directly with RunAsync<T> and decide with its typed result",
+        "Check a result returned by a model before the code uses it",
+        "Delegate by the model: turn agents into tools with AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
+        "Read the delegations of a run: the query written by the model and the text returned",
+        "Keep the context of a specialist across calls with AsAIFunction(session: ...)",
+        "Know the limits of an agent used as a tool: single query, text only, hidden token usage, approvals that do not come back"
+      ],
+      "path": "LearningLabs/MultiAgentSystem/Lab01-UseAgentAsTool",
+      "startProject": "Start/UseAgentAsTool.csproj",
+      "solutionProject": "Solution/UseAgentAsTool.csproj",
+      "timeoutSeconds": 240,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-answer",
+          "description": "Scenario 1 - the after-sales expert answered the customer",
+          "pattern": "(?s)^AfterSalesExpert: \\S"
+        },
+        {
+          "id": "scenario1-approved",
+          "description": "Scenario 1 - the reviewer scored the answer of the expert and the code sent it to the customer",
+          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review: (?:[7-9]|10)/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\bsent\\b"
+        },
+        {
+          "id": "scenario1-held-back",
+          "description": "Scenario 1 - the wrong answer written by hand was held back by the decision of the code",
+          "pattern": "(?is)\\A(?:(?!^Quality review:).)*^Quality review:[^\\n]*\\n(?:(?!^Quality review:).)*^Quality review: [1-6]/10\\b(?:(?!^Quality review:).)*?^(?!\\s+Feedback:)[^\\n]*\\b(?:held|hold|human)\\b"
+        },
+        {
+          "id": "scenario1-usage",
+          "description": "Scenario 1 - token usage of each agent displayed",
+          "pattern": "(?is)\\bAfterSalesExpert\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+.*?\\bQualityReviewer\\b[^\\n]*\\n\\s*input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario2-tool-schema",
+          "description": "Scenario 2 - an agent turned into a tool takes a single query parameter",
+          "pattern": "^Tool ask_order_specialist: \\S[^\\n]*\\n\\s*Parameters: \\{[^\\n]*\\\"properties\\\":\\{\\\"query\\\":\\{[^{}]*\\}\\}"
+        },
+        {
+          "id": "scenario2-order",
+          "description": "Scenario 2 - the front desk asked the order specialist with a query that contains the order number",
+          "pattern": "(?im)^\\[Delegation\\] ask_order_specialist(?! returned)[^\\n]*\\bORD-1042\\b"
+        },
+        {
+          "id": "scenario2-after-sales",
+          "description": "Scenario 2 - the front desk asked the after-sales expert, who returned a text",
+          "pattern": "^\\[Delegation\\] ask_after_sales_expert returned: \\S"
+        },
+        {
+          "id": "scenario2-answer",
+          "description": "Scenario 2 - the front desk answered with the options given by the rules (replacement or refund)",
+          "pattern": "(?s)^FrontDesk: .*?(?i:replacement|refund)"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage of the front desk displayed",
+          "pattern": "(?i)\\binput tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario3-tool",
+          "description": "Scenario 3 - without options, the tool takes the name and the description of the agent",
+          "pattern": "^Tool TicketSpecialist: Keeps the support ticket"
+        },
+        {
+          "id": "scenario3-without-session",
+          "description": "Scenario 3 - with a new session for each call, the ticket lost the order number given in the first call",
+          "pattern": "^Ticket after the second call - a new session for each call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: no$"
+        },
+        {
+          "id": "scenario3-with-session",
+          "description": "Scenario 3 - with one session for every call, the ticket kept the order number given in the first call",
+          "pattern": "^Ticket after the second call - one session for every call:\\n(?:  [^\\n]*\\n)*?  -> Order number of the first call \\(ORD-1042\\) kept: yes$"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Système multi-agents",
+          "title": "Confier une tâche à un autre agent",
+          "level": "Intermédiaire",
+          "summary": "Faites travailler des agents ensemble : déléguez par le code à un agent relecteur et décidez avec sa revue typée, laissez un agent d'accueil déléguer à des agents spécialistes transformés en outils, et gardez le contexte d'un spécialiste avec une session.",
+          "objectives": [
+            "Déléguer par le code : appeler directement un autre agent avec RunAsync<T> et décider avec son résultat typé",
+            "Vérifier un résultat renvoyé par un modèle avant que le code ne l'utilise",
+            "Déléguer par le modèle : transformer des agents en outils avec AsAIFunction(new AIFunctionFactoryOptions { Name, Description })",
+            "Lire les délégations d'une exécution : la requête écrite par le modèle et le texte renvoyé",
+            "Garder le contexte d'un spécialiste d'un appel à l'autre avec AsAIFunction(session: ...)",
+            "Connaître les limites d'un agent utilisé comme outil : une seule requête, du texte seulement, tokens invisibles, approbations qui ne remontent pas"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-answer": "Scénario 1 - l'expert après-vente a répondu au client",
+            "scenario1-approved": "Scénario 1 - le relecteur a noté la réponse de l'expert et le code l'a envoyée au client",
+            "scenario1-held-back": "Scénario 1 - la réponse fausse écrite à la main a été retenue par la décision du code",
+            "scenario1-usage": "Scénario 1 - consommation de tokens de chaque agent affichée",
+            "scenario2-tool-schema": "Scénario 2 - un agent transformé en outil prend un seul paramètre query",
+            "scenario2-order": "Scénario 2 - l'accueil a interrogé le spécialiste des commandes avec une requête qui contient le numéro de commande",
+            "scenario2-after-sales": "Scénario 2 - l'accueil a interrogé l'expert après-vente, qui a renvoyé un texte",
+            "scenario2-answer": "Scénario 2 - l'accueil a répondu avec les options prévues par les règles (remplacement ou remboursement)",
+            "scenario2-usage": "Scénario 2 - consommation de tokens de l'accueil affichée",
+            "scenario3-tool": "Scénario 3 - sans options, l'outil reprend le nom et la description de l'agent",
+            "scenario3-without-session": "Scénario 3 - avec une nouvelle session à chaque appel, le ticket a perdu le numéro de commande donné au premier appel",
+            "scenario3-with-session": "Scénario 3 - avec une seule session pour tous les appels, le ticket a gardé le numéro de commande donné au premier appel"
+          }
+        }
+      }
+    },
+    {
+      "id": "multiagent-lab02",
+      "number": "02",
+      "track": "Multi-Agent System",
+      "title": "Sequential Orchestration: a Pipeline of Agents",
+      "summary": "Chain agents in a sequential workflow: build it with AgentWorkflowBuilder.BuildSequential, run it and follow its events, control the context each agent receives, and pause the pipeline until a tool call is approved.",
+      "level": "Intermediate",
+      "objectives": [
+        "Build a sequential workflow of agents with AgentWorkflowBuilder.BuildSequential",
+        "Run it with InProcessExecution.RunStreamingAsync and a TurnToken, and read its output from the WorkflowOutputEvent",
+        "Handle the errors of a run: ExecutorFailedEvent and WorkflowErrorEvent",
+        "Follow a run with its events: ExecutorInvokedEvent, AgentResponseUpdateEvent and the token usage of each agent",
+        "Choose the context passed between agents: the whole conversation (default) or the previous agent only (chainOnlyAgentResponses)",
+        "Pause the pipeline on a tool that requires an approval (RequestInfoEvent) and resume it with SendResponseAsync"
+      ],
+      "path": "LearningLabs/MultiAgentSystem/Lab02_OrchestrationSequential",
+      "startProject": "Start/OrchestrationSequential.csproj",
+      "solutionProject": "Solution/OrchestrationSequential.csproj",
+      "timeoutSeconds": 300,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-pipeline",
+          "description": "Scenario 1 - the sequential workflow runs the summarizer, then the action items extractor, then the output executor",
+          "pattern": "^Workflow meeting-notes: MeetingSummarizer -> ActionItemsExtractor -> OutputMessages$"
+        },
+        {
+          "id": "scenario1-output",
+          "description": "Scenario 1 - the output of the workflow is the conversation: the transcript, then the message of each agent in order",
+          "pattern": "(?s)^Workflow meeting-notes: .*?^Workflow output \\(3 messages\\):\\n  \\[user\\] \\(input\\): Meeting Transcript[^\\n]*\\n  \\[assistant\\] MeetingSummarizer: \\S.*?^  \\[assistant\\] ActionItemsExtractor: 1\\. \\S"
+        },
+        {
+          "id": "scenario2-full-context",
+          "description": "Scenario 2 - by default, the last agent received the whole conversation: the input and the messages of the two previous agents",
+          "pattern": "^\\[Context\\] Translator received 3 messages: user, ActionItemsExtractor, FollowUpWriter$"
+        },
+        {
+          "id": "scenario2-full-output",
+          "description": "Scenario 2 - by default, the output of the workflow contains the whole conversation",
+          "pattern": "^Workflow output \\(4 messages\\): user, ActionItemsExtractor, FollowUpWriter, Translator$"
+        },
+        {
+          "id": "scenario2-chained-context",
+          "description": "Scenario 2 - with chainOnlyAgentResponses, each agent received only the messages of the previous agent",
+          "pattern": "^\\[Context\\] FollowUpWriter received 1 message: ActionItemsExtractor\\n(?:[^\\n]*\\n){4}\\[Context\\] Translator received 1 message: FollowUpWriter$"
+        },
+        {
+          "id": "scenario2-chained-output",
+          "description": "Scenario 2 - with chainOnlyAgentResponses, the output of the workflow contains only the messages of the last agent",
+          "pattern": "^Workflow output \\(1 message\\): Translator$"
+        },
+        {
+          "id": "scenario2-translation",
+          "description": "Scenario 2 - the last agent translated the follow-up email into French",
+          "pattern": "(?s)^Translator:\\n.*?(?i:\\b(?:objet|cordialement|équipe|réunion)\\b)"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage of each agent displayed, for the two runs",
+          "pattern": "(?s)Token Usage \\(Translator\\):\\n\\s*Input tokens: \\d+.*?Token Usage \\(Translator\\):\\n\\s*Input tokens: \\d+"
+        },
+        {
+          "id": "scenario3-pipeline",
+          "description": "Scenario 3 - the sender is the last step of the pipeline",
+          "pattern": "^Workflow meeting-minutes: ActionItemsExtractor -> FollowUpWriter -> MinutesSender -> OutputMessages$"
+        },
+        {
+          "id": "scenario3-paused",
+          "description": "Scenario 3 - the call of send_email waited for an approval, and the run paused for it",
+          "pattern": "^\\[Approval\\] send_email\\(to: \"[^\"\\n]+\"[^\\n]*\\) waits for an approval\\nRun status: PendingRequests$"
+        },
+        {
+          "id": "scenario3-sent",
+          "description": "Scenario 3 - once approved, the workflow resumed and the email was sent",
+          "pattern": "(?s)^\\[Approval\\] send_email: approved$.*?^  \\[tool\\] MinutesSender: \\(result: Email sent to "
+        },
+        {
+          "id": "scenario3-done",
+          "description": "Scenario 3 - the run has nothing left to do after the output",
+          "pattern": "(?s)\\(result: Email sent to .*?^Run status: Idle$"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Système multi-agents",
+          "title": "Orchestration séquentielle : un pipeline d'agents",
+          "level": "Intermédiaire",
+          "summary": "Enchaînez des agents dans un workflow séquentiel : construisez-le avec AgentWorkflowBuilder.BuildSequential, exécutez-le et suivez ses événements, choisissez le contexte que reçoit chaque agent, et mettez le pipeline en pause jusqu'à l'approbation d'un appel d'outil.",
+          "objectives": [
+            "Construire un workflow séquentiel d'agents avec AgentWorkflowBuilder.BuildSequential",
+            "L'exécuter avec InProcessExecution.RunStreamingAsync et un TurnToken, et lire sa sortie dans le WorkflowOutputEvent",
+            "Traiter les erreurs d'une exécution : ExecutorFailedEvent et WorkflowErrorEvent",
+            "Suivre une exécution par ses événements : ExecutorInvokedEvent, AgentResponseUpdateEvent et la consommation de tokens de chaque agent",
+            "Choisir le contexte transmis entre agents : toute la conversation (par défaut) ou l'agent précédent seulement (chainOnlyAgentResponses)",
+            "Mettre le pipeline en pause sur un outil soumis à approbation (RequestInfoEvent) et le reprendre avec SendResponseAsync"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-pipeline": "Scénario 1 - le workflow séquentiel exécute le résumeur, puis l'extracteur d'actions, puis l'exécuteur de sortie",
+            "scenario1-output": "Scénario 1 - la sortie du workflow est la conversation : la transcription, puis le message de chaque agent dans l'ordre",
+            "scenario2-full-context": "Scénario 2 - par défaut, le dernier agent a reçu toute la conversation : l'entrée et les messages des deux agents précédents",
+            "scenario2-full-output": "Scénario 2 - par défaut, la sortie du workflow contient toute la conversation",
+            "scenario2-chained-context": "Scénario 2 - avec chainOnlyAgentResponses, chaque agent n'a reçu que les messages de l'agent précédent",
+            "scenario2-chained-output": "Scénario 2 - avec chainOnlyAgentResponses, la sortie du workflow ne contient que les messages du dernier agent",
+            "scenario2-translation": "Scénario 2 - le dernier agent a traduit l'e-mail de suivi en français",
+            "scenario2-usage": "Scénario 2 - consommation de tokens de chaque agent affichée, pour les deux exécutions",
+            "scenario3-pipeline": "Scénario 3 - l'expéditeur est la dernière étape du pipeline",
+            "scenario3-paused": "Scénario 3 - l'appel de send_email a attendu une approbation, et l'exécution s'est mise en pause",
+            "scenario3-sent": "Scénario 3 - une fois approuvé, le workflow a repris et l'e-mail a été envoyé",
+            "scenario3-done": "Scénario 3 - l'exécution n'a plus rien à faire après la sortie"
+          }
+        }
+      }
+    },
+    {
+      "id": "multiagent-lab03",
+      "number": "03",
+      "track": "Multi-Agent System",
+      "title": "Concurrent Orchestration: Agents in Parallel",
+      "summary": "Run agents in parallel on the same input with AgentWorkflowBuilder.BuildConcurrent: read the aggregated answers, measure the time saved and what each agent receives, then combine the answers with your own aggregator and a reply writer.",
+      "level": "Intermediate",
+      "objectives": [
+        "Build a concurrent workflow of agents with AgentWorkflowBuilder.BuildConcurrent: fan-out to every agent, fan-in to an aggregator",
+        "Run it with InProcessExecution.RunStreamingAsync and a TurnToken, and read the aggregated output (one answer per agent)",
+        "Handle the errors of a run: one failing agent stops the whole workflow",
+        "Show with the events that the agents work at the same time, each with the input only, and measure their time and cost",
+        "Write a custom aggregator: one list per agent, in the order they finished, turned into the output you need",
+        "Combine the independent answers into one reply with an agent that runs once they have all answered"
+      ],
+      "path": "LearningLabs/MultiAgentSystem/Lab03_OrchestrationConcurrent",
+      "startProject": "Start/OrchestrationConcurrent.csproj",
+      "solutionProject": "Solution/OrchestrationConcurrent.csproj",
+      "timeoutSeconds": 240,
+      "expectations": [
+        {
+          "id": "config",
+          "description": "Configuration loaded",
+          "pattern": "^Endpoint: \\S+"
+        },
+        {
+          "id": "scenario1-graph",
+          "description": "Scenario 1 - the concurrent workflow fans out from Start to the three specialists, then fans in to ConcurrentEnd",
+          "pattern": "^Workflow after-sales: Start -> \\[ReturnsSpecialist \\| RefundSpecialist \\| ShippingSpecialist\\] -> \\[Batcher/ReturnsSpecialist \\| Batcher/RefundSpecialist \\| Batcher/ShippingSpecialist\\] -> ConcurrentEnd$"
+        },
+        {
+          "id": "scenario1-output",
+          "description": "Scenario 1 - the aggregated output contains one answer per specialist, and not the input",
+          "pattern": "^Workflow output \\(3 messages\\):\\n  \\[assistant\\] (\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(\\w+Specialist): [^\\n]*\\n(?:      [^\\n]*\\n)*  \\[assistant\\] (?!\\1:)(?!\\2:)\\w+Specialist: "
+        },
+        {
+          "id": "scenario2-context",
+          "description": "Scenario 2 - each specialist received only the customer message: the agents do not see each other's answers",
+          "pattern": "(?s)(?=.*^\\[Context\\] ReturnsSpecialist received 1 message: user$)(?=.*^\\[Context\\] RefundSpecialist received 1 message: user$)(?=.*^\\[Context\\] ShippingSpecialist received 1 message: user$)"
+        },
+        {
+          "id": "scenario2-parallel",
+          "description": "Scenario 2 - the turns of the agents overlapped: they worked at the same time",
+          "pattern": "^\\[Timing\\] All the agents worked at the same time: yes$"
+        },
+        {
+          "id": "scenario2-usage",
+          "description": "Scenario 2 - token usage of each specialist displayed",
+          "pattern": "(?s)(?:Token Usage \\((?:Returns|Refund|Shipping)Specialist\\):\\n\\s*Input tokens: \\d+.*?){3}"
+        },
+        {
+          "id": "scenario2-order",
+          "description": "Scenario 2 - the output lists the three answers in the order they arrived",
+          "pattern": "^Workflow output \\(3 messages, in the order they arrived\\): \\w+Specialist, \\w+Specialist, \\w+Specialist$"
+        },
+        {
+          "id": "scenario3-merged",
+          "description": "Scenario 3 - the custom aggregator merged the three answers into one message, in the order of the specialists",
+          "pattern": "(?s)^Workflow output \\(1 message\\):\\n  \\[user\\] Specialists: [^\\n]*\\n.*?^      ReturnsSpecialist: .*?^      RefundSpecialist: .*?^      ShippingSpecialist: "
+        },
+        {
+          "id": "scenario3-reply",
+          "description": "Scenario 3 - the reply writer answered the customer about the missing charger, with its token usage",
+          "pattern": "(?s)^ReplyWriter: .*?(?i:charger).*?^Token Usage \\(ReplyWriter\\):\\n\\s*Input tokens: \\d+"
+        }
+      ],
+      "translations": {
+        "fr": {
+          "track": "Système multi-agents",
+          "title": "Orchestration concurrente : des agents en parallèle",
+          "level": "Intermédiaire",
+          "summary": "Faites travailler des agents en parallèle sur la même entrée avec AgentWorkflowBuilder.BuildConcurrent : lisez les réponses agrégées, mesurez le temps gagné et ce que reçoit chaque agent, puis combinez les réponses avec votre propre agrégateur et un agent rédacteur.",
+          "objectives": [
+            "Construire un workflow concurrent d'agents avec AgentWorkflowBuilder.BuildConcurrent : diffusion vers chaque agent, regroupement vers un agrégateur",
+            "L'exécuter avec InProcessExecution.RunStreamingAsync et un TurnToken, et lire la sortie agrégée (une réponse par agent)",
+            "Traiter les erreurs d'une exécution : un seul agent en échec arrête tout le workflow",
+            "Montrer avec les événements que les agents travaillent en même temps, chacun avec la seule entrée, et mesurer leur temps et leur coût",
+            "Écrire un agrégateur personnalisé : une liste par agent, dans l'ordre où ils ont fini, transformée en la sortie voulue",
+            "Combiner les réponses indépendantes en une seule réponse avec un agent qui s'exécute une fois qu'ils ont tous répondu"
+          ],
+          "checks": {
+            "config": "Configuration chargée",
+            "scenario1-graph": "Scénario 1 - le workflow concurrent diffuse de Start vers les trois spécialistes, puis regroupe vers ConcurrentEnd",
+            "scenario1-output": "Scénario 1 - la sortie agrégée contient une réponse par spécialiste, et pas l'entrée",
+            "scenario2-context": "Scénario 2 - chaque spécialiste n'a reçu que le message du client : les agents ne voient pas les réponses des autres",
+            "scenario2-parallel": "Scénario 2 - les tours des agents se sont chevauchés : ils ont travaillé en même temps",
+            "scenario2-usage": "Scénario 2 - consommation de tokens de chaque spécialiste affichée",
+            "scenario2-order": "Scénario 2 - la sortie liste les trois réponses dans leur ordre d'arrivée",
+            "scenario3-merged": "Scénario 3 - l'agrégateur personnalisé a fusionné les trois réponses en un message, dans l'ordre des spécialistes",
+            "scenario3-reply": "Scénario 3 - le rédacteur a répondu au client à propos du chargeur manquant, avec sa consommation de tokens"
           }
         }
       }

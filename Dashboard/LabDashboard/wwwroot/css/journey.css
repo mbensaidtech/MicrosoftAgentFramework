@@ -71,7 +71,11 @@
 .jr-rules summary:hover { color: color-mix(in srgb, var(--acc) 80%, var(--txt)); }
 .jr-rules p { margin: 8px 0 0; line-height: 1.55; color: var(--txt3); }
 
-/* ---------- Trajectory: one group per level, one chip per exercise ---------- */
+/* ---------- Trajectory: one section per track (its own path), one group per level, one chip per exercise ---------- */
+.jr-tracks { display: grid; gap: 18px; }
+.jr-track { min-width: 0; }
+.jr-track + .jr-track { padding-top: 16px; border-top: 1px solid var(--line); }
+.jr-track-name { margin: 0 0 12px; font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--txt3); }
 .jr-groups { display: grid; gap: 16px; }
 .jr-group { min-width: 0; }
 .jr-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
@@ -178,6 +182,8 @@
 /* Two columns: figures and mission side by side, the trajectory below. */
 @container journey (min-width: 560px) {
   .journey-body { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "summary mission" "path path" "badges badges"; }
+  .jr-tracks { display: flex; flex-wrap: wrap; gap: 16px 36px; }
+  .jr-track + .jr-track { padding-top: 0; border-top: 0; }
   .jr-groups { display: flex; flex-wrap: wrap; gap: 14px 28px; }
   .jr-chips { gap: 6px; }
 }

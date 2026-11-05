@@ -74,6 +74,16 @@ function levelText(milestone) {
   return catalogLab(milestone.labIds[0])?.translations?.[language()]?.level ?? milestone.level;
 }
 
+const sameTrack = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Track names (Azure OpenAI, Multi-Agent System...) come from the lab translations of the catalog. */
+function trackText(track) {
+  return journey.labs.find((lab) => sameTrack(lab.track, track))?.translations?.[language()]?.track ?? track;
+}
+
+/** A level exists in several tracks: named with its track wherever the track heading is not next to it. */
+const milestoneName = (milestone) => `${trackText(milestone.track)} · ${levelText(milestone)}`;
+
 const checksText = (lab) => t("journey.state.checks", { passed: lab.bestChecks, total: lab.totalChecks });
 
 function stateText(lab) {
@@ -317,19 +327,34 @@ function renderRules() {
   return rules;
 }
 
-/** Trajectory: one group per level, one chip per exercise in catalog order. */
+/**
+ * Trajectory: one section per track (its own learning path, numbered from 1), one group per level inside it, one chip per
+ * exercise in the order of the path. The server sends the milestones grouped by track.
+ */
 function renderPath(model) {
   const section = tile("path");
   section.setAttribute("aria-label", t("journey.pathAria"));
-  const groups = el("div", "jr-groups");
+  const tracks = el("div", "jr-tracks");
+  let groups = null;
+  let track = null;
   for (const milestone of model.milestones) {
+    if (track === null || !sameTrack(track, milestone.track)) {
+      track = milestone.track;
+      const trackSection = el("section", "jr-track");
+      const trackName = el("h4", "jr-track-name", trackText(track));
+      trackName.id = `jr-track-${tracks.childElementCount}`;
+      trackSection.setAttribute("aria-labelledby", trackName.id);
+      groups = el("div", "jr-groups");
+      trackSection.append(trackName, groups);
+      tracks.append(trackSection);
+    }
     const group = el("div", `jr-group${milestone.cleared ? " cleared" : ""}`);
     const head = el("div", "jr-group-head");
     const name = el("span", "jr-group-name", t("journey.milestone", { level: levelText(milestone) }));
     if (milestone.cleared) name.prepend(spriteIcon("check", "jr-group-check"));
     const count = el("span", "jr-group-count", `${milestone.completed}/${milestone.total}`);
     count.setAttribute("aria-label", t(milestone.cleared ? "journey.milestoneCleared" : "journey.milestoneCount",
-      { level: levelText(milestone), done: milestone.completed, total: milestone.total }));
+      { level: milestoneName(milestone), done: milestone.completed, total: milestone.total }));
     head.append(name, count);
 
     const list = el("ol", "jr-chips");
@@ -342,7 +367,7 @@ function renderPath(model) {
     group.append(head, list);
     groups.append(group);
   }
-  section.append(groups, renderLegend(model));
+  section.append(tracks, renderLegend(model));
   return section;
 }
 
@@ -360,10 +385,10 @@ function renderLegend(model) {
   return legend;
 }
 
-/** Position in the learning path (the catalog order), from 1; the lab number is the folder, not the step. */
+/** Position in the learning path of its track, from 1, whatever the labs of the other tracks; the lab number is the folder, not the step. */
 function stepOf(lab, model) {
-  const index = journey.labs.findIndex((l) => l.id === lab.id);
-  return (index >= 0 ? index : model.labs.indexOf(lab)) + 1;
+  const labs = journey.labs.some((l) => l.id === lab.id) ? journey.labs : model.labs;
+  return labs.filter((l) => sameTrack(l.track, lab.track)).findIndex((l) => l.id === lab.id) + 1;
 }
 
 function renderChip(lab, model) {
@@ -493,7 +518,7 @@ function eventTexts(event) {
     case "fixed": return [t("journey.kicker.fixed"), t("journey.event.fixed", { lab: labTitle(event.lab.id) })];
     case "checks": return [t("journey.kicker.checks"), t("journey.event.checks", { xp: fmt(event.xp), lab: labTitle(event.lab.id), checks: checksText(event.lab) })];
     case "rank": return [t("journey.kicker.rank"), t("journey.event.rank", { roman: romanOf(event.rank.index), rank: rankName(event.rank) })];
-    case "milestone": return [t("journey.kicker.milestone"), t("journey.event.milestone", { level: levelText(event.milestone) })];
+    case "milestone": return [t("journey.kicker.milestone"), t("journey.event.milestone", { level: milestoneName(event.milestone) })];
     default: return [t("journey.kicker.badge"), badgeName(event.badge.id)];
   }
 }

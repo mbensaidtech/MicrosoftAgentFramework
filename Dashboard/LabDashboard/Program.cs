@@ -122,8 +122,9 @@ app.UseStaticFiles(new StaticFileOptions
 MarkdownPipeline markdown = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
 RouteGroupBuilder api = app.MapGroup("/api");
 
+// One learning path per track (Azure OpenAI, then Multi-Agent System...): the lab list and the journey show them apart.
 api.MapGet("/labs", (LabCatalog catalog, RunHistoryStore history, LabRunner runner, LabResetService reset) =>
-    catalog.Labs.Select(lab => LabSummary.From(lab, history.ForLab(lab.Id), runner.ActiveRun, reset.HasCompletedCopy(lab))));
+    catalog.LearningPath.Select(lab => LabSummary.From(lab, history.ForLab(lab.Id), runner.ActiveRun, reset.HasCompletedCopy(lab))));
 
 api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistoryStore history, LabRunner runner, LabResetService reset) =>
 {
@@ -159,7 +160,7 @@ api.MapGet("/labs/{id}", (string id, string? lang, LabCatalog catalog, RunHistor
 
 // The learner's journey (states, XP, rank, milestones, distinctions, next mission), recomputed from the history: read-only.
 api.MapGet("/journey", (LabCatalog catalog, RunHistoryStore history, LabRunner runner) =>
-    LearningJourney.Build(catalog.Labs, history.ForLab, runner.ActiveRun?.Lab.Id));
+    LearningJourney.Build(catalog.LearningPath, history.ForLab, runner.ActiveRun?.Lab.Id));
 
 api.MapGet("/labs/{id}/solution", (string id, LabCatalog catalog) =>
 {
