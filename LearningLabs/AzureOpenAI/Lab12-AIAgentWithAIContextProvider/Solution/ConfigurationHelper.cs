@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
-using MongoDB.Bson;
-using MongoDB.Driver;
+using CommonUtilities;
 
 namespace AIAgentWithAIContextProvider;
 
@@ -41,34 +40,41 @@ public static class ConfigurationHelper
     }
 
     /// <summary>
-    /// Connect to the MongoDB database of the configuration and check that the server answers.
+    /// Opens the repository of the user memories chosen by <c>Storage:Mode</c>: MongoDB (Docker container, local installation or Atlas),
+    /// a MongoDB started by the lab (no Docker), or a JSON file (no MongoDB).
     /// </summary>
-    /// <returns>The MongoDB database that stores the user memories.</returns>
-    public static async Task<IMongoDatabase> ConnectToMongoDbAsync(CancellationToken cancellationToken = default)
+    /// <returns>The repository of the user memories.</returns>
+    public static async Task<IUserMemoriesRepository> CreateUserMemoriesRepositoryAsync(CancellationToken cancellationToken = default)
     {
+        StorageSettings storage = Configuration.GetSection("Storage").Get<StorageSettings>() ?? new StorageSettings();
         MongoDbSettings settings = Configuration.GetSection("MongoDb").Get<MongoDbSettings>()
             ?? throw new InvalidOperationException("MongoDb configuration section is missing.");
 
-        EnsureConfigured(settings.ConnectionString, "MongoDb:ConnectionString");
         EnsureConfigured(settings.DatabaseName, "MongoDb:DatabaseName");
 
-        MongoClientSettings clientSettings = MongoClientSettings.FromConnectionString(settings.ConnectionString);
-        // Fail fast (instead of the 30 seconds default) when MongoDB is not started.
-        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
-
-        IMongoDatabase database = new MongoClient(clientSettings).GetDatabase(settings.DatabaseName);
-        try
+        IUserMemoriesRepository repository;
+        switch (storage.Mode)
         {
-            await database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
-        }
-        catch (TimeoutException exception)
-        {
-            throw new InvalidOperationException(
-                $"MongoDB is not reachable with the connection string of 'MongoDb:ConnectionString'. " +
-                "Start it with 'docker compose up -d' in the MongoDB folder of the lab.", exception);
+            case StorageMode.JsonFile:
+                repository = new JsonFileUserMemoriesRepository(Path.Combine(storage.GetDataDirectory(settings.DatabaseName), "user_memories.json"));
+                break;
+
+            case StorageMode.EmbeddedMongoDb:
+                repository = new MongoUserMemoriesRepository(
+                    await MongoDbConnection.ConnectAsync(storage, settings, cancellationToken),
+                    $"embedded MongoDB, database '{settings.DatabaseName}'");
+                break;
+
+            default:
+                EnsureConfigured(settings.ConnectionString, "MongoDb:ConnectionString");
+                repository = new MongoUserMemoriesRepository(
+                    await MongoDbConnection.ConnectAsync(storage, settings, cancellationToken),
+                    $"MongoDB, database '{settings.DatabaseName}'");
+                break;
         }
 
-        return database;
+        ColoredConsole.WriteSecondaryLogLine($"Memories storage: {repository.Description} (Storage:Mode = {storage.Mode})");
+        return repository;
     }
 
     private static void EnsureConfigured(string value, string key)

@@ -3,7 +3,6 @@ using System.ClientModel.Primitives;
 using System.Text.Json;
 using Azure.Identity;
 using Microsoft.Agents.AI;
-using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
 using CommonUtilities;
@@ -20,7 +19,7 @@ using static AIAgentWithThreads.SessionConsole;
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
-// Scenario 3 needs MongoDB (see the README).
+// Scenario 3 needs a storage for the chat history: MongoDB with Docker, MongoDB without Docker, or a JSON file (see the README).
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
@@ -113,26 +112,27 @@ if (ShouldRunScenario(2))
 
 #endregion
 
-#region Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
+#region Scenario 3: Custom ChatHistoryProvider - chat history outside of the application
 
 if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===");
 
-    // TODO 16: Connect to MongoDB with ConfigurationHelper.ConnectToMongoDbAsync() (start MongoDB first, see the README)
+    // TODO 16: Open the storage of the chat history with ConfigurationHelper.CreateChatHistoryStoreAsync()
+    // (MongoDB with or without Docker, or a JSON file: choose it with Storage:Mode, see the README)
 
-    // TODO 17: Write a function Func<IMongoDatabase, AIAgent> createAgent that creates the agent of TODO 10
-    // with a new MongoChatHistoryProvider(mongoDatabase) as ChatHistoryProvider
+    // TODO 17: Write a function Func<IChatHistoryStore, AIAgent> createAgent that creates the agent of TODO 10
+    // with a new PersistentChatHistoryProvider(chatHistoryStore) as ChatHistoryProvider
 
-    // TODO 18: Create the agent with createAgent(database), create a session and ask Questions.First
+    // TODO 18: Create the agent with createAgent(store), create a session and ask Questions.First
 
     // TODO 19: Serialize the session, display it and save it as text
 
-    // TODO 20: Simulate a restart of the application: create a new agent with a new MongoDB connection
-    // (createAgent(await ConfigurationHelper.ConnectToMongoDbAsync())) and restore the saved session with this new agent
+    // TODO 20: Simulate a restart of the application: create a new agent with a new connection to the storage
+    // (createAgent(await ConfigurationHelper.CreateChatHistoryStoreAsync())) and restore the saved session with this new agent
 
-    // TODO 21: Get the MongoChatHistoryProvider of the new agent and display the key of the restored session
+    // TODO 21: Get the PersistentChatHistoryProvider of the new agent and display the key of the restored session
 
     // TODO 22: Ask Questions.FollowUp to the new agent in the restored session, display the answer and the token usage
 }

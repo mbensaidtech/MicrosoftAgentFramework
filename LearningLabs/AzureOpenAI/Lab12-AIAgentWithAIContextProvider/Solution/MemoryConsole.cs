@@ -48,11 +48,11 @@ public static class MemoryConsole
     }
 
     /// <summary>
-    /// Displays the memories of a user, as stored in MongoDB.
+    /// Displays the memories of a user, as stored in the repository.
     /// </summary>
     public static void WriteStoredMemories(string userId, IReadOnlyCollection<string> memories)
     {
-        ColoredConsole.WritePrimaryLogLine($"Memories stored in MongoDB for user '{userId}': {memories.Count}");
+        ColoredConsole.WritePrimaryLogLine($"Memories stored for user '{userId}': {memories.Count}");
         foreach (string memory in memories)
         {
             ColoredConsole.WriteSecondaryLogLine($"  - {memory}");

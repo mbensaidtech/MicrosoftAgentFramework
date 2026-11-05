@@ -3,7 +3,6 @@ using System.ClientModel.Primitives;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
 using CommonUtilities;
@@ -24,7 +23,7 @@ ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 
 bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
-// The user of this lab. Its memories are stored in MongoDB under this id.
+// The user of this lab. Its memories are stored under this id.
 // In a real application, it is the id of the signed-in user.
 const string UserId = "ada";
 
@@ -60,15 +59,14 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 #region Agent with a long-term memory (shared by both scenarios)
 
 ColoredConsole.WriteDividerLine();
-ColoredConsole.WriteInfoLine("Agent with a long-term memory - the memories of the user are stored in MongoDB");
+ColoredConsole.WriteInfoLine("Agent with a long-term memory - the memories of the user are stored outside of the application");
 ColoredConsole.WritePrimaryLogLine($"User id: {UserId}");
 ColoredConsole.WritePrimaryLogLine($"{Agents.MemoryAssistant.Name} instructions: {Agents.MemoryAssistant.Instructions}");
 ColoredConsole.WritePrimaryLogLine($"Memory extractor instructions: {Agents.MemoryExtractor.Instructions}");
 
-// TODO 4: Connect to MongoDB (start it first, see the README) and create the repository of the memories
-// Hint: await ConfigurationHelper.ConnectToMongoDbAsync(), then new UserMemoriesRepository(database)
-// IMongoDatabase database = ...
-// UserMemoriesRepository memoriesRepository = ...
+// TODO 4: Open the repository of the memories (MongoDB with or without Docker, or a JSON file: choose it with Storage:Mode, see the README)
+// Hint: await ConfigurationHelper.CreateUserMemoriesRepositoryAsync()
+// IUserMemoriesRepository memoriesRepository = ...
 
 // TODO 5: Create the agent that extracts memories from a user message (the context provider will use it),
 // with the instructions and the name of Agents.MemoryExtractor (provided in LabPrompts.cs)
@@ -103,7 +101,7 @@ if (ShouldRunScenario(1))
     // TODO 8: Create a session, run the agent with Questions.Introduction in it and display the answer ("Agent: ...")
     // Before the model call, the provider adds the memories to the request (a message); after it, it extracts and stores the new ones.
 
-    // TODO 9: Display the memories stored in MongoDB for the user
+    // TODO 9: Display the memories stored for the user
     // Hint: WriteStoredMemories(UserId, await memoriesRepository.GetMemoriesAsync(UserId))
 
     ColoredConsole.WriteDividerLine();
@@ -132,20 +130,20 @@ if (ShouldRunScenario(2))
     // - Console.Write("You: ") then Console.ReadLine() (null when the input is closed)
     // - run the agent with the message in the session and display the answer
 
-    ColoredConsole.WriteInfoLine("Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are in MongoDB).");
+    ColoredConsole.WriteInfoLine("Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are stored outside of the application).");
 }
 
 #endregion
 
-#region Context provider: a long-term memory of the user, in MongoDB
+#region Context provider: a long-term memory of the user, in a repository
 
 /// <summary>
 /// An <see cref="AIContextProvider"/> that gives the agent a long-term memory of the user.
 /// <list type="bullet">
-/// <item><description>Before each model call (<see cref="ProvideAIContextAsync"/>): loads the memories of the user from MongoDB
+/// <item><description>Before each model call (<see cref="ProvideAIContextAsync"/>): loads the memories of the user from the repository
 /// and adds them to the request of the run, as a message framed as data.</description></item>
 /// <item><description>After each successful run (<see cref="StoreAIContextAsync"/>): extracts the new facts from the user message
-/// with another agent (structured output) and stores them in MongoDB.</description></item>
+/// with another agent (structured output) and stores them in the repository.</description></item>
 /// </list>
 /// One instance is attached to the agent and shared by all its sessions: it keeps no session data in its fields.
 /// The id of the user lives in the session (<see cref="AgentSession.StateBag"/>), through <see cref="ProviderSessionState{TState}"/>.
@@ -153,14 +151,14 @@ if (ShouldRunScenario(2))
 internal sealed class UserMemoryAIContextProvider : AIContextProvider
 {
     private readonly AIAgent _memoryExtractor;
-    private readonly UserMemoriesRepository _memoriesRepository;
+    private readonly IUserMemoriesRepository _memoriesRepository;
     private readonly ProviderSessionState<State> _sessionState;
     private IReadOnlyList<string>? _stateKeys;
 
     /// <param name="memoryExtractor">The agent that extracts memories from a user message.</param>
-    /// <param name="memoriesRepository">The MongoDB storage of the memories.</param>
+    /// <param name="memoriesRepository">The storage of the memories (MongoDB or a JSON file).</param>
     /// <param name="stateInitializer">Gives the state of a session the first time the provider sees it: the id of the user.</param>
-    public UserMemoryAIContextProvider(AIAgent memoryExtractor, UserMemoriesRepository memoriesRepository, Func<AgentSession?, State> stateInitializer)
+    public UserMemoryAIContextProvider(AIAgent memoryExtractor, IUserMemoriesRepository memoriesRepository, Func<AgentSession?, State> stateInitializer)
     {
         _memoryExtractor = memoryExtractor;
         _memoriesRepository = memoriesRepository;
@@ -177,7 +175,7 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
     {
         // TODO 13: Give the memories of the user to the model
         // - get the id of the user from the state of the session: _sessionState.GetOrInitializeState(context.Session).UserId
-        // - load the memories of the user from MongoDB and display them with WriteMemoriesProvided(userId, memories)
+        // - load the memories of the user from the repository and display them with WriteMemoriesProvided(userId, memories)
         // - return a new AIContext whose Messages contain one user message that lists the memories, framed as data:
         //   ContextTexts.MemoriesIntroduction (provided in LabPrompts.cs) followed by one "- memory" line per memory
         //   (or an empty AIContext when there is none). Not Instructions: they are sent as the system message.
@@ -201,7 +199,7 @@ internal sealed class UserMemoryAIContextProvider : AIContextProvider
         // Hint: the system message is ContextTexts.KnownFactsIntroduction followed by the known facts, one per line
         //       (ContextTexts.NoKnownFact when there is none: knownMemories.DefaultIfEmpty(ContextTexts.NoKnownFact))
 
-        // TODO 16: Store the new memories in MongoDB (skip the empty and already known ones),
+        // TODO 16: Store the new memories in the repository (skip the empty and already known ones),
         // then display them with WriteMemoriesExtracted(userId, newMemories, extraction.Usage)
         // Replace the last line of this method.
 

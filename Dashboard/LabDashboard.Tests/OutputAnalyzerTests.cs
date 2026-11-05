@@ -708,7 +708,7 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===",
+        "=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===",
         "User: Hello, my name is Ada. What is the capital of France?",
         "",
         "",
@@ -716,7 +716,7 @@ public class OutputAnalyzerTests
         "Serialized session:",
         "{",
         "  \"stateBag\": {",
-        "    \"MongoChatHistoryProvider\": {",
+        "    \"PersistentChatHistoryProvider\": {",
         "      \"sessionDbKey\": \"8ec5b27595174bebb3b3b5cdb2a7e04e\"",
         "    }",
         "  }",
@@ -724,8 +724,8 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...",
-        "Restored session - chat history stored in MongoDB under the key: 8ec5b27595174bebb3b3b5cdb2a7e04e",
+        "Simulating a restart: new agent, new connection to the storage, session restored from the saved JSON...",
+        "Restored session - chat history stored under the key: 8ec5b27595174bebb3b3b5cdb2a7e04e",
         "User: What is the population of that city? And what is my name?",
         "",
         "",
@@ -756,7 +756,7 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===",
+        "=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===",
     ];
 
     [Fact]
@@ -797,17 +797,17 @@ public class OutputAnalyzerTests
             "User: What is the population of that city? And what is my name?",
             "Agent: Rome has about 2.8 million inhabitants, and your name is Ada.",
             "Messages kept in the session: 6 (input tokens of this run: 98)",
-            "=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===",
+            "=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===",
             "Serialized session:",
             "{",
             "  \"stateBag\": {",
-            "    \"MongoChatHistoryProvider\": {",
+            "    \"PersistentChatHistoryProvider\": {",
             "      \"sessionDbKey\": \"f3b863cd58334e6aa5edfcc72d376ff9\"",
             "    }",
             "  }",
             "}",
-            "Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...",
-            "Restored session - chat history stored in MongoDB under the key: 0123456789abcdef0123456789abcdef",
+            "Simulating a restart: new agent, new connection to the storage, session restored from the saved JSON...",
+            "Restored session - chat history stored under the key: 0123456789abcdef0123456789abcdef",
             "Agent: Which city do you mean? What is your name?",
         ];
 
@@ -2163,7 +2163,7 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "Agent with a long-term memory - the memories of the user are stored in MongoDB",
+        "Agent with a long-term memory - the memories of the user are stored outside of the application",
         "User id: ada",
         "MemoryAssistant instructions: You are a friendly personal assistant. Use what you remember about the user to personalize your answers. When a conversation starts without a message from the user, introduce yourself and welcome the user, by name if you know it.",
         "Memory extractor instructions: You extract facts about the user from the user message: name, job, city, interests, preferences, constraints. Write each fact as a short sentence in the third person, for example: \"The user works as a nurse.\". Do not extract a fact that is already known, nor questions or requests. Return an empty list when there is no new fact.",
@@ -2182,7 +2182,7 @@ public class OutputAnalyzerTests
         "  + The user loves hiking in the Alps.",
         "  + The user is vegetarian.",
         "Agent: Hi Ada! It's great to meet you. Welcome! As a software developer and a vegetarian who enjoys hiking in the Alps, you must have some interesting stories to tell. How can I assist you today?",
-        "Memories stored in MongoDB for user 'ada': 5",
+        "Memories stored for user 'ada': 5",
         "  - The user's name is Ada.",
         "  - The user works as a software developer.",
         "  - The user is from Lyon.",
@@ -2218,10 +2218,10 @@ public class OutputAnalyzerTests
         "  + The user works remotely on Fridays.",
         "Agent: That's great to hear, Ada! Working remotely on Fridays can be a nice way to wrap up the week. Do you have any special plans for your remote workday, or do you like to keep it flexible?",
         "You: ",
-        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are in MongoDB).",
+        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are stored outside of the application).",
     ];
 
-    // Standard output of the Lab12 exercise as delivered (TODOs not done yet): no MongoDB, no agent, no provider.
+    // Standard output of the Lab12 exercise as delivered (TODOs not done yet): no storage, no agent, no provider.
     private static readonly string[] Lab12StartOutput =
     [
         "Endpoint: https://example.openai.azure.com/",
@@ -2229,7 +2229,7 @@ public class OutputAnalyzerTests
         "",
         "-------------------------------------------------------------------------------",
         "",
-        "Agent with a long-term memory - the memories of the user are stored in MongoDB",
+        "Agent with a long-term memory - the memories of the user are stored outside of the application",
         "User id: ada",
         "",
         "-------------------------------------------------------------------------------",
@@ -2247,7 +2247,7 @@ public class OutputAnalyzerTests
         "",
         "=== Scenario 2: Chat with the agent - it greets you with what it remembers ===",
         "Type a message, or an empty line / 'exit' to end the chat.",
-        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are in MongoDB).",
+        "Chat ended. Run scenario 2 again: the agent still remembers what you told it (the memories are stored outside of the application).",
     ];
 
     [Fact]
@@ -2276,7 +2276,7 @@ public class OutputAnalyzerTests
             "First session",
             "User: Hi! I'm Ada, a software developer from Lyon. I love hiking in the Alps and I'm vegetarian.",
             "Agent: Hi Ada! It's great to meet you! How can I assist you today?",
-            "Memories stored in MongoDB for user 'ada': 0",
+            "Memories stored for user 'ada': 0",
             "New session (empty chat history)",
             "User: What is my name? Suggest a dinner idea and a weekend activity for me.",
             "Agent: I don't know your name yet! For dinner, how about a homemade stir-fry? As for a weekend activity, consider a hike.",
@@ -2298,7 +2298,7 @@ public class OutputAnalyzerTests
     public void Lab12_checks_fail_when_the_memories_are_stored_but_never_given_to_the_model()
     {
         LabDefinition lab12 = LabCatalogTests.LoadRealCatalog().Find("azureopenai-lab12")!;
-        // StoreAIContextAsync done, ProvideAIContextAsync not done: the memories reach MongoDB, but neither the new session
+        // StoreAIContextAsync done, ProvideAIContextAsync not done: the memories reach the storage, but neither the new session
         // nor the greeting can use them (and the answer of the new session is guessed from the question only).
         string[] output =
         [
@@ -2314,7 +2314,7 @@ public class OutputAnalyzerTests
             "  + The user loves hiking in the Alps.",
             "  + The user is vegetarian.",
             "Agent: Hi Ada! It's great to meet you!",
-            "Memories stored in MongoDB for user 'ada': 5",
+            "Memories stored for user 'ada': 5",
             "  - The user's name is Ada.",
             "  - The user works as a software developer.",
             "  - The user is from Lyon.",

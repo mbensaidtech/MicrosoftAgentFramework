@@ -8,7 +8,7 @@ A conversation lives in an **`AgentSession`**. The messages of the conversation 
 
 1. **In the session itself** — the default `InMemoryChatHistoryProvider`: the serialized session contains the whole conversation. You **serialize** the session, save it as text, **restore** it, and ask a follow-up question that only makes sense with the history ("that city", "my name").
 2. **Bounded** — the same provider with a **chat reducer** that keeps only the last messages: the cost of each run stops growing, and the agent forgets the beginning of the conversation.
-3. **In MongoDB** — a custom `ChatHistoryProvider` on a real database: the serialized session only contains a key, the conversation survives the application, a new agent resumes it.
+3. **Outside of the application** — a custom `ChatHistoryProvider` on a real storage (MongoDB, or a JSON file when MongoDB cannot run on your computer): the serialized session only contains a key, the conversation survives the application, a new agent resumes it.
 
 ## What You Will Learn
 
@@ -17,7 +17,7 @@ A conversation lives in an **`AgentSession`**. The messages of the conversation 
 - Where the chat history lives with the default `InMemoryChatHistoryProvider`, and how to read it (`GetService<InMemoryChatHistoryProvider>()`, `GetMessages(session)`)
 - How to plug a custom `ChatHistoryProvider` with `ChatClientAgentOptions.ChatHistoryProvider`
 - How a provider keeps its per-session state (a storage key) in the session: `AgentSession.StateBag` and `ProviderSessionState<T>`
-- How to store the chat history in MongoDB with your own `ChatHistoryProvider`
+- How to store the chat history outside of the application with your own `ChatHistoryProvider` (MongoDB or a JSON file)
 - How to **bound** the chat history with a chat reducer (`MessageCountingChatReducer`), and what it costs: the agent forgets
 - What changes when the **service** keeps the conversation (Responses API), and how to protect stored sessions
 
@@ -28,7 +28,7 @@ A conversation lives in an **`AgentSession`**. The messages of the conversation 
 - One of the following for authentication:
   - the resource **API key**, or
   - Azure CLI logged in (`az login`) with the **Cognitive Services OpenAI User** role on the resource
-- **Docker** (Docker Desktop or any Docker engine with Compose) for scenario 3 (MongoDB)
+- For scenario 3, a storage for the chat history: **Docker** (the MongoDB container of the lab), **or nothing at all** — MongoDB started by the lab itself, or a JSON file (see [Step 2](#step-2-choose-the-storage-of-scenario-3)). None of them needs administrator rights
 - Lab 01 completed (client creation, `AsAIAgent()`, `AgentResponse`)
 
 ## Project Structure
@@ -40,12 +40,17 @@ Lab05-AIAgentWithThreads/
 │   ├── Program.cs                          <-- Complete the TODOs here
 │   ├── LabPrompts.cs                       <-- Provided: name, instructions and questions of the agent
 │   ├── Stores/
-│   │   └── MongoChatHistoryProvider.cs     <-- ChatHistoryProvider on MongoDB (scenario 3)
+│   │   ├── PersistentChatHistoryProvider.cs <-- ChatHistoryProvider on a store (scenario 3)
+│   │   ├── IChatHistoryStore.cs            <-- Where the messages are kept
+│   │   ├── MongoChatHistoryStore.cs        <-- ... in MongoDB
+│   │   └── JsonFileChatHistoryStore.cs     <-- ... in a JSON file
 │   ├── MongoDB/
-│   │   └── docker-compose.yml              <-- Local MongoDB for scenario 3
+│   │   └── docker-compose.yml              <-- Local MongoDB in Docker for scenario 3
 │   ├── SessionConsole.cs                   <-- Display helpers (provided)
-│   ├── ConfigurationHelper.cs
+│   ├── ConfigurationHelper.cs              <-- Configuration, opens the store chosen by Storage:Mode
+│   ├── MongoDbConnection.cs                <-- Connects to MongoDB, starts it without Docker
 │   ├── AzureOpenAISettings.cs
+│   ├── StorageSettings.cs
 │   ├── MongoDbSettings.cs
 │   ├── appsettings.json
 │   └── AIAgentWithThreads.csproj
@@ -67,6 +72,9 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
        "Endpoint": "https://YOUR-RESOURCE.openai.azure.com/",
        "ChatDeploymentName": "YOUR-DEPLOYMENT-NAME"
      },
+     "Storage": {
+       "Mode": "MongoDb"
+     },
      "MongoDb": {
        "ConnectionString": "mongodb://localhost:27017",
        "DatabaseName": "AIAgentSessions"
@@ -76,7 +84,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
    Use the resource endpoint shown in the Azure portal. The `/openai/v1/` suffix required by the v1 API is added for you.
    `*.openai.azure.com`, `*.cognitiveservices.azure.com` and `*.services.ai.azure.com` endpoints all work.
-   The `MongoDb` values match the provided `docker-compose.yml`: keep them unless you use another MongoDB server.
+   The `Storage` and `MongoDb` values match the provided `docker-compose.yml`: keep them unless you use another storage (Step 2).
 
 2. Choose an authentication method:
 
@@ -94,7 +102,29 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 3. **Or use the dashboard**: the *Azure OpenAI settings* of the optional [Lab Bench dashboard](../../../Dashboard/README.md#azure-openai-settings) write the endpoint, the deployment and the API key to the same user secrets, for every migrated lab (no file to edit, no command to type).
 
-### Step 2: Start MongoDB (scenario 3)
+### Step 2: Choose the storage of scenario 3
+
+Scenario 3 keeps the chat history outside of the application. Choose where with the `Storage:Mode` setting. None of the three modes needs administrator rights, and the code of the scenario is the same with all of them:
+
+| `Storage:Mode` | What you need | Where the data are kept |
+|---|---|---|
+| `MongoDb` (default) | **Docker**, to start the MongoDB container of the lab (or any MongoDB server, set in `MongoDb:ConnectionString`) | The Docker volume of the container |
+| `EmbeddedMongoDb` | **Nothing**: the lab downloads MongoDB at its first run (about 1 minute, then a few seconds), and starts it itself | `<local app data>/MicrosoftAgentFrameworkLabs/AIAgentSessions/mongodb` |
+| `JsonFile` | **Nothing**, not even MongoDB: the fallback when the two others are not possible | `<local app data>/MicrosoftAgentFrameworkLabs/AIAgentSessions/chat_history.json` |
+
+`<local app data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support` on macOS and `~/.local/share` on Linux (`Storage:DataDirectory` changes it). At the start of scenario 3, the lab displays the storage it uses.
+
+To change the mode, set it once in the user secrets: they are shared by all the labs, so Lab 12 uses the same mode.
+
+```bash
+cd Start
+dotnet user-secrets set "Storage:Mode" "EmbeddedMongoDb"    # or "JsonFile"
+dotnet user-secrets remove "Storage:Mode"                    # back to Docker (MongoDb)
+```
+
+You can also use the environment variable `Storage__Mode`, or change `Storage:Mode` in `appsettings.json`.
+
+#### Option A — MongoDB in Docker (`MongoDb`, default)
 
 ```bash
 cd Start/MongoDB
@@ -106,16 +136,31 @@ This starts a MongoDB 8.0 container named `lab05-mongodb`, reachable from your c
 - See what the agent stored: `docker exec lab05-mongodb mongosh AIAgentSessions --quiet --eval "db.chat_history.find({}, {_id: 0, SessionId: 1, Role: 1, MessageText: 1})"`
 - Stop MongoDB: `docker compose down` (add `-v` to also delete the stored conversations)
 
-Scenarios 1 and 2 do not need MongoDB. To skip scenario 3: `dotnet run -- --scenarios 1,2`.
+#### Option B — MongoDB without Docker (`EmbeddedMongoDb`)
+
+The lab starts MongoDB itself, with [EphemeralMongo](https://github.com/asimmon/ephemeral-mongo): no Docker, no installation. At the first run, it downloads MongoDB Community from **mongodb.org** into your local app data folder (`ephemeral-mongo`), then runs `mongod` as a child process of the lab, on `127.0.0.1` only, without authentication. The server stops with the lab; its data folder is kept, so the conversations survive the lab, like with the container.
+
+- Behind a corporate proxy, the download goes through the proxy of the system, with your Windows credentials. If mongodb.org is blocked, set `MongoDb:BinaryDirectory` to a folder that contains the MongoDB binaries (`mongod`), for example copied from a colleague, or use `JsonFile`.
+- If Windows shows a firewall prompt for `mongod`, you can cancel it: the server only listens on `127.0.0.1`.
+- If the lab is killed, its `mongod` keeps running on macOS and Linux: the next run of the lab stops it before starting a new one.
+
+#### Option C — a JSON file (`JsonFile`)
+
+No MongoDB at all: `JsonFileChatHistoryStore` keeps the messages in `chat_history.json` (its path is displayed at the start of scenario 3). Open the file to see what the agent stored, and delete it to start again from an empty history.
+
+Scenarios 1 and 2 need no storage. To skip scenario 3: `dotnet run -- --scenarios 1,2`.
 
 ### Step 3: Look at the provided files
 
-- `Stores/MongoChatHistoryProvider.cs` — a `ChatHistoryProvider` on a MongoDB collection (`chat_history`), with the official MongoDB driver, adapted from the official sample `Agent_Step04_3rdPartyChatHistoryStorage`. It overrides two methods:
-  - `ProvideChatHistoryAsync` — called **before** each run: loads the last 10 messages of the session from MongoDB. The agent sends them to the model before the new message.
-  - `StoreChatHistoryAsync` — called **after** each successful run: stores the new messages (`RequestMessages` + `ResponseMessages`). Each message is a document: `SessionId`, `Timestamp`, `Order`, `Role`, `MessageText` and the serialized `ChatMessage`.
+- `Stores/PersistentChatHistoryProvider.cs` — a `ChatHistoryProvider` that keeps the chat history in a store (`IChatHistoryStore`), adapted from the official sample `Agent_Step04_3rdPartyChatHistoryStorage`. It overrides two methods:
+  - `ProvideChatHistoryAsync` — called **before** each run: loads the last 10 messages of the session from the store. The agent sends them to the model before the new message.
+  - `StoreChatHistoryAsync` — called **after** each successful run: stores the new messages (`RequestMessages` + `ResponseMessages`).
 
   The provider instance is shared by all the sessions of the agent, so it keeps **no session data in its fields**. The key of the conversation (`SessionDbKey`) is stored **in the session**, through `ProviderSessionState<State>`: `GetOrInitializeState(session)` reads it from `AgentSession.StateBag`, or creates a new key the first time. That is why the key is saved and restored with the session.
-- `ConfigurationHelper.cs` — `ConnectToMongoDbAsync()` connects to the database of the configuration and checks that MongoDB answers (clear error message when it is not started).
+- `Stores/IChatHistoryStore.cs` — where the provider keeps the messages, under the key of each session. Two implementations, chosen by `Storage:Mode`; the provider does not know which one it uses:
+  - `Stores/MongoChatHistoryStore.cs` — the `chat_history` collection of MongoDB, with the official MongoDB driver. Each message is a document: `SessionId`, `Timestamp`, `Order`, `Role`, `MessageText` and the serialized `ChatMessage`.
+  - `Stores/JsonFileChatHistoryStore.cs` — the `chat_history.json` file: the messages of all the sessions, with their `SessionId`.
+- `ConfigurationHelper.cs` — `CreateChatHistoryStoreAsync()` opens the store chosen by `Storage:Mode`, and checks that MongoDB answers (clear error message when it is not started). `MongoDbConnection.cs` connects to MongoDB, and starts it in the `EmbeddedMongoDb` mode.
 - `SessionConsole.cs` — `WriteSerializedSession(json)` displays a serialized session, `WriteTurn(question, response, storedMessages)` one turn of a conversation (scenario 2) and `WriteTokenUsage(response)` the token usage of a run. `Program.cs` imports them with `using static`, so you can call them directly.
 - `LabPrompts.cs` — the name and the instructions of the agent (`Agents.Global`) and the questions of the conversation (`Questions.First`, `Questions.Intermediate` for scenario 2, and `Questions.FollowUp`), shared by the three scenarios and displayed at the start of `Program.cs`.
 
@@ -169,18 +214,18 @@ Without a limit, every run sends the **whole** history back to the model: the co
 
 ---
 
-#### Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
+#### Scenario 3: Custom ChatHistoryProvider - chat history outside of the application
 
-Same pattern with `MongoChatHistoryProvider`. This time, you simulate a **restart of the application**: the follow-up question is asked to a **new** agent, with a new provider and a new MongoDB connection. The only things kept are the saved JSON and the documents in MongoDB.
+Same pattern with `PersistentChatHistoryProvider`, on the store chosen in [Step 2](#step-2-choose-the-storage-of-scenario-3). This time, you simulate a **restart of the application**: the follow-up question is asked to a **new** agent, with a new provider and a new connection to the storage. The only things kept are the saved JSON and the stored messages.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 16** | Connect to MongoDB | • `IMongoDatabase database = await ConfigurationHelper.ConnectToMongoDbAsync();` |
-| **TODO 17** | Write a function that creates the agent on a database | • `Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.Global.Name, ChatOptions = new() { Instructions = Agents.Global.Instructions }, ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase) });` |
-| **TODO 18** | Create the agent and a session, and ask the first question | • `AIAgent agent = createAgent(database);` <br> • Then the same code as TODO 5 |
+| **TODO 16** | Open the storage of the chat history | • `IChatHistoryStore store = await ConfigurationHelper.CreateChatHistoryStoreAsync();` <br> • MongoDB (with or without Docker) or a JSON file, according to `Storage:Mode` |
+| **TODO 17** | Write a function that creates the agent on a store | • `Func<IChatHistoryStore, AIAgent> createAgent = chatHistoryStore => chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.Global.Name, ChatOptions = new() { Instructions = Agents.Global.Instructions }, ChatHistoryProvider = new PersistentChatHistoryProvider(chatHistoryStore) });` |
+| **TODO 18** | Create the agent and a session, and ask the first question | • `AIAgent agent = createAgent(store);` <br> • Then the same code as TODO 5 |
 | **TODO 19** | Serialize the session and save it as text | • `JsonElement serializedSession = await agent.SerializeSessionAsync(session);` <br> • `WriteSerializedSession(serializedSession);` <br> • `string savedSession = JsonSerializer.Serialize(serializedSession);` |
-| **TODO 20** | Simulate a restart and restore the session with a new agent | • `ColoredConsole.WriteDividerLine();` then `ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...");` <br> • `AIAgent restartedAgent = createAgent(await ConfigurationHelper.ConnectToMongoDbAsync());` <br> • `AgentSession resumedSession = await restartedAgent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));` |
-| **TODO 21** | Display the key of the restored session | • `MongoChatHistoryProvider chatHistoryProvider = restartedAgent.GetService<MongoChatHistoryProvider>()!;` <br> • `ColoredConsole.WriteInfoLine($"Restored session - chat history stored in MongoDB under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");` <br> • Same key as in the serialized session: it is the `SessionId` of the documents |
+| **TODO 20** | Simulate a restart and restore the session with a new agent | • `ColoredConsole.WriteDividerLine();` then `ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new connection to the storage, session restored from the saved JSON...");` <br> • `AIAgent restartedAgent = createAgent(await ConfigurationHelper.CreateChatHistoryStoreAsync());` <br> • `AgentSession resumedSession = await restartedAgent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));` |
+| **TODO 21** | Display the key of the restored session | • `PersistentChatHistoryProvider chatHistoryProvider = restartedAgent.GetService<PersistentChatHistoryProvider>()!;` <br> • `ColoredConsole.WriteInfoLine($"Restored session - chat history stored under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");` <br> • Same key as in the serialized session: it is the `SessionId` of the stored messages |
 | **TODO 22** | Ask the follow-up question to the new agent | • Same code as TODO 9, with `restartedAgent` and `resumedSession` |
 
 ---
@@ -199,7 +244,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios: `dotnet run -- --scenarios 1,2` without MongoDB ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
+To run only some scenarios: `dotnet run -- --scenarios 1,2` without storage ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)).
 
 ## How sessions and chat history work
 
@@ -222,14 +267,14 @@ To run only some scenarios: `dotnet run -- --scenarios 1,2` without MongoDB ([Ch
    DeserializeSessionAsync(json)   → AgentSession               → RunAsync(..., resumedSession)
 ```
 
-| | Scenario 1 — `InMemoryChatHistoryProvider` | Scenario 2 — with a chat reducer | Scenario 3 — MongoDB |
+| | Scenario 1 — `InMemoryChatHistoryProvider` | Scenario 2 — with a chat reducer | Scenario 3 — `PersistentChatHistoryProvider` |
 |---|---|---|---|
-| Where are the messages? | In the session (`StateBag`) | In the session, the last ones only | In the `chat_history` collection |
+| Where are the messages? | In the session (`StateBag`) | In the session, the last ones only | In the store: the `chat_history` collection (MongoDB) or `chat_history.json` |
 | What does the serialized session contain? | The whole conversation | The last messages | The key (`sessionDbKey`) |
-| Survives the application? | Yes, if you save the JSON | Yes, if you save the JSON | Yes: JSON + MongoDB |
+| Survives the application? | Yes, if you save the JSON | Yes, if you save the JSON | Yes: JSON + the store |
 | Cost of a run | Grows with the conversation | Bounded | Bounded (last 10 messages) |
 
-The token usage shows the cost of a conversation: the input tokens of a run include the history sent back to the model. Scenario 2 bounds it with a reducer; the MongoDB provider of scenario 3 keeps every message but only sends the **10 most recent ones**. Both choices trade memory for cost: what is not sent is forgotten (Lab 12 shows how to keep **facts** about the user beyond the conversation).
+The token usage shows the cost of a conversation: the input tokens of a run include the history sent back to the model. Scenario 2 bounds it with a reducer; the provider of scenario 3 keeps every message but only sends the **10 most recent ones**. Both choices trade memory for cost: what is not sent is forgotten (Lab 12 shows how to keep **facts** about the user beyond the conversation).
 
 ### When the service keeps the conversation (Responses API)
 
@@ -276,7 +321,7 @@ A saved session is a conversation: treat it as personal data, and as **untrusted
 | `Azure.Identity` | `DefaultAzureCredential` |
 | `Microsoft.Agents.AI` | `AIAgent`, `AgentSession`, `AgentResponse`, `ChatClientAgentOptions`, `ChatHistoryProvider`, `InMemoryChatHistoryProvider`, `ProviderSessionState<T>` |
 | `Microsoft.Extensions.AI` (aliased as `AIExtensions`, because `OpenAI.Chat` also has a `ChatMessage`) | `ChatMessage`, `MessageCountingChatReducer` (scenario 2) |
-| `MongoDB.Driver` | `IMongoDatabase` |
+| `AIAgentWithThreads.Stores` | `IChatHistoryStore`, `PersistentChatHistoryProvider` (scenario 3) |
 | `System.Text.Json` | `JsonElement`, `JsonSerializer` |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
 
@@ -329,10 +374,12 @@ Token Usage (follow-up):
   Output tokens: 23
   Total tokens: 96
 ----------------------------------------
-=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===
+=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===
+Chat history storage: MongoDB, database 'AIAgentSessions' (Storage:Mode = MongoDb)
 ...
-Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...
-Restored session - chat history stored in MongoDB under the key: f3b863cd58334e6aa5edfcc72d376ff9
+Simulating a restart: new agent, new connection to the storage, session restored from the saved JSON...
+Chat history storage: MongoDB, database 'AIAgentSessions' (Storage:Mode = MongoDb)
+Restored session - chat history stored under the key: f3b863cd58334e6aa5edfcc72d376ff9
 User: What is the population of that city? And what is my name?
 Agent: As of 2023, the population of Paris is approximately 2.1 million. Your name is Ada.
 ...
@@ -348,7 +395,9 @@ Answers vary from one run to another; the keys are new at each run.
 | `401 Unauthorized` with an API key | Check the key (user secret `AzureOpenAI:APIKey`) and that it belongs to the resource of the endpoint |
 | `401` / `403` with Entra ID | Run `az login` and make sure your identity has the **Cognitive Services OpenAI User** role on the resource |
 | `404 DeploymentNotFound` | `ChatDeploymentName` must be the **deployment** name, not the model name |
-| `MongoDB is not reachable ...` | Start MongoDB (`docker compose up -d` in `MongoDB/`), check `docker ps`, or skip scenario 3 with `dotnet run -- --scenarios 1,2` |
+| `MongoDB is not reachable ...` | Start MongoDB (`docker compose up -d` in `MongoDB/`) and check `docker ps`. Without Docker, set `Storage:Mode` to `EmbeddedMongoDb` or `JsonFile` ([Step 2](#step-2-choose-the-storage-of-scenario-3)), or skip scenario 3 with `dotnet run -- --scenarios 1,2` |
+| `The embedded MongoDB could not start` | The first run downloads MongoDB from mongodb.org: check the proxy / VPN, or set `MongoDb:BinaryDirectory` to a folder that contains `mongod`. Otherwise, set `Storage:Mode` to `JsonFile` |
+| `The embedded MongoDB of '...' is already used by another running lab` | Another run of the lab (Start or Solution) uses the same data folder: stop it first |
 | `docker compose up` fails with *port is already allocated* | Another MongoDB already uses port 27017: stop it, or point `MongoDb:ConnectionString` to it |
 | The follow-up answer does not know the city or the name | Pass the **restored** session to `RunAsync` (TODO 9, 22), and restore it with the agent that has the same provider |
 | `NullReferenceException` on `GetService<...>()!` | The agent has no provider of this type: check `ChatHistoryProvider = ...` in `ChatClientAgentOptions` (TODO 10, 17) |
@@ -360,10 +409,13 @@ The following files are provided and should not be modified:
 
 - `LabPrompts.cs` - Name, instructions and questions of the agent, the same for everyone
 - `AIAgentWithThreads.csproj` - Project file with all required dependencies
-- `ConfigurationHelper.cs` - Loads and validates the configuration, connects to MongoDB
+- `ConfigurationHelper.cs` - Loads and validates the configuration, opens the store of the chat history
+- `MongoDbConnection.cs` - Connects to MongoDB, starts it without Docker (`EmbeddedMongoDb`)
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
+- `StorageSettings.cs` - Settings class for the storage (`Storage:Mode`)
 - `MongoDbSettings.cs` - Settings class for MongoDB
-- `Stores/MongoChatHistoryProvider.cs` - `ChatHistoryProvider` on MongoDB
+- `Stores/PersistentChatHistoryProvider.cs` - `ChatHistoryProvider` on a store
+- `Stores/IChatHistoryStore.cs`, `Stores/MongoChatHistoryStore.cs`, `Stores/JsonFileChatHistoryStore.cs` - The stores: MongoDB, JSON file
 - `SessionConsole.cs` - Display helpers
 - `MongoDB/docker-compose.yml` - Local MongoDB
 
@@ -379,7 +431,8 @@ The following files should be modified:
 | `Microsoft.Agents.AI.OpenAI` | Agent Framework + `AsAIAgent()` for OpenAI clients (brings `OpenAI` and `Microsoft.Extensions.AI`) |
 | `Azure.Identity` | `DefaultAzureCredential` for Entra ID authentication |
 | `Microsoft.Extensions.Configuration.*` | `appsettings.json`, user secrets and environment variables, bound to the settings classes |
-| `MongoDB.Driver` | Official MongoDB driver (scenario 3) |
+| `MongoDB.Driver` | Official MongoDB driver (scenario 3, `MongoDb` and `EmbeddedMongoDb` modes) |
+| `EphemeralMongo` | Downloads and starts MongoDB without Docker (`EmbeddedMongoDb` mode) |
 
 ## Going Further
 
@@ -406,6 +459,7 @@ The following files should be modified:
 | MongoDB with a password in `appsettings.json` + Mongo Express | MongoDB without authentication bound to `127.0.0.1`, no secret in `appsettings.json`; `mongosh` to look at the data |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
 | — | Scenario 1: the default in-memory chat history, inside the session |
+| `MongoChatHistoryProvider` (MongoDB in Docker only) | `PersistentChatHistoryProvider` on a store chosen by `Storage:Mode`: MongoDB in Docker, MongoDB without Docker (EphemeralMongo) or a JSON file |
 
 ## Useful Links
 

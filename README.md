@@ -43,7 +43,7 @@ Each lab contains one or more **scenarios** that demonstrate different aspects o
 | **Azure OpenAI resource** with a chat deployment | Every lab | You need the endpoint URL and the **deployment name** (not the model name). |
 | **Authentication** | Every lab | Either the resource **API key**, or **Microsoft Entra ID**: `az login` + the *Cognitive Services OpenAI User* role on the resource (used automatically when no key is set). |
 | Embedding deployment | Lab07+ | e.g. `text-embedding-3-small`. Lab07 reads it from `AzureOpenAI:EmbeddingDeploymentName` (`appsettings.json`, user secret or `AzureOpenAI__EmbeddingDeploymentName`). |
-| MongoDB | Lab05, Lab12 | Each lab provides a local container: `docker compose up -d` in its `MongoDB/` folder (Docker required). Lab05 uses `mongodb://localhost:27017`, Lab12 `mongodb://localhost:27018` (set in their `appsettings.json`), so both can run at the same time. |
+| MongoDB, or nothing | Lab05, Lab12 | Choose the storage with `Storage:Mode` (shared user secret, see the lab READMEs); none needs administrator rights. `MongoDb` (default): the lab's container, `docker compose up -d` in its `MongoDB/` folder (Docker required); Lab05 uses `mongodb://localhost:27017`, Lab12 `mongodb://localhost:27018`, so both can run at the same time. `EmbeddedMongoDb`: no Docker, the lab downloads MongoDB from mongodb.org at its first run and starts it itself. `JsonFile`: no MongoDB at all, a JSON file. |
 | Internet access to `https://huggingface.co/mcp` | Lab04 | Works anonymously; an optional Hugging Face token (user secret `MCPServers:HuggingFace:BearerToken`) raises the rate limits. |
 | Visual Studio Code (C# Dev Kit), Visual Studio 2026 (18.0+) or Rider | Editing the exercises | Any editor works with the `dotnet` CLI. Visual Studio 2022 cannot target `net10.0`. |
 
@@ -259,7 +259,7 @@ The API key never appears in the output, the history or a copied output: it is r
 
 - Only the migrated labs are listed (AzureOpenAI Lab01–Lab15, MultiAgentSystem Lab01), in the order of the [learning path](#learning-path): run the other labs with the CLI.
 - Lab09: scenario 1 waits for your decision in the input box under the output (type `Y` to approve; its checks expect the approval). Scenario 2 needs no input.
-- Lab12: needs its MongoDB container (`docker compose up -d` in its `MongoDB/` folder). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
+- Lab12: needs its storage (its MongoDB container, or `Storage:Mode` set to `EmbeddedMongoDb` or `JsonFile`, see its README). Scenario 2 is a chat: type messages in the input box, then an empty line, `exit` or **End input** to finish.
 - Lab06: the dashboard runs the A2A server and client together (on port 5071), you do not need to start the server yourself.
 - Lab13: the program starts its API on `WebApi:BaseUrl` (`http://localhost:5200` by default) and stops it at the end: the port must be free during the run.
 - Lab10: each scenario starts its own MCP server (HTTP on `McpServer:BaseUrl`, `http://localhost:5100` by default, or stdio as a child process) and stops it: the port must be free during the run.

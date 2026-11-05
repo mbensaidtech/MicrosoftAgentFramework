@@ -6,26 +6,22 @@ namespace AIAgentWithAIContextProvider;
 /// <summary>
 /// Stores the long-term memories of the users in MongoDB, with the official MongoDB driver:
 /// one document per memory in the <c>user_memories</c> collection, keyed by the id of the user.
-/// <para>
-/// The memories belong to a <b>user</b>, not to a conversation: every session of the same user reads the same memories,
-/// and they survive the application.
-/// </para>
 /// </summary>
-public sealed class UserMemoriesRepository
+public sealed class MongoUserMemoriesRepository : IUserMemoriesRepository
 {
     private const string CollectionName = "user_memories";
 
     private readonly IMongoCollection<UserMemoryDocument> _collection;
 
-    public UserMemoriesRepository(IMongoDatabase database)
+    public MongoUserMemoriesRepository(IMongoDatabase database, string description)
     {
         ArgumentNullException.ThrowIfNull(database);
         _collection = database.GetCollection<UserMemoryDocument>(CollectionName);
+        Description = description;
     }
 
-    /// <summary>
-    /// Returns the memories of a user, in the order they were stored.
-    /// </summary>
+    public string Description { get; }
+
     public async Task<List<string>> GetMemoriesAsync(string userId, CancellationToken cancellationToken = default)
     {
         List<UserMemoryDocument> documents = await _collection
@@ -37,9 +33,6 @@ public sealed class UserMemoriesRepository
         return documents.ConvertAll(document => document.Memory);
     }
 
-    /// <summary>
-    /// Stores new memories for a user.
-    /// </summary>
     public async Task AddMemoriesAsync(string userId, IEnumerable<string> memories, CancellationToken cancellationToken = default)
     {
         DateTime now = DateTime.UtcNow;
@@ -53,10 +46,6 @@ public sealed class UserMemoriesRepository
         }
     }
 
-    /// <summary>
-    /// Deletes all the memories of a user ("forget me").
-    /// </summary>
-    /// <returns>The number of deleted memories.</returns>
     public async Task<long> DeleteMemoriesAsync(string userId, CancellationToken cancellationToken = default)
     {
         DeleteResult result = await _collection.DeleteManyAsync(document => document.UserId == userId, cancellationToken);

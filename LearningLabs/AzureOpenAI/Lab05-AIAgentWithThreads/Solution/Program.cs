@@ -3,7 +3,6 @@ using System.ClientModel.Primitives;
 using System.Text.Json;
 using Azure.Identity;
 using Microsoft.Agents.AI;
-using MongoDB.Driver;
 using OpenAI;
 using OpenAI.Chat;
 using CommonUtilities;
@@ -20,7 +19,7 @@ using static AIAgentWithThreads.SessionConsole;
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
-// Scenario 3 needs MongoDB (see the README).
+// Scenario 3 needs a storage for the chat history: MongoDB with Docker, MongoDB without Docker, or a JSON file (see the README).
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
@@ -144,26 +143,26 @@ if (ShouldRunScenario(2))
 
 #endregion
 
-#region Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB
+#region Scenario 3: Custom ChatHistoryProvider - chat history outside of the application
 
 if (ShouldRunScenario(3))
 {
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("=== Scenario 3: Custom ChatHistoryProvider - chat history in MongoDB ===");
+    ColoredConsole.WriteInfoLine("=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===");
 
-    // Step 1: Connect to MongoDB (started with docker compose, see the README)
-    IMongoDatabase database = await ConfigurationHelper.ConnectToMongoDbAsync();
+    // Step 1: Open the storage of the chat history chosen by Storage:Mode (MongoDB with or without Docker, or a JSON file, see the README)
+    IChatHistoryStore store = await ConfigurationHelper.CreateChatHistoryStoreAsync();
 
-    // Step 2: Write a function that creates the agent with a MongoChatHistoryProvider on a database
-    Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions
+    // Step 2: Write a function that creates the agent with a PersistentChatHistoryProvider on a store
+    Func<IChatHistoryStore, AIAgent> createAgent = chatHistoryStore => chatClient.AsAIAgent(new ChatClientAgentOptions
     {
         Name = Agents.Global.Name,
         ChatOptions = new() { Instructions = Agents.Global.Instructions },
-        ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase)
+        ChatHistoryProvider = new PersistentChatHistoryProvider(chatHistoryStore)
     });
 
     // Step 3: Create the agent and a session, and ask the first question
-    AIAgent agent = createAgent(database);
+    AIAgent agent = createAgent(store);
     AgentSession session = await agent.CreateSessionAsync();
     ColoredConsole.WritePrimaryLogLine($"User: {Questions.First}");
     AgentResponse firstResponse = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");
@@ -174,18 +173,18 @@ if (ShouldRunScenario(3))
     WriteSerializedSession(serializedSession);
     string savedSession = JsonSerializer.Serialize(serializedSession);
 
-    // Step 5: Simulate a restart of the application: new MongoDB connection, new provider, new agent.
-    // Nothing is shared in memory with the first agent: only the saved JSON and the documents in MongoDB.
+    // Step 5: Simulate a restart of the application: new connection to the storage, new provider, new agent.
+    // Nothing is shared in memory with the first agent: only the saved JSON and the stored messages.
     ColoredConsole.WriteDividerLine();
-    ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...");
-    AIAgent restartedAgent = createAgent(await ConfigurationHelper.ConnectToMongoDbAsync());
+    ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new connection to the storage, session restored from the saved JSON...");
+    AIAgent restartedAgent = createAgent(await ConfigurationHelper.CreateChatHistoryStoreAsync());
     AgentSession resumedSession = await restartedAgent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
 
-    // Step 6: Display the key of the restored session: the key of the documents in the chat_history collection
-    MongoChatHistoryProvider chatHistoryProvider = restartedAgent.GetService<MongoChatHistoryProvider>()!;
-    ColoredConsole.WriteInfoLine($"Restored session - chat history stored in MongoDB under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");
+    // Step 6: Display the key of the restored session: the key of the stored messages (field SessionId)
+    PersistentChatHistoryProvider chatHistoryProvider = restartedAgent.GetService<PersistentChatHistoryProvider>()!;
+    ColoredConsole.WriteInfoLine($"Restored session - chat history stored under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");
 
-    // Step 7: Ask the follow-up question to the new agent: the history comes from MongoDB
+    // Step 7: Ask the follow-up question to the new agent: the history comes from the storage
     ColoredConsole.WritePrimaryLogLine($"User: {Questions.FollowUp}");
     AgentResponse followUpResponse = await restartedAgent.RunAsync(Questions.FollowUp, resumedSession).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");

@@ -19,8 +19,10 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
-    <!-- Official MongoDB driver: storage of the user memories. -->
+    <!-- Official MongoDB driver: storage of the user memories (Storage:Mode = MongoDb or EmbeddedMongoDb). -->
     <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
+    <!-- MongoDB without Docker and without installation (Storage:Mode = EmbeddedMongoDb): downloads and starts mongod. -->
+    <PackageReference Include="EphemeralMongo" Version="3.3.0" />
   </ItemGroup>
 
   <ItemGroup>

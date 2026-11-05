@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
-using MongoDB.Bson;
-using MongoDB.Driver;
+using CommonUtilities;
+using AIAgentWithThreads.Stores;
 
 namespace AIAgentWithThreads;
 
@@ -41,34 +41,41 @@ public static class ConfigurationHelper
     }
 
     /// <summary>
-    /// Connect to the MongoDB database of the configuration and check that the server answers.
+    /// Opens the storage of the chat history chosen by <c>Storage:Mode</c>: MongoDB (Docker container, local installation or Atlas),
+    /// a MongoDB started by the lab (no Docker), or a JSON file (no MongoDB). Each call opens a new connection.
     /// </summary>
-    /// <returns>The MongoDB database that stores the chat history.</returns>
-    public static async Task<IMongoDatabase> ConnectToMongoDbAsync(CancellationToken cancellationToken = default)
+    /// <returns>The store of the chat history.</returns>
+    public static async Task<IChatHistoryStore> CreateChatHistoryStoreAsync(CancellationToken cancellationToken = default)
     {
+        StorageSettings storage = Configuration.GetSection("Storage").Get<StorageSettings>() ?? new StorageSettings();
         MongoDbSettings settings = Configuration.GetSection("MongoDb").Get<MongoDbSettings>()
             ?? throw new InvalidOperationException("MongoDb configuration section is missing.");
 
-        EnsureConfigured(settings.ConnectionString, "MongoDb:ConnectionString");
         EnsureConfigured(settings.DatabaseName, "MongoDb:DatabaseName");
 
-        MongoClientSettings clientSettings = MongoClientSettings.FromConnectionString(settings.ConnectionString);
-        // Fail fast (instead of the 30 seconds default) when MongoDB is not started.
-        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
-
-        IMongoDatabase database = new MongoClient(clientSettings).GetDatabase(settings.DatabaseName);
-        try
+        IChatHistoryStore store;
+        switch (storage.Mode)
         {
-            await database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
-        }
-        catch (TimeoutException exception)
-        {
-            throw new InvalidOperationException(
-                $"MongoDB is not reachable with the connection string of 'MongoDb:ConnectionString'. " +
-                "Start it with 'docker compose up -d' in the MongoDB folder of the lab.", exception);
+            case StorageMode.JsonFile:
+                store = new JsonFileChatHistoryStore(Path.Combine(storage.GetDataDirectory(settings.DatabaseName), "chat_history.json"));
+                break;
+
+            case StorageMode.EmbeddedMongoDb:
+                store = new MongoChatHistoryStore(
+                    await MongoDbConnection.ConnectAsync(storage, settings, cancellationToken),
+                    $"embedded MongoDB, database '{settings.DatabaseName}'");
+                break;
+
+            default:
+                EnsureConfigured(settings.ConnectionString, "MongoDb:ConnectionString");
+                store = new MongoChatHistoryStore(
+                    await MongoDbConnection.ConnectAsync(storage, settings, cancellationToken),
+                    $"MongoDB, database '{settings.DatabaseName}'");
+                break;
         }
 
-        return database;
+        ColoredConsole.WriteSecondaryLogLine($"Chat history storage: {store.Description} (Storage:Mode = {storage.Mode})");
+        return store;
     }
 
     private static void EnsureConfigured(string value, string key)
