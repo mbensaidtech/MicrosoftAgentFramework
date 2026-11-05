@@ -514,6 +514,30 @@ For labs that expose an agent as an MCP tool, check what the MCP client sees (th
 For labs with an `AIContextProvider`, make the provider write what it does while the agent runs (memories added before the model call, memories extracted after it) and check those lines in order, the data stored for the scope (the user) and what only the provider can give in a **new** session: the name and a preference of the user, with lookaheads over a multi-line answer, bounded by the next block (see `azureopenai-lab12`). Accept any of several memory-only details (`vegetarian`, `tofu`, `Alps`...): the model words its answer differently from one run to another.
 For labs that log HTTP traffic, check the logged request itself (the URL, a header added by the handler, the status and duration of the response), that no credential header is printed in clear (a lookahead anchored at `\A` on the whole output, so the pattern is tried once), and what only the second request of a function call contains (`"role": "tool"` with the tool result), not only the agent answer (see `azureopenai-lab11`).
 
+### Provided texts (LabPrompts.cs)
+
+The learner never writes the texts sent to the model: every lab of the catalog provides them, so the whole room runs the same agents with the same questions and
+gets answers comparable with the README's Expected Output. Reference implementation: `LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent`.
+
+- **One file per lab project**, `LabPrompts.cs`, byte-identical in `Start/` and `Solution/`, in the namespace of the project, headed by the
+  "PROVIDED - do not edit" banner and its explanation (copy Lab01's). A lab with two projects (Lab06 client and server) has one file per project, holding only the texts that project uses.
+- **Shape**: one nested static class per agent, `Agents.<Agent>.Name` / `.Instructions` (and `.Description` when the agent is exposed as a tool or an A2A card);
+  `Questions.<Name>` for every question or user message, follow-ups included; `SystemMessages.<Name>` when the lab has some; any other text sent to the model
+  in a class with an explicit name (`ToolDescriptions`, `ContextTexts`, `JudgeCriteria`...). All `const string`, each with an XML `<summary>` naming the scenario(s) that use it.
+  One constant per distinct value, never a computed string; a text with a run-time value is a format string, filled in `Program.cs` with
+  `string.Format(CultureInfo.InvariantCulture, ...)`. No constant for what is absent on purpose (an agent with no name or no instructions).
+- **What is provided**: agent names, instructions, system messages, questions, descriptions, judge criteria, injected contexts — anything that is not
+  Agent Framework knowledge. A text stays for the learner to write **only when writing it is the objective of the TODO** (Lab03 TODO 11, the refusal message;
+  Lab07 TODO 15, the Q:/A: text), and the lab's README says so. Console titles and labels are not concerned. Data files (`Data/*.json`, `skills/**/SKILL.md`) stay where they are.
+- **Verbatim**: the texts keep their wording: the checks and the README Expected Output were produced with them.
+- **Solution** uses the constants everywhere, no such string literal left. **Start**: each TODO names the `Agents.<Agent>` class and the `Questions.<Name>` (or other)
+  constant to use, hints show constants, never the literal text, and the scenario code stays commented out. **README**: the "texts are provided" paragraph
+  under "Complete the Program.cs", hints that cite constants, and `LabPrompts.cs` in "Project Structure" and first in "Provided Files".
+- **Fingerprints**: `LabPrompts.cs` holds only constants, but any change to the executable code of a Start (a provided `const`, a format call, a using) changes
+  its fingerprints: regenerate them with `dotnet run -- exercise-fingerprints` and check that the Start still lists every scenario as not implemented.
+
+MultiAgentSystem `Lab02_OrchestrationSequential` and `Lab03_OrchestrationConcurrent` (not in the catalog yet) do not have the file: they adopt the convention when they are migrated.
+
 ## Tests
 
 ```bash

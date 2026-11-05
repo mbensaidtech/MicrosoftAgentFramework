@@ -1,6 +1,6 @@
 ---
 title: Labs - Provided Agent Prompts
-status: draft
+status: implemented
 priority: medium
 author: PM Agent
 created: 2026-11-05
@@ -23,10 +23,10 @@ In every lab, the name of each agent, its instructions and the questions it is a
 
 ## Goals
 
-- [ ] In every lab in scope, no agent name, agent instructions, system message or question has to be written by the learner: each one is a named constant of `LabPrompts.cs`.
-- [ ] Each Start TODO that creates or runs an agent names the constant to use; each README hint points to the constants.
-- [ ] The Solution of every lab in scope uses the constants, with no such text left hard-coded in its code.
-- [ ] Every lab in scope still builds, passes the dashboard tests, and reports its delivered Start as "not implemented" and its Solution as "implemented".
+- [x] In every lab in scope, no agent name, agent instructions, system message or question has to be written by the learner: each one is a named constant of `LabPrompts.cs`.
+- [x] Each Start TODO that creates or runs an agent names the constant to use; each README hint points to the constants.
+- [x] The Solution of every lab in scope uses the constants, with no such text left hard-coded in its code.
+- [x] Every lab in scope still builds, passes the dashboard tests, and reports its delivered Start as "not implemented" and its Solution as "implemented".
 
 ## Non-Goals
 
@@ -39,6 +39,7 @@ In every lab, the name of each agent, its instructions and the questions it is a
 ## Changelog
 
 - **v1.0** (2026-11-05) — Initial release. Tasks T1..T5, no Jira Epic (mini-spec). Lab01 already converted (reference implementation).
+- **v1.0 delivered** (2026-11-05) — Lab01 pilot `019253a`, T1 `7c8c88f`, T2 `4229fee`, T3 `54edd3a`, T4 `467c335`, T5 (this commit). No other Start was found committed solved.
 
 ---
 
@@ -205,12 +206,52 @@ No schema changes.
 
 ## Test Plan
 
-> Auto-populated by `mbs-spec-dev` after the last implementation task is Done.
-> Status: _pending_
->
-> This section will contain step-by-step manual verification steps covering every User Story and critical Edge Case, referencing the ACTUAL delivered routes, selectors, and behaviors. Initially for human walkthrough; later consumable by a test agent.
->
-> **Do NOT fill this section at PM time.** Leave it exactly as above — `mbs-spec-dev` detects the `_pending_` marker and replaces it after all tasks complete.
+> Generated: 2026-11-05
+> Status: ready-for-qa
+> Delivered by: T1, T2, T3, T4, T5 (no Jira)
+
+### Prerequisites
+
+- .NET 10 SDK; the labs built once (`dotnet build` of a Start and a Solution).
+- For the runs against the model (Scenario 3): valid Azure OpenAI settings (user secrets `AzureOpenAI:*` or the dashboard's *Azure OpenAI settings*). Builds, `--list-scenarios` and the dashboard tests need none.
+
+### Scenario 1 — A learner finds the texts provided (Story 1)
+
+1. Open `LearningLabs/AzureOpenAI/Lab03-AIAgentWithFunctionTools/Start/LabPrompts.cs`.
+   → Expect: the "PROVIDED - do not edit" banner, `Agents.CompanyAssistant`, `Agents.NotificationAssistant`, and `Questions` with a summary naming each scenario.
+2. Open `Start/Program.cs` of the same lab, scenario 2.
+   → Expect: TODO 13 names `Questions.BookPastAndTomorrowMeetings` and its hint shows the `string.Format(...)` call with the date of tomorrow; no literal question to type.
+3. Open the lab's `README.md`, section "Complete the Program.cs".
+   → Expect: the paragraph saying the texts are provided; the hints give constants; TODO 11 says the refusal message is yours to write (it is the objective of the TODO).
+4. Repeat steps 1–2 on Lab06_A2AServer (agent card name and description come from `Agents.<X>.Description`) and MultiAgentSystem Lab01 (`ToolDescriptions`, `CustomerMessages`).
+
+**Negative case**: in any lab of the catalog, search the Start and the README for `e.g., "` next to an agent name, instructions or question.
+   → Expect: no hit, except the documented exceptions (Lab03 TODO 11, Lab07 TODO 15) and console labels.
+
+### Scenario 2 — The delivered exercise is untouched (Story 1)
+
+1. From a lab folder, run `dotnet run --project Start -- --list-scenarios`, then `dotnet run --project Solution -- --list-scenarios`, on Lab01, Lab05, Lab09, Lab12 and MultiAgentSystem Lab01.
+   → Expect: Start lists every scenario "not implemented (code unchanged since delivered)" and the setup line "still the delivered one"; Solution lists every scenario "implemented".
+2. In Lab01 Start, write the code of TODO 4–6 only, then list the scenarios again.
+   → Expect: scenario 1 "implemented", the others still "not implemented".
+3. From `Dashboard/`, run `dotnet test`, and from the root `dotnet run --project Dashboard/LabDashboard -- exercise-fingerprints`.
+   → Expect: tests green; every lab "unchanged".
+
+### Scenario 3 — Everyone gets comparable answers (Story 2)
+
+1. Run the Solution of Lab01 (`dotnet run`), then of Lab07 and Lab14, with valid credentials.
+   → Expect: the same answers as the README's Expected Output (in substance), the dashboard checks of each scenario pass in the Lab Bench dashboard.
+2. Lab14: compare the reference and candidate runs.
+   → Expect: the candidate (degraded instructions) is flagged as a regression, as before.
+
+### Cross-cutting checks
+
+- `Start/LabPrompts.cs` and `Solution/LabPrompts.cs` are identical in every lab (`cmp`).
+- The root README shows `LabPrompts.cs` in the lab structure; `Dashboard/README.md` § "Provided texts (LabPrompts.cs)" documents the convention for authors.
+
+### Rollback / cleanup
+
+- Revert the code written in Lab01 Start at Scenario 2 step 2 (`git restore LearningLabs/AzureOpenAI/Lab01-FirstBasicAIAgent/Start/Program.cs`).
 
 ## Dependencies
 
@@ -225,5 +266,5 @@ No schema changes.
 
 ## Open Questions
 
-- [ ] Lab14: is degrading the prompt a learning objective of a TODO (the learner writes the degraded prompt) or a provided variant (`Agents.<Agent>.DegradedInstructions`)? Default: provided variant, the objective being to see the regression detected.
-- [ ] T1–T4 are independent: implement them in parallel (one agent per task) or in order with a review after T1? Default: in order, review after T1, then T2–T4.
+- [x] Lab14: is degrading the prompt a learning objective of a TODO or a provided variant? **Provided** (`Agents.Support.CandidateInstructions`): the objective is to see the regression detected. Lab14 has no judge text to provide (built-in Relevance and Coherence evaluators).
+- [x] T1–T4 in parallel or in order? **In order**, one commit per task (user decision, 2026-11-05).

@@ -16,16 +16,18 @@ Each lab follows a consistent structure designed for effective learning:
 LabXX-LabName/
 ├── README.md       <-- Detailed instructions, hints, and explanations
 ├── Start/          <-- Your working folder with TODOs to complete
-│   └── Program.cs  <-- Contains step-by-step TODOs with hints
+│   ├── Program.cs     <-- Contains step-by-step TODOs with hints
+│   └── LabPrompts.cs  <-- Provided: names, instructions and questions of the agents
 └── Solution/       <-- Complete reference implementation
-    └── Program.cs  <-- Fully working code to compare with your solution
+    ├── Program.cs     <-- Fully working code to compare with your solution
+    └── LabPrompts.cs  <-- The same file as in Start/
 ```
 
 #### How to Work with Each Lab
 
 1. **Read the README.md** - Understand the objective and key concepts
 2. **Open the `Start/` folder** - This is your working directory
-3. **Complete the TODOs** - Follow the comments in `Program.cs` with basic hints
+3. **Complete the TODOs** - Follow the comments in `Program.cs` with basic hints. The names, instructions and questions of the agents are **provided** in `LabPrompts.cs` (do not edit it): use its constants (`Agents.<Agent>.Name`, `Agents.<Agent>.Instructions`, `Questions.<Name>`...) instead of writing your own texts, so everyone runs the same agents, gets answers comparable with the README's Expected Output, and spends the lab on the Agent Framework code
 4. **Need more help?** - Check the README.md for detailed hints and explanations
 5. **Stuck?** - Compare your code with the `Solution/` folder
 
@@ -106,7 +108,7 @@ Labs live in `LearningLabs/<Part>/<LabFolder>/`, and each lab has two projects:
 
 | Folder | Content | When to run it |
 |--------|---------|----------------|
-| `Start/` | The exercise, with `TODO` comments to complete | While you work on the lab |
+| `Start/` | The exercise, with `TODO` comments to complete in `Program.cs`, and the provided texts of the agents in `LabPrompts.cs` | While you work on the lab |
 | `Solution/` | The complete reference implementation | To see the expected behavior, or to compare |
 
 ```bash
@@ -552,7 +554,7 @@ The `CommonUtilities` project provides shared helper classes used across all lab
 
 2. **Configure Azure OpenAI once** — see [Configure Azure OpenAI](#configure-azure-openai)
 
-3. **Choose a lab** (AzureOpenAI/Lab01 recommended for beginners), read its `README.md` and complete the TODOs in `Start/Program.cs`
+3. **Choose a lab** (AzureOpenAI/Lab01 recommended for beginners), read its `README.md` and complete the TODOs in `Start/Program.cs`, using the agent names, instructions and questions provided in `Start/LabPrompts.cs`
 
 4. **Run it** with either option (see [Running the Labs](#running-the-labs-cli-or-dashboard)):
    ```bash
