@@ -35,6 +35,7 @@ Lab08-DataFormatComparison/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions and question of the agents
 │   ├── Models/
 │   │   └── Hotel.cs                <-- The hotel type (provided)
 │   ├── Tools/
@@ -90,6 +91,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names and the instructions of the two agents, and the question asked to both (see Step 3).
 - `Models/Hotel.cs` — the hotel type, used everywhere: read from `Data/hotels.json`, returned by the JSON tool, deserialized from the structured output of scenario 1 and parsed back from the CSV answer of scenario 2. Its `[Description]` attributes are copied into the JSON schema of scenario 1.
 - `Tools/HotelTools.cs` — the two function tools, both named `get_all_hotels` when given to an agent: `GetAllHotelsAsJson()` returns the hotels as **objects** (`IReadOnlyList<Hotel>`), `GetAllHotelsAsCsv()` returns them as **CSV text**. Their `[Description]` tells the model what the tool returns.
 - `HotelCsv.cs` — `Header` (`Name,City,Stars,PricePerNight,Currency,Rooms,HasPool,HasWifi,Rating`), `Serialize(hotels)` and `Deserialize(text)`, which throws a `FormatException` when the text is not the expected CSV.
@@ -99,7 +101,9 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the question of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.HotelJson.Name`, `Agents.HotelJson.Instructions`, `Agents.HotelCsv.Name`, `Agents.HotelCsv.Instructions`) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The question, `Questions.HotelsUnder100Usd`, is already in the `question` variable of the setup.
 
 ---
 
@@ -119,7 +123,7 @@ TODO 1 to 3 are the same as in Lab 01.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Create the JSON tool and the agent | • `AITool getAllHotelsAsJson = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsJson, "get_all_hotels");` <br> • `AIAgent jsonAgent = chatClient.AsAIAgent(instructions: "You are a hotel data assistant. Call get_all_hotels to get the hotels, then answer with every hotel that matches the request, in the requested order.", name: "HotelJsonAgent", tools: [getAllHotelsAsJson]);` <br> • The tool returns objects: the framework serializes them as JSON (indented, camelCase) in the tool result |
+| **TODO 4** | Create the JSON tool and the agent | • `AITool getAllHotelsAsJson = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsJson, "get_all_hotels");` <br> • `AIAgent jsonAgent = chatClient.AsAIAgent(instructions: Agents.HotelJson.Instructions, name: Agents.HotelJson.Name, tools: [getAllHotelsAsJson]);` <br> • The tool returns objects: the framework serializes them as JSON (indented, camelCase) in the tool result |
 | **TODO 5** | Run the agent with structured output | • `jsonResponse = await jsonAgent.RunAsync<List<Hotel>>(question).WithSpinner("Running agent");` <br> • The JSON schema of `List<Hotel>` is sent as the response format of the run (Lab 02); `jsonResponse.Result` is already a `List<Hotel>` |
 | **TODO 6** | Display the tool calls and the typed result | • `WriteToolCalls(jsonResponse);` — `Tool called: get_all_hotels()` and `Tool result sent to the model: ... characters` <br> • `WriteHotels(jsonResponse.Result, "Hotels returned by the agent");` <br> • Expected: up to 43 hotels (the model often skips a few), `Backpacker Hostel (Bangkok) - 25 USD/night` first |
 | **TODO 7** | Display token usage | • `WriteTokenUsage(jsonResponse, "Token Usage (JSON):");` <br> • Total of the model calls of the run: the call that asks for the tool, then the call that answers with the tool result |
@@ -130,7 +134,7 @@ TODO 1 to 3 are the same as in Lab 01.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 8** | Create the CSV tool and the agent | • `AITool getAllHotelsAsCsv = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsCsv, "get_all_hotels");` <br> • `AIAgent csvAgent = chatClient.AsAIAgent(instructions: $"""..."""`, `name: "HotelCsvAgent", tools: [getAllHotelsAsCsv]);` with these instructions (an interpolated raw string literal, `{HotelCsv.Header}` on its own line): <br> `You are a hotel data assistant. Call get_all_hotels to get the hotels as CSV, then answer with every hotel that matches the request, in the requested order.` <br> `Answer ONLY in CSV, with exactly this header line and then one line per hotel, with the same columns and values as the tool result:` <br> `{HotelCsv.Header}` <br> `No explanation, no markdown, no code fences.` |
+| **TODO 8** | Create the CSV tool and the agent | • `AITool getAllHotelsAsCsv = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsCsv, "get_all_hotels");` <br> • `AIAgent csvAgent = chatClient.AsAIAgent(instructions: Agents.HotelCsv.Instructions, name: Agents.HotelCsv.Name, tools: [getAllHotelsAsCsv]);` <br> • The instructions ask for an answer **only** in CSV, with the header line `HotelCsv.Header` and the same columns and values as the tool result: a request, not a schema |
 | **TODO 9** | Run the agent | • `csvResponse = await csvAgent.RunAsync(question).WithSpinner("Running agent");` — the non-generic `RunAsync`: the answer is text |
 | **TODO 10** | Display the tool calls and the raw answer | • `WriteToolCalls(csvResponse);` <br> • `ColoredConsole.WritePrimaryLogLine("Agent answer (CSV):");` <br> • `ColoredConsole.WriteSecondaryLogLine(csvResponse.Text);` |
 | **TODO 11** | Parse the CSV back into hotels | • `try { List<Hotel> csvHotels = HotelCsv.Deserialize(csvResponse.Text); WriteHotels(csvHotels, "Hotels parsed back from the CSV answer"); }` — the same display as scenario 1: only hotels parsed back into `Hotel` objects can be listed <br> • `catch (FormatException ex) { ColoredConsole.WriteErrorLine($"The answer is not the expected CSV: {ex.Message}"); }` <br> • No schema guarantees the format: the instructions are a request, not a guarantee |
@@ -292,6 +296,7 @@ The sizes of the tool results are exact (same data every time). The token counts
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and question of the agents, the same for everyone
 - `DataFormatComparison.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

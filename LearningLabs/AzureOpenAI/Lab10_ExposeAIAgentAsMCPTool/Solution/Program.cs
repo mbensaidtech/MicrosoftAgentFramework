@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using System.Reflection;
 using Azure.Identity;
 using Microsoft.Agents.AI;
@@ -76,9 +77,9 @@ ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);
 // Its name and its description become the name and the description of the MCP tool.
 var companyTools = new CompanyTools();
 AIAgent companyAssistant = chatClient.AsAIAgent(
-    instructions: "You are a helpful assistant that can help with company tasks. Answer with the facts returned by the tools.",
-    name: "CompanyAssistant",
-    description: "Answers questions about the employees and the meeting rooms of the company, and books meeting rooms.",
+    instructions: Agents.CompanyAssistant.Instructions,
+    name: Agents.CompanyAssistant.Name,
+    description: Agents.CompanyAssistant.Description,
     tools:
     [
         AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"),
@@ -146,7 +147,7 @@ if (ShouldRunScenario(1) || httpServerMode)
     // Step 3: Be an MCP client of the server, as MCP Inspector or VS Code would be: connect with the Streamable HTTP
     // transport, list the tools (the agent is one tool, with a "query" parameter) and call the tool. The server runs the
     // CompanyAssistant agent, which calls its own tools, and returns the agent's answer.
-    const string query = "Get the information of the employee with the ID EMP003.";
+    const string query = Questions.EmployeeInfoEmp003;
     ColoredConsole.WritePrimaryLogLine($"Query: {query}");
 
     await using (McpClient mcpClient = await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
@@ -184,7 +185,7 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===");
 
-    const string query = "Which meeting rooms can host at least 10 people?";
+    const string query = Questions.RoomsForTenPeople;
     ColoredConsole.WritePrimaryLogLine($"Query: {query}");
 
     // Step 1: Describe how to start the server. An MCP host starts a local MCP server as a child process and talks to it
@@ -220,8 +221,8 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===");
 
-    string prompt = $"Book the meeting room ROOM-B for the employee EMP002 on {DateTime.Today.AddDays(1):yyyy-MM-dd} " +
-                    "from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.";
+    string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    string prompt = string.Format(CultureInfo.InvariantCulture, Questions.BookRoomBTomorrow, tomorrow);
     ColoredConsole.WritePrimaryLogLine($"User: {prompt}");
 
     // Step 1: Start the stdio server and connect to it (same as scenario 2)
@@ -237,9 +238,8 @@ if (ShouldRunScenario(3))
     // whose only tool is the CompanyAssistant
     IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
     AIAgent officeAssistant = chatClient.AsAIAgent(
-        instructions: "You are the personal assistant of the employees. Delegate every question or task about the company " +
-                      "to the CompanyAssistant tool, then report its answer briefly.",
-        name: "OfficeAssistant",
+        instructions: Agents.OfficeAssistant.Instructions,
+        name: Agents.OfficeAssistant.Name,
         tools: [.. mcpTools.Cast<AITool>()]);
 
     // Step 3: Run the OfficeAssistant: its model calls the CompanyAssistant tool, and the MCP server runs the CompanyAssistant agent.

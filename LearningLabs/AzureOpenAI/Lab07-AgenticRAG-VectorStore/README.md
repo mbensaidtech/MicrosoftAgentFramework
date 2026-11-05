@@ -39,6 +39,7 @@ Lab07-AgenticRAG-VectorStore/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions and questions of the agents
 │   ├── Models/
 │   │   └── FaqRecord.cs            <-- The record stored in the vector store (provided)
 │   ├── Tools/
@@ -114,6 +115,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names, the instructions and the questions of the agents, and the question of the semantic search (see Step 3).
 - `Models/FaqRecord.cs` — a FAQ entry as the vector store sees it. The attributes define the schema of the collection: `[VectorStoreKey]` on `Id`, `[VectorStoreData]` on `Question` and `Answer`, and `[VectorStoreVector]` on `Embedding`. `Embedding` is a **string** (question + answer): when a record is upserted, the store generates its vector itself with the `EmbeddingGenerator` you give it, and when you search with a string, the store embeds the question the same way. The same class reads `Data/sav-faq.json`.
 - `Tools/FaqSearchTool.cs` — the function tool of scenario 3: `SearchFaqAsync(question, top)` searches the collection and returns the closest entries as text (id, score, question, answer). The `[Description]` attributes are what the model reads to decide when to call it.
 - `FaqData.cs` — `LoadAsync()` reads the 20 entries of `Data/sav-faq.json` (an after-sales FAQ: returns, refunds, delivery, payment, warranty...).
@@ -122,7 +124,11 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Faq.Name`, `Agents.Faq.Instructions`, `Agents.FaqRag.Name`, `Questions.BrokenItem`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The questions match entries of `Data/sav-faq.json`: the Expected Output below and the dashboard check the entries they find.
+
+The text of each search result returned by the provider (TODO 15) is not in `LabPrompts.cs`: it is built from the FAQ record (`Q: ...` / `A: ...`), and mapping the records to `TextSearchResult` is the objective of this TODO.
 
 ---
 
@@ -157,7 +163,7 @@ The store is in memory: it starts empty at each run, so scenario 1 must run befo
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 10** | Search the 3 closest entries and display them | • `string question = "Is there a phone number I can call for help?";` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {question}");` <br> • `int rank = 0;` <br> • `await foreach (VectorSearchResult<FaqRecord> result in faqCollection.SearchAsync(question, top: 3)) { WriteSearchResult(++rank, result); }` <br> • The question shares no word with `faq-010` ("How do I contact customer support?"), yet it is the first result: the search compares meanings <br> • `result.Record` is the `FaqRecord`, `result.Score` its cosine similarity with the question (1 = same meaning) |
+| **TODO 10** | Search the 3 closest entries and display them | • `string question = Questions.PhoneNumberForHelp;` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {question}");` <br> • `int rank = 0;` <br> • `await foreach (VectorSearchResult<FaqRecord> result in faqCollection.SearchAsync(question, top: 3)) { WriteSearchResult(++rank, result); }` <br> • The question shares no word with `faq-010` ("How do I contact customer support?"), yet it is the first result: the search compares meanings <br> • `result.Record` is the `FaqRecord`, `result.Score` its cosine similarity with the question (1 = same meaning) |
 
 ---
 
@@ -166,8 +172,8 @@ The store is in memory: it starts empty at each run, so scenario 1 must run befo
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 11** | Turn the search into a function tool | • `FaqSearchTool faqSearchTool = new(faqCollection);` <br> • `AITool searchFaqTool = AIFunctionFactory.Create(faqSearchTool.SearchFaqAsync, "search_faq");` |
-| **TODO 12** | Create the agent with the tool | • `AIAgent faqAgent = chatClient.AsAIAgent(instructions: "You are the customer support assistant of an online shop. Answer only from the FAQ: call search_faq to find the relevant entries, answer from them and quote the id of the entries you used. If the FAQ does not cover the question, say so.", name: "FaqAgent", tools: [searchFaqTool]);` |
-| **TODO 13** | Run the agent, then display the tool calls and the answer | • `string question = "I received a broken item yesterday. What should I do?";` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {question}");` <br> • `AgentResponse response = await faqAgent.RunAsync(question).WithSpinner("Running agent");` <br> • `WriteToolCalls(response);` — the function calls of the run are kept in `response.Messages` <br> • `ColoredConsole.WritePrimaryLogLine($"Agent: {response.Text}");` <br> • Expected: `Tool called: search_faq(question: ...)`, then an answer built on `faq-005` (contact customer service within 48 hours, with photos) |
+| **TODO 12** | Create the agent with the tool | • `AIAgent faqAgent = chatClient.AsAIAgent(instructions: Agents.Faq.Instructions, name: Agents.Faq.Name, tools: [searchFaqTool]);` <br> • The instructions tell the agent to answer only from the FAQ, to call `search_faq` and to quote the ids of the entries it used |
+| **TODO 13** | Run the agent, then display the tool calls and the answer | • `string question = Questions.BrokenItem;` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {question}");` <br> • `AgentResponse response = await faqAgent.RunAsync(question).WithSpinner("Running agent");` <br> • `WriteToolCalls(response);` — the function calls of the run are kept in `response.Messages` <br> • `ColoredConsole.WritePrimaryLogLine($"Agent: {response.Text}");` <br> • Expected: `Tool called: search_faq(question: ...)`, then an answer built on `faq-005` (contact customer service within 48 hours, with photos) |
 | **TODO 14** | Display token usage | • `WriteTokenUsage(response);` <br> • Total of the model calls of the run: the call that asks for the tool, then the call that answers with the tool result |
 
 ---
@@ -180,9 +186,9 @@ The store is in memory: it starts empty at each run, so scenario 1 must run befo
 |------|-------------|-------|
 | **TODO 15** | Write the search function of the provider | • Signature: `async Task<IEnumerable<TextSearchProvider.TextSearchResult>> SearchFaqForProviderAsync(string text, CancellationToken cancellationToken)` (a local function inside the scenario) <br> • `List<TextSearchProvider.TextSearchResult> results = [];` <br> • `await foreach (VectorSearchResult<FaqRecord> result in faqCollection.SearchAsync(text, top: 2, cancellationToken: cancellationToken)) { results.Add(new TextSearchProvider.TextSearchResult { SourceName = result.Record.Id, Text = $"Q: {result.Record.Question}\nA: {result.Record.Answer}", RawRepresentation = result }); }` <br> • `ColoredConsole.WriteWarningLine($"[TextSearchProvider] Search input: {text.ReplaceLineEndings(" \| ")}");` <br> • `ColoredConsole.WriteWarningLine($"[TextSearchProvider] Results: {string.Join(", ", results.Select(result => result.SourceName))}");` <br> • `return results;` <br> • `SourceName` becomes the "source document name" that the model is asked to cite |
 | **TODO 16** | Configure the provider | • `TextSearchProviderOptions textSearchOptions = new() { SearchTime = TextSearchProviderOptions.TextSearchBehavior.BeforeAIInvoke, RecentMessageMemoryLimit = 2 };` <br> • `BeforeAIInvoke` (the default): search before every model call <br> • `RecentMessageMemoryLimit = 2`: the last 2 user messages of the session are added to the search input, so that a vague follow-up question is searched with its context |
-| **TODO 17** | Create the agent with the provider | • `AIAgent ragAgent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "FaqRagAgent", ChatOptions = new ChatOptions { Instructions = "You are the customer support assistant of an online shop. Answer only from the provided context and quote the id of the FAQ entries you used. Keep the answers short." }, AIContextProviders = [new TextSearchProvider(SearchFaqForProviderAsync, textSearchOptions)], ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { StorageInputRequestMessageFilter = messages => messages.Where(message => message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.AIContextProvider && message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.ChatHistory) }) });` <br> • `AIContextProviders`: the providers called around each run <br> • The `ChatHistoryProvider` filter keeps the messages produced by the provider (the search results) out of the stored history: without it, every later question would send them again |
-| **TODO 18** | Create a session and ask a first question | • `AgentSession session = await ragAgent.CreateSessionAsync();` <br> • `string firstQuestion = "I want to send back a jacket I bought last week. How does it work?";` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {firstQuestion}");` <br> • `AgentResponse firstResponse = await ragAgent.RunAsync(firstQuestion, session);` (no `.WithSpinner()`: the provider writes to the console during the run) <br> • `ColoredConsole.WritePrimaryLogLine($"Agent: {firstResponse.Text}");` <br> • `WriteTokenUsage(firstResponse, "Token Usage (first question):");` <br> • Expected: the provider finds `faq-001` and the answer gives the 30 days and 'My Orders' |
-| **TODO 19** | Ask a follow-up question in the same session | • `string followUpQuestion = "And how long until I get my money back?";` <br> • Same code as TODO 18 with `followUpQuestion`, `followUpResponse` and `WriteTokenUsage(followUpResponse, "Token Usage (follow-up):")` <br> • Expected: the search input contains both questions, the provider finds `faq-002`, and the answer gives 5-7 business days |
+| **TODO 17** | Create the agent with the provider | • `AIAgent ragAgent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.FaqRag.Name, ChatOptions = new ChatOptions { Instructions = Agents.FaqRag.Instructions }, AIContextProviders = [new TextSearchProvider(SearchFaqForProviderAsync, textSearchOptions)], ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { StorageInputRequestMessageFilter = messages => messages.Where(message => message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.AIContextProvider && message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.ChatHistory) }) });` <br> • `AIContextProviders`: the providers called around each run <br> • The `ChatHistoryProvider` filter keeps the messages produced by the provider (the search results) out of the stored history: without it, every later question would send them again |
+| **TODO 18** | Create a session and ask a first question | • `AgentSession session = await ragAgent.CreateSessionAsync();` <br> • `string firstQuestion = Questions.SendBackJacket;` <br> • `ColoredConsole.WriteSecondaryLogLine($"Question: {firstQuestion}");` <br> • `AgentResponse firstResponse = await ragAgent.RunAsync(firstQuestion, session);` (no `.WithSpinner()`: the provider writes to the console during the run) <br> • `ColoredConsole.WritePrimaryLogLine($"Agent: {firstResponse.Text}");` <br> • `WriteTokenUsage(firstResponse, "Token Usage (first question):");` <br> • Expected: the provider finds `faq-001` and the answer gives the 30 days and 'My Orders' |
+| **TODO 19** | Ask a follow-up question in the same session | • `string followUpQuestion = Questions.MoneyBackDelay;` <br> • Same code as TODO 18 with `followUpQuestion`, `followUpResponse` and `WriteTokenUsage(followUpResponse, "Token Usage (follow-up):")` <br> • Expected: the search input contains both questions, the provider finds `faq-002`, and the answer gives 5-7 business days |
 
 ---
 
@@ -361,6 +367,7 @@ What the search returns goes into the request of the model: as a **tool result**
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, the same for everyone
 - `AgenticRAG.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI (chat and embedding deployments, optional embedding resource)

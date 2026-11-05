@@ -86,15 +86,13 @@ if (ShouldRunScenario(1))
 
     // Step 3: Create the two agents. Their names are the keys used by the A2A hosting to find them.
     AIAgent authAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. " +
-                      "When you generate a key, return the key exactly as produced by the tool.",
-        name: "AuthAgent",
+        instructions: Agents.Auth.Instructions,
+        name: Agents.Auth.Name,
         tools: tools);
 
     AIAgent customerToneAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. " +
-                      "Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.",
-        name: "CustomerToneAgent");
+        instructions: Agents.CustomerTone.Instructions,
+        name: Agents.CustomerTone.Name);
 
     // Step 4: Give each agent a session store, registered under the name of the agent: the A2A hosting keeps there the
     // conversation of each contextId. Without a store, it uses a NoopAgentSessionStore, which keeps nothing: every

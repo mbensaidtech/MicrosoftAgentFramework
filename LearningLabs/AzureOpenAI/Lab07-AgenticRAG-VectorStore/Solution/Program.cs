@@ -104,7 +104,7 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteInfoLine("=== Scenario 2: Semantic search - without an agent ===");
 
     // Step 1: A question that shares no word with the FAQ entry it is about (faq-010 "How do I contact customer support?")
-    string question = "Is there a phone number I can call for help?";
+    string question = Questions.PhoneNumberForHelp;
     ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
 
     // Step 2: Search the 3 closest entries: the store embeds the question, then compares its vector with the vectors of the entries
@@ -132,14 +132,12 @@ if (ShouldRunScenario(3))
 
     // Step 2: Create the agent with the tool: it decides itself when to search, and with which question
     AIAgent faqAgent = chatClient.AsAIAgent(
-        instructions: "You are the customer support assistant of an online shop. " +
-                      "Answer only from the FAQ: call search_faq to find the relevant entries, answer from them and quote the id of the entries you used. " +
-                      "If the FAQ does not cover the question, say so.",
-        name: "FaqAgent",
+        instructions: Agents.Faq.Instructions,
+        name: Agents.Faq.Name,
         tools: [searchFaqTool]);
 
     // Step 3: Run the agent (with spinner to show loading): it calls search_faq, then answers with the FAQ entries it received
-    string question = "I received a broken item yesterday. What should I do?";
+    string question = Questions.BrokenItem;
     ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
     AgentResponse response = await faqAgent.RunAsync(question).WithSpinner("Running agent");
 
@@ -194,12 +192,8 @@ if (ShouldRunScenario(4))
     // (they would otherwise be sent again with every later question).
     AIAgent ragAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = "FaqRagAgent",
-        ChatOptions = new ChatOptions
-        {
-            Instructions = "You are the customer support assistant of an online shop. " +
-                           "Answer only from the provided context and quote the id of the FAQ entries you used. Keep the answers short."
-        },
+        Name = Agents.FaqRag.Name,
+        ChatOptions = new ChatOptions { Instructions = Agents.FaqRag.Instructions },
         AIContextProviders = [new TextSearchProvider(SearchFaqForProviderAsync, textSearchOptions)],
         ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
         {
@@ -211,14 +205,14 @@ if (ShouldRunScenario(4))
 
     // Step 4: Ask a first question in a session (no spinner: the provider writes to the console during the run)
     AgentSession session = await ragAgent.CreateSessionAsync();
-    string firstQuestion = "I want to send back a jacket I bought last week. How does it work?";
+    string firstQuestion = Questions.SendBackJacket;
     ColoredConsole.WriteSecondaryLogLine($"Question: {firstQuestion}");
     AgentResponse firstResponse = await ragAgent.RunAsync(firstQuestion, session);
     ColoredConsole.WritePrimaryLogLine($"Agent: {firstResponse.Text}");
     WriteTokenUsage(firstResponse, "Token Usage (first question):");
 
     // Step 5: Ask a follow-up question in the same session: the search input combines it with the first question
-    string followUpQuestion = "And how long until I get my money back?";
+    string followUpQuestion = Questions.MoneyBackDelay;
     ColoredConsole.WriteSecondaryLogLine($"Question: {followUpQuestion}");
     AgentResponse followUpResponse = await ragAgent.RunAsync(followUpQuestion, session);
     ColoredConsole.WritePrimaryLogLine($"Agent: {followUpResponse.Text}");

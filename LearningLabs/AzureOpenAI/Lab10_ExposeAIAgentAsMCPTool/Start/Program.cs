@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using System.Reflection;
 using Azure.Identity;
 using Microsoft.Agents.AI;
@@ -70,9 +71,11 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
 #region The CompanyAssistant agent and its MCP tool (used by every scenario and by the stdio server)
 
-// TODO 4: Create the CompanyAssistant agent with the company tools (same as Lab 03)
-// Hint: var companyTools = new CompanyTools(); then chatClient.AsAIAgent(instructions: ..., name: "CompanyAssistant",
-//       description: ..., tools: [AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"), ...])
+// TODO 4: Create the CompanyAssistant agent with the company tools (same as Lab 03), and the instructions, the name
+// and the description of Agents.CompanyAssistant (provided in LabPrompts.cs)
+// Hint: var companyTools = new CompanyTools(); then chatClient.AsAIAgent(instructions: Agents.CompanyAssistant.Instructions,
+//       name: Agents.CompanyAssistant.Name, description: Agents.CompanyAssistant.Description,
+//       tools: [AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"), ...])
 //       with the three public methods of CompanyTools. The name and the description become those of the MCP tool.
 // AIAgent companyAssistant = ...
 
@@ -124,10 +127,11 @@ if (ShouldRunScenario(1) || httpServerMode)
     //       then ColoredConsole.WritePrimaryLogLine($"MCP server listening on {mcpUrl}")
     // WebApplication app = ...
 
-    const string query = "Get the information of the employee with the ID EMP003.";
+    const string query = Questions.EmployeeInfoEmp003;
     ColoredConsole.WritePrimaryLogLine($"Query: {query}");
 
     // TODO 11: Be an MCP client of the server: connect with the Streamable HTTP transport, list the tools, call the tool
+    // with the query above (Questions.EmployeeInfoEmp003)
     // Hint: await using (McpClient mcpClient = await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
     //       { Name = "CompanyAssistant over HTTP", Endpoint = new Uri(mcpUrl), TransportMode = HttpTransportMode.StreamableHttp }))) { ... }
     //       and in the block: WriteTools(await mcpClient.ListToolsAsync()), then
@@ -148,7 +152,7 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Expose the agent as a local MCP tool (stdio) ===");
 
-    const string query = "Which meeting rooms can host at least 10 people?";
+    const string query = Questions.RoomsForTenPeople;
     ColoredConsole.WritePrimaryLogLine($"Query: {query}");
 
     // TODO 13: Describe how to start the server: this same program, started with --stdio as a child process
@@ -160,7 +164,8 @@ if (ShouldRunScenario(2))
     // TODO 14: Connect: the client starts the server process, then opens the MCP session
     // Hint: await using McpClient mcpClient = await McpClient.CreateAsync(transport);
 
-    // TODO 15: List the tools of the server and call the tool (same as in TODO 11, another transport)
+    // TODO 15: List the tools of the server and call the tool with the query above, Questions.RoomsForTenPeople
+    // (same as in TODO 11, another transport)
     // Hint: WriteTools(await mcpClient.ListToolsAsync()), then CallToolAsync("CompanyAssistant", ...) and WriteToolResult(result)
 }
 
@@ -173,19 +178,21 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Another agent uses the CompanyAssistant through MCP ===");
 
-    string prompt = $"Book the meeting room ROOM-B for the employee EMP002 on {DateTime.Today.AddDays(1):yyyy-MM-dd} " +
-                    "from 10:00 to 11:00, subject: Campaign review. Tell me the name of the room and the name of the employee.";
+    string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    string prompt = string.Format(CultureInfo.InvariantCulture, Questions.BookRoomBTomorrow, tomorrow);
     ColoredConsole.WritePrimaryLogLine($"User: {prompt}");
 
     // TODO 16: Start the stdio server and connect to it (same as TODO 13 and TODO 14)
     // await using McpClient mcpClient = ...
 
-    // TODO 17: Get the MCP tools and create the OfficeAssistant agent, whose only tool is the CompanyAssistant
-    // Hint: IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync(); then chatClient.AsAIAgent(instructions: ...,
-    //       name: "OfficeAssistant", tools: [.. mcpTools.Cast<AITool>()]) - an McpClientTool is an AIFunction (Lab 04)
+    // TODO 17: Get the MCP tools and create the OfficeAssistant agent, whose only tool is the CompanyAssistant,
+    // with the instructions and the name of Agents.OfficeAssistant
+    // Hint: IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync(); then chatClient.AsAIAgent(instructions: Agents.OfficeAssistant.Instructions,
+    //       name: Agents.OfficeAssistant.Name, tools: [.. mcpTools.Cast<AITool>()]) - an McpClientTool is an AIFunction (Lab 04)
     // AIAgent officeAssistant = ...
 
-    // TODO 18: Run the OfficeAssistant, then display the MCP tool calls, the answer and the token usage
+    // TODO 18: Run the OfficeAssistant with the prompt above (Questions.BookRoomBTomorrow, filled with the date of tomorrow),
+    // then display the MCP tool calls, the answer and the token usage
     // Hint: await officeAssistant.RunAsync(prompt).WithSpinner("Running the OfficeAssistant"), then WriteToolCalls(response),
     //       "Agent answer:" with response.Text, and WriteTokenUsage(response)
 }

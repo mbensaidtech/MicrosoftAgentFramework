@@ -25,18 +25,14 @@ ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 
 bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
-// The same HR assistant in both scenarios: only the way the approval decision is taken changes.
-const string AgentInstructions =
-    "You are an HR assistant. Use the tools to look up employees and to delete employee data when asked. " +
-    "Only report a deletion as done when the delete_employee_data tool confirmed it; if a deletion was rejected, say so and give the reason.";
-
 #region Setup: Configuration and Client Initialization
 
 // Step 1: Load Azure OpenAI settings from configuration
 var settings = ConfigurationHelper.GetAzureOpenAISettings();
 Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
-Console.WriteLine($"Agent instructions: {AgentInstructions}");
+// The same HR assistant in every scenario (Agents.HrAssistant, provided in LabPrompts.cs): only the way the approval decision is taken changes.
+Console.WriteLine($"Agent instructions: {Agents.HrAssistant.Instructions}");
 
 // TODO 1: Create the OpenAIClientOptions that point to the Azure OpenAI v1 endpoint
 // Hint: AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint) turns "https://<resource>.openai.azure.com/" into ".../openai/v1/"
@@ -68,14 +64,16 @@ if (ShouldRunScenario(1))
     //       new ApprovalRequiredAIFunction(...) marks it as requiring approval
     // List<AITool> tools = [...];
 
-    // TODO 5: Create the agent with the tool (same as Lab 03)
-    // Hint: chatClient.AsAIAgent(instructions: AgentInstructions, name: "HrAssistant", tools: tools)
+    // TODO 5: Create the agent with the tool (same as Lab 03), and the instructions and the name of Agents.HrAssistant
+    // (provided in LabPrompts.cs)
+    // Hint: chatClient.AsAIAgent(instructions: Agents.HrAssistant.Instructions, name: Agents.HrAssistant.Name, tools: tools)
     // AIAgent hrAgent = ...
 
-    // TODO 6: Create a session and run the agent in it (the session is mandatory for the approval flow)
+    // TODO 6: Create a session and run the agent in it with the prompt below, Questions.DeleteDataOfEmp001
+    // (the session is mandatory for the approval flow)
     // Hint: await hrAgent.CreateSessionAsync(), then await hrAgent.RunAsync(prompt, session).WithSpinner("Running agent")
     //       Keep every response in a list: List<AgentResponse> runs = [response];
-    const string prompt = "Delete all the data of the employee with the ID EMP001.";
+    const string prompt = Questions.DeleteDataOfEmp001;
     ColoredConsole.WritePrimaryLogLine($"User: {prompt}");
     // AgentSession session = ...
     // AgentResponse response = ...
@@ -113,11 +111,12 @@ if (ShouldRunScenario(2))
     // Hint: AIFunctionFactory.Create(HrTools.GetEmployeeInfo, "get_employee_info") and the wrapped tool of TODO 4
     // List<AITool> tools = [...];
 
-    // TODO 12: Create the agent (same as TODO 5)
+    // TODO 12: Create the agent (same Agents.HrAssistant as TODO 5)
     // AIAgent hrAgent = ...
 
-    // TODO 13: Create a session, run the agent with the prompt below and keep the response in a list (same as TODO 6)
-    const string prompt = "The employees EMP001 and EMP002 asked us to erase their data. Look up both employees, then delete the data of each of them.";
+    // TODO 13: Create a session, run the agent with the prompt below, Questions.EraseDataOfEmp001AndEmp002,
+    // and keep the response in a list (same as TODO 6)
+    const string prompt = Questions.EraseDataOfEmp001AndEmp002;
     ColoredConsole.WritePrimaryLogLine($"User: {prompt}");
     // AgentSession session = ...
     // AgentResponse response = ...
@@ -147,19 +146,18 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Guardrails with an agent run middleware ===");
 
-    // TODO 18: Create the HR agent of scenario 2 (same tools and agent as TODO 11 and TODO 12)
+    // TODO 18: Create the HR agent of scenario 2 (same tools and Agents.HrAssistant as TODO 11 and TODO 12)
     // AIAgent hrAgent = ...
 
     // TODO 19: Wrap the agent in the guardrail middleware (HrGuardrail.RunAsync, at the end of this file)
     // Hint: hrAgent.AsBuilder().Use(runFunc: HrGuardrail.RunAsync, runStreamingFunc: null).Build()
     // AIAgent guardedAgent = ...
 
-    // TODO 20: Run the guarded agent with a forbidden question and display the answer and the usage
-    // Question: "What is the salary of the employee EMP002?"
+    // TODO 20: Run the guarded agent with the forbidden question Questions.SalaryOfEmp002 and display the answer and the usage
     // Hint: the response has no Usage when the middleware answered by itself: display "Token usage: none, the model was not called"
 
-    // TODO 21: Run the guarded agent with a question that contains personal data, then display the answer and WriteTokenUsage([maskedResponse])
-    // Question: "My phone number is +33 6 12 34 56 78 and my e-mail is ada.lovelace@example.com. Call me back with the status of the employee EMP001."
+    // TODO 21: Run the guarded agent with the question Questions.CallMeBackWithPersonalData, which contains personal data,
+    // then display the answer and WriteTokenUsage([maskedResponse])
 }
 
 #endregion
@@ -186,7 +184,7 @@ internal static class HrGuardrail
 
         // TODO 22: Block a forbidden topic: if a user message contains one of the ForbiddenTopics (case-insensitive),
         // write "[Guardrail] Request blocked: forbidden topic '<topic>'. The agent was not called." with ColoredConsole.WriteWarningLine,
-        // and return new AgentResponse([new ChatMessage(ChatRole.Assistant, "I can't help with salaries or passwords. ...")])
+        // and return new AgentResponse([new ChatMessage(ChatRole.Assistant, GuardrailAnswers.ForbiddenTopic)])
         // WITHOUT calling innerAgent
 
         // TODO 23: Mask the personal data of the request with MaskPersonalData(request) and write how many items were masked,

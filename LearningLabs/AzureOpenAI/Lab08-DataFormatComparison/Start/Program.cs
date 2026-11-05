@@ -53,8 +53,9 @@ List<Hotel> hotels = await HotelData.LoadAsync();
 HotelTools hotelTools = new(hotels);
 Console.WriteLine($"Loaded {hotels.Count} hotels from {HotelData.FileName}");
 
-// The same question is asked in both scenarios; the responses are kept for the comparison at the end
-string question = "Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.";
+// The same question is asked in both scenarios (Questions.HotelsUnder100Usd, provided in LabPrompts.cs); the responses are kept
+// for the comparison at the end
+string question = Questions.HotelsUnder100Usd;
 AgentResponse<List<Hotel>>? jsonResponse = null;
 AgentResponse? csvResponse = null;
 
@@ -68,9 +69,10 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteInfoLine("=== Scenario 1: JSON - the tool returns objects, the agent answers with structured output ===");
     ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
 
-    // TODO 4: Turn hotelTools.GetAllHotelsAsJson into a tool named "get_all_hotels" and create the agent with it
+    // TODO 4: Turn hotelTools.GetAllHotelsAsJson into a tool named "get_all_hotels" and create the agent with it,
+    // and the instructions and the name of Agents.HotelJson (provided in LabPrompts.cs)
     // Hint: AITool getAllHotelsAsJson = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsJson, "get_all_hotels");
-    //       chatClient.AsAIAgent(instructions: "...", name: "HotelJsonAgent", tools: [getAllHotelsAsJson]) (see the README for the instructions)
+    //       chatClient.AsAIAgent(instructions: Agents.HotelJson.Instructions, name: Agents.HotelJson.Name, tools: [getAllHotelsAsJson])
     // AIAgent jsonAgent = ...
 
     // TODO 5: Run the agent with structured output: the answer follows the JSON schema of List<Hotel>
@@ -93,10 +95,11 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteInfoLine("=== Scenario 2: CSV - the tool returns text, the agent answers in CSV ===");
     ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
 
-    // TODO 8: Turn hotelTools.GetAllHotelsAsCsv into a tool named "get_all_hotels" and create the agent with it
+    // TODO 8: Turn hotelTools.GetAllHotelsAsCsv into a tool named "get_all_hotels" and create the agent with it,
+    // and the instructions and the name of Agents.HotelCsv
     // Hint: AITool getAllHotelsAsCsv = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsCsv, "get_all_hotels");
-    //       chatClient.AsAIAgent(instructions: $"""...""", name: "HotelCsvAgent", tools: [getAllHotelsAsCsv])
-    //       The instructions (see the README) ask for a CSV answer with the header line HotelCsv.Header
+    //       chatClient.AsAIAgent(instructions: Agents.HotelCsv.Instructions, name: Agents.HotelCsv.Name, tools: [getAllHotelsAsCsv])
+    //       The instructions ask for a CSV answer with the header line HotelCsv.Header
     // AIAgent csvAgent = ...
 
     // TODO 9: Run the agent with the non-generic RunAsync: the answer is text

@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using A2A;
 using Azure.Identity;
 using Microsoft.Agents.AI;
@@ -71,16 +72,18 @@ if (ShouldRunScenario(1))
     AIAgent authAgent = authAgentCard.AsAIAgent();
 
     // Step 3: Ask the remote agent for a new API key (its tools run on the server)
-    AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key").WithSpinner("Calling the remote agent");
+    AgentResponse generateResponse = await authAgent.RunAsync(Questions.GenerateApiKey).WithSpinner("Calling the remote agent");
     string apiKey = FindApiKey(generateResponse.Text);
     ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");
 
     // Step 4: Ask the remote agent to validate the key, then a tampered copy of it
-    AgentResponse validResponse = await authAgent.RunAsync($"Validate this API key: {apiKey}").WithSpinner("Calling the remote agent");
+    AgentResponse validResponse = await authAgent.RunAsync(string.Format(CultureInfo.InvariantCulture, Questions.ValidateApiKey, apiKey))
+        .WithSpinner("Calling the remote agent");
     ColoredConsole.WriteAssistantLine($"Validation of the generated key: {validResponse.Text}");
 
     string tamperedKey = apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A');
-    AgentResponse tamperedResponse = await authAgent.RunAsync($"Validate this API key: {tamperedKey}").WithSpinner("Calling the remote agent");
+    AgentResponse tamperedResponse = await authAgent.RunAsync(string.Format(CultureInfo.InvariantCulture, Questions.ValidateApiKey, tamperedKey))
+        .WithSpinner("Calling the remote agent");
     ColoredConsole.WriteAssistantLine($"Validation of a tampered key: {tamperedResponse.Text}");
 }
 
@@ -101,9 +104,9 @@ if (ShouldRunScenario(2))
     ColoredConsole.WritePrimaryLogLine($"Remote agent: {customerToneAgent.Name} at {customerToneAgentSettings.Url}");
 
     // Step 2: Send a customer message to the remote agent
-    const string CustomerMessage = "I have been waiting for my order for two weeks and nobody answers my emails!";
-    ColoredConsole.WriteUserLine($"Customer message: {CustomerMessage}");
-    AgentResponse toneResponse = await customerToneAgent.RunAsync($"What is the tone of this customer message: \"{CustomerMessage}\"")
+    ColoredConsole.WriteUserLine($"Customer message: {CustomerMessages.WaitingForOrder}");
+    AgentResponse toneResponse = await customerToneAgent.RunAsync(
+            string.Format(CultureInfo.InvariantCulture, Questions.ToneOfCustomerMessage, CustomerMessages.WaitingForOrder))
         .WithSpinner("Calling the remote agent");
     ColoredConsole.WriteAssistantLine($"Tone: {toneResponse.Text}");
 }
@@ -123,13 +126,12 @@ if (ShouldRunScenario(3))
 
     // Step 2: Create a local agent (Azure OpenAI) that can call the remote agent as a tool
     AIAgent assistant = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant. Use the available tools to answer the user's questions.",
-        name: "Assistant",
+        instructions: Agents.Assistant.Instructions,
+        name: Agents.Assistant.Name,
         tools: [authAgent.AsAIFunction()]);
 
     // Step 3: Run the local agent: its model decides when to call the remote agent
-    AgentResponse response = await assistant.RunAsync(
-        "I need a new API key. Generate one, check that it is valid, and give me the key and the result of the check.")
+    AgentResponse response = await assistant.RunAsync(Questions.GenerateAndCheckApiKey)
         .WithSpinner("Running the local agent");
     WriteToolCalls(response);
     ColoredConsole.WriteAssistantLine($"Assistant: {response.Text}");
@@ -154,7 +156,7 @@ if (ShouldRunScenario(4))
     AgentSession session = await authAgent.CreateSessionAsync();
 
     // Step 3: First turn: ask for a new API key
-    AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key", session).WithSpinner("Calling the remote agent");
+    AgentResponse generateResponse = await authAgent.RunAsync(Questions.GenerateApiKey, session).WithSpinner("Calling the remote agent");
     string apiKey = FindApiKey(generateResponse.Text);
     ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");
     WriteContextId("turn 1", session);
@@ -162,14 +164,13 @@ if (ShouldRunScenario(4))
     // Step 4: Second turn, in the same session: refer to the key without giving it again.
     // The code checks that the answer contains the exact key of turn 1: a model without the conversation could
     // generate a new key and say "it is valid", which proves nothing
-    const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";
-    AgentResponse followUpResponse = await authAgent.RunAsync(FollowUpQuestion, session).WithSpinner("Calling the remote agent");
+    AgentResponse followUpResponse = await authAgent.RunAsync(Questions.KeyYouJustGenerated, session).WithSpinner("Calling the remote agent");
     ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");
     ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
     WriteContextId("turn 2", session);
 
     // Step 5: The same question without the session: a new conversation, in which no key was generated
-    AgentResponse newConversationResponse = await authAgent.RunAsync(FollowUpQuestion).WithSpinner("Calling the remote agent");
+    AgentResponse newConversationResponse = await authAgent.RunAsync(Questions.KeyYouJustGenerated).WithSpinner("Calling the remote agent");
     ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}");
     ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(newConversationResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
 }

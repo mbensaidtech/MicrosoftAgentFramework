@@ -75,8 +75,9 @@ if (ShouldRunScenario(1))
     // TODO 6: Wrap GenerateAPIKey and ValidateAPIKey as AI tools named "generate_api_key" and "validate_api_key"
     // IList<AITool> tools = ...
 
-    // TODO 7: Create the two agents from chatClient: "AuthAgent" (with the tools) and "CustomerToneAgent" (no tools)
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: ..., tools: ...), instructions in the README.
+    // TODO 7: Create the two agents from chatClient, with the instructions and the name of Agents.Auth (with the tools)
+    // and of Agents.CustomerTone (no tools), provided in LabPrompts.cs
+    // Hint: chatClient.AsAIAgent(instructions: Agents.Auth.Instructions, name: Agents.Auth.Name, tools: tools), same for Agents.CustomerTone without tools.
     //       The names are the keys used by the A2A hosting to find the agents.
     // AIAgent authAgent = ...
     // AIAgent customerToneAgent = ...

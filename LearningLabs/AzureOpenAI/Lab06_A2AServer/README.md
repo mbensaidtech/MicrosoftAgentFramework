@@ -39,6 +39,7 @@ Lab06_A2AServer/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions and descriptions of the agents
 │   ├── AgentCards.cs               <-- Agent cards of the two agents (provided)
 │   ├── Tools/
 │   │   └── APIKeyTools.cs          <-- Tools of the AuthAgent (provided)
@@ -103,13 +104,16 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
-- `AgentCards.cs` — the `AgentCard` of each agent: `Name`, `Description`, `Version`, `Skills` (`AgentSkill`: id, name, description, tags, examples) and `SupportedInterfaces`. Each interface is a URL + a protocol binding (`ProtocolBindingNames.JsonRpc`, `ProtocolBindingNames.HttpJson`) + a protocol version (`"1.0"`). The URL of the agent is given by `Program.cs` (`BaseUrl` + path of the agent).
+- `LabPrompts.cs` — the names, the instructions and the descriptions of the agents (see Step 3).
+- `AgentCards.cs` — the `AgentCard` of each agent: `Name`, `Description` (those of the agent, from `LabPrompts.cs`), `Version`, `Skills` (`AgentSkill`: id, name, description, tags, examples) and `SupportedInterfaces`. Each interface is a URL + a protocol binding (`ProtocolBindingNames.JsonRpc`, `ProtocolBindingNames.HttpJson`) + a protocol version (`"1.0"`). The URL of the agent is given by `Program.cs` (`BaseUrl` + path of the agent).
 - `Tools/APIKeyTools.cs` — `GenerateAPIKey()` returns `Meknes<random>.<signature>`; `ValidateAPIKey(apiKey)` checks the prefix and the signature (constant-time comparison). `IsSecretConfigured` tells whether the secret comes from the configuration.
 - `A2AServerSettings.cs`, `APIKeySettings.cs` — the settings above. `ConfigurationHelper.GetA2AServerSettings()` checks that `BaseUrl` is an absolute `http(s)://` URL.
 
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs.
+
+The names and the instructions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Auth.Name`, `Agents.Auth.Instructions`, `Agents.CustomerTone.Name`, `Agents.CustomerTone.Instructions`) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The descriptions of the agents (`Agents.Auth.Description`, `Agents.CustomerTone.Description`) are already used by the agent cards of `AgentCards.cs`.
 
 ---
 
@@ -132,7 +136,7 @@ TODO 1 to 3 are the same as in Lab 01.
 | **TODO 4** | Create the ASP.NET Core application builder | • `var builder = WebApplication.CreateBuilder(args);` |
 | **TODO 5** | Create the tools of the AuthAgent | • `APIKeySettings apiKeySettings = ConfigurationHelper.GetAPIKeySettings();` <br> • `APIKeyTools apiKeyTools = new(apiKeySettings);` <br> • `if (!apiKeyTools.IsSecretConfigured) { ColoredConsole.WriteSecondaryLogLine("APIKeySettings:SecretKey is not set: API keys are signed with a random secret, valid until the server stops."); }` |
 | **TODO 6** | Wrap the two methods as AI tools (Lab 03) | • `IList<AITool> tools = [AIFunctionFactory.Create(apiKeyTools.GenerateAPIKey, "generate_api_key"), AIFunctionFactory.Create(apiKeyTools.ValidateAPIKey, "validate_api_key")];` |
-| **TODO 7** | Create the two agents | • `AIAgent authAgent = chatClient.AsAIAgent(instructions: "You are a helpful API key assistant. You are able to generate and validate API keys. When you generate a key, return the key exactly as produced by the tool.", name: "AuthAgent", tools: tools);` <br> • `AIAgent customerToneAgent = chatClient.AsAIAgent(instructions: "You are a helpful customer tone assistant. You are able to detect the tone of a customer's message. Start your answer with the tone in one word (for example: Angry, Neutral, Satisfied), then explain briefly.", name: "CustomerToneAgent");` |
+| **TODO 7** | Create the two agents | • `AIAgent authAgent = chatClient.AsAIAgent(instructions: Agents.Auth.Instructions, name: Agents.Auth.Name, tools: tools);` <br> • `AIAgent customerToneAgent = chatClient.AsAIAgent(instructions: Agents.CustomerTone.Instructions, name: Agents.CustomerTone.Name);` <br> • The names (`AuthAgent`, `CustomerToneAgent`) are the keys used by the A2A hosting to find the agents, and the names of their agent cards |
 | **TODO 8** | Give each agent a session store | • `builder.Services.AddKeyedSingleton<AgentSessionStore>(authAgent.Name, new InMemoryAgentSessionStore());` <br> • Same line for `customerToneAgent` <br> • `ColoredConsole.WriteSecondaryLogLine("Session store: in memory (development only), one per agent.");` <br> • The store is registered under the agent **name**: that is where the A2A hosting looks for it. Keep the lines between the `#pragma` of the skeleton (`MAAI001`, see *Conversations* below) |
 | **TODO 9** | Register an A2A server for each agent, then build the app | • `builder.AddA2AServer(authAgent);` <br> • `builder.AddA2AServer(customerToneAgent);` <br> • `var app = builder.Build();` <br> • `AddA2AServer` registers, for the agent **name**, the A2A request handler and a task store |
 | **TODO 10** | Map both protocol bindings of each agent | • `app.MapA2AJsonRpc(authAgent, AuthAgentPath);` <br> • `app.MapA2AHttpJson(authAgent, AuthAgentPath);` <br> • Same two lines for `customerToneAgent` and `CustomerToneAgentPath` |
@@ -292,6 +296,7 @@ In production, follow the [authentication guide of the official sample](https://
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and descriptions of the agents, the same for everyone
 - `A2AServer.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs`, `A2AServerSettings.cs`, `APIKeySettings.cs` - Settings classes

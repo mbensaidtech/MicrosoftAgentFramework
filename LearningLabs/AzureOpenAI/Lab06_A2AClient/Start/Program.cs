@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using A2A;
 using Azure.Identity;
 using Microsoft.Agents.AI;
@@ -68,12 +69,15 @@ if (ShouldRunScenario(1))
     // TODO 5: Create an AIAgent for the remote agent: name, description and protocol binding come from the card
     // AIAgent authAgent = ...
 
-    // TODO 6: Ask the remote agent for a new API key ("Generate a new API key"), find the key in its answer and display it
+    // TODO 6: Ask the remote agent for a new API key with the question Questions.GenerateApiKey (provided in LabPrompts.cs),
+    // find the key in its answer and display it
     // Hint: FindApiKey(generateResponse.Text) (provided in AgentConsole.cs) extracts the key from the natural-language answer
     // string apiKey = ...
 
-    // TODO 7: Ask the remote agent to validate the key, then a tampered copy of it, and display both answers
-    // Hint: $"Validate this API key: {apiKey}"; a tampered copy: apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A')
+    // TODO 7: Ask the remote agent to validate the key, then a tampered copy of it, with the question Questions.ValidateApiKey,
+    // and display both answers
+    // Hint: the question is a format string, {0} is the key: string.Format(CultureInfo.InvariantCulture, Questions.ValidateApiKey, apiKey);
+    //       a tampered copy: apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A')
 }
 
 #endregion
@@ -91,8 +95,10 @@ if (ShouldRunScenario(2))
     // using A2A.A2AClient toneClient = ...
     // AIAgent customerToneAgent = ...
 
-    // TODO 9: Send a customer message to the remote agent and display the tone
-    // Hint: $"What is the tone of this customer message: \"{CustomerMessage}\"" with the message of the README
+    // TODO 9: Send the customer message CustomerMessages.WaitingForOrder to the remote agent with the question
+    // Questions.ToneOfCustomerMessage, and display the message and the tone
+    // Hint: the question is a format string, {0} is the customer message:
+    //       string.Format(CultureInfo.InvariantCulture, Questions.ToneOfCustomerMessage, CustomerMessages.WaitingForOrder)
 }
 
 #endregion
@@ -108,11 +114,13 @@ if (ShouldRunScenario(3))
     // Hint: GetAIAgentAsync() on an A2ACardResolver reads the card and creates the agent
     // AIAgent authAgent = ...
 
-    // TODO 11: Create a local agent (Azure OpenAI) that can call the remote agent as a tool
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: "Assistant", tools: [authAgent.AsAIFunction()])
+    // TODO 11: Create a local agent (Azure OpenAI) that can call the remote agent as a tool,
+    // with the instructions and the name of Agents.Assistant
+    // Hint: chatClient.AsAIAgent(instructions: Agents.Assistant.Instructions, name: Agents.Assistant.Name, tools: [authAgent.AsAIFunction()])
     // AIAgent assistant = ...
 
-    // TODO 12: Run the local agent, then display the tools it called, its answer and the token usage
+    // TODO 12: Run the local agent with the question Questions.GenerateAndCheckApiKey, then display the tools it called,
+    // its answer and the token usage
     // Hint: WriteToolCalls(response) and WriteTokenUsage(response) are provided in AgentConsole.cs
 }
 
@@ -131,17 +139,18 @@ if (ShouldRunScenario(4))
     // AIAgent authAgent = ...
     // AgentSession session = ...
 
-    // TODO 14: First turn, with the session: ask for a new API key, display it and the context id
-    // Hint: await authAgent.RunAsync("Generate a new API key", session); string apiKey = FindApiKey(...);
+    // TODO 14: First turn, with the session: ask for a new API key (Questions.GenerateApiKey), display it and the context id
+    // Hint: await authAgent.RunAsync(Questions.GenerateApiKey, session); string apiKey = FindApiKey(...);
     //       ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}"); WriteContextId("turn 1", session)
 
-    // TODO 15: Second turn, with the same session: ask for the key again without giving it, and check the answer
-    // Hint: const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";
+    // TODO 15: Second turn, with the same session: ask for the key again without giving it (Questions.KeyYouJustGenerated),
+    // and check the answer
+    // Hint: await authAgent.RunAsync(Questions.KeyYouJustGenerated, session);
     //       ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");
     //       ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");
     //       WriteContextId("turn 2", session)
 
-    // TODO 16: The same question without the session (a new conversation), and the same check
+    // TODO 16: The same question (Questions.KeyYouJustGenerated) without the session (a new conversation), and the same check
     // Hint: ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}"), then the "-> Answer contains..." line
 }
 

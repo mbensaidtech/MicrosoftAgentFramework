@@ -55,8 +55,9 @@ List<Hotel> hotels = await HotelData.LoadAsync();
 HotelTools hotelTools = new(hotels);
 Console.WriteLine($"Loaded {hotels.Count} hotels from {HotelData.FileName}");
 
-// The same question is asked in both scenarios; the responses are kept for the comparison at the end
-string question = "Which hotels cost less than 100 USD per night? Give all of them, ordered by price per night, cheapest first.";
+// The same question is asked in both scenarios (Questions.HotelsUnder100Usd, provided in LabPrompts.cs); the responses are kept
+// for the comparison at the end
+string question = Questions.HotelsUnder100Usd;
 AgentResponse<List<Hotel>>? jsonResponse = null;
 AgentResponse? csvResponse = null;
 
@@ -73,8 +74,8 @@ if (ShouldRunScenario(1))
     // Step 1: The tool returns the hotels as objects: the framework serializes them as JSON for the model
     AITool getAllHotelsAsJson = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsJson, "get_all_hotels");
     AIAgent jsonAgent = chatClient.AsAIAgent(
-        instructions: "You are a hotel data assistant. Call get_all_hotels to get the hotels, then answer with every hotel that matches the request, in the requested order.",
-        name: "HotelJsonAgent",
+        instructions: Agents.HotelJson.Instructions,
+        name: Agents.HotelJson.Name,
         tools: [getAllHotelsAsJson]);
 
     // Step 2: RunAsync<T> (Lab 02): the answer is JSON that follows the schema generated from List<Hotel>, deserialized for us
@@ -101,13 +102,8 @@ if (ShouldRunScenario(2))
     // Step 1: The tool returns the hotels as CSV text (sent to the model as is), and the instructions ask for CSV back
     AITool getAllHotelsAsCsv = AIFunctionFactory.Create(hotelTools.GetAllHotelsAsCsv, "get_all_hotels");
     AIAgent csvAgent = chatClient.AsAIAgent(
-        instructions: $"""
-            You are a hotel data assistant. Call get_all_hotels to get the hotels as CSV, then answer with every hotel that matches the request, in the requested order.
-            Answer ONLY in CSV, with exactly this header line and then one line per hotel, with the same columns and values as the tool result:
-            {HotelCsv.Header}
-            No explanation, no markdown, no code fences.
-            """,
-        name: "HotelCsvAgent",
+        instructions: Agents.HotelCsv.Instructions,
+        name: Agents.HotelCsv.Name,
         tools: [getAllHotelsAsCsv]);
 
     // Step 2: The non-generic RunAsync: the answer is text

@@ -41,6 +41,7 @@ Lab06_A2AClient/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: name and instructions of the local agent, questions
 │   ├── AgentConsole.cs             <-- Display helpers (provided)
 │   ├── ConfigurationHelper.cs
 │   ├── AzureOpenAISettings.cs
@@ -114,6 +115,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the name and the instructions of the local agent of scenario 3, the questions sent to the agents and the customer message of scenario 2 (see Step 3).
 - `RemoteAgentSettings.cs` — `Url`, `Name` and `Description` of a remote agent. `ConfigurationHelper.GetRemoteAgentSettings("AuthAgent")` reads the `RemoteAgents:AuthAgent` section and checks that the URL is an absolute `http(s)://` URL.
 - `AgentConsole.cs` — display helpers, imported with `using static`:
   - `WriteAgentCard(card)` — the name, version, description, skills and supported interfaces of an agent card;
@@ -124,6 +126,8 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs.
+
+The name and the instructions of the local agent, the questions and the customer message are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Assistant.Name`, `Agents.Assistant.Instructions`, `Questions.GenerateApiKey`, `CustomerMessages.WaitingForOrder`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. Two questions contain a value known at run time (`Questions.ValidateApiKey`, `Questions.ToneOfCustomerMessage`): they are format strings, whose `{0}` you fill with `string.Format`. The name and the description given to the CustomerToneAgent in scenario 2 come from the configuration (`RemoteAgents:CustomerToneAgent` in `appsettings.json`), like its URL.
 
 ---
 
@@ -147,8 +151,8 @@ An **agent card** is the discovery document of an A2A agent. The server publishe
 |------|-------------|-------|
 | **TODO 4** | Read and display the agent card | • `A2ACardResolver cardResolver = new(new Uri($"{authAgentSettings.Url}/"));` <br> • `AgentCard authAgentCard = await cardResolver.GetAgentCardAsync().WithSpinner("Reading the agent card");` <br> • `WriteAgentCard(authAgentCard);` <br> • The trailing `/` matters: the resolver appends `.well-known/agent-card.json` to the URL |
 | **TODO 5** | Create the remote agent from its card | • `AIAgent authAgent = authAgentCard.AsAIAgent();` <br> • Its `Name` and `Description` come from the card; the A2A client is created for one of its `SupportedInterfaces` |
-| **TODO 6** | Generate an API key | • `AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key").WithSpinner("Calling the remote agent");` <br> • `string apiKey = FindApiKey(generateResponse.Text);` <br> • `ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");` |
-| **TODO 7** | Validate the key, then a tampered copy | • `AgentResponse validResponse = await authAgent.RunAsync($"Validate this API key: {apiKey}").WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Validation of the generated key: {validResponse.Text}");` <br> • `string tamperedKey = apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A');` <br> • Same `RunAsync` with `tamperedKey`, displayed with `$"Validation of a tampered key: {tamperedResponse.Text}"` <br> • Only the tool of the server can tell: the signature of the tampered key no longer matches |
+| **TODO 6** | Generate an API key | • `AgentResponse generateResponse = await authAgent.RunAsync(Questions.GenerateApiKey).WithSpinner("Calling the remote agent");` <br> • `string apiKey = FindApiKey(generateResponse.Text);` <br> • `ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");` |
+| **TODO 7** | Validate the key, then a tampered copy | • Question: `Questions.ValidateApiKey`, a format string whose `{0}` is the key <br> • `AgentResponse validResponse = await authAgent.RunAsync(string.Format(CultureInfo.InvariantCulture, Questions.ValidateApiKey, apiKey)).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Validation of the generated key: {validResponse.Text}");` <br> • `string tamperedKey = apiKey[..^1] + (apiKey[^1] == 'A' ? 'B' : 'A');` <br> • Same `RunAsync` with `tamperedKey`, displayed with `$"Validation of a tampered key: {tamperedResponse.Text}"` <br> • Only the tool of the server can tell: the signature of the tampered key no longer matches |
 
 ---
 
@@ -159,7 +163,7 @@ When you already know the URL of an agent (configuration, private registry), you
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 8** | Create the A2A client and the remote agent | • `using A2A.A2AClient toneClient = new(new Uri(customerToneAgentSettings.Url));` — written in full because the namespace of this project is also called `A2AClient` <br> • `AIAgent customerToneAgent = toneClient.AsAIAgent(name: customerToneAgentSettings.Name, description: customerToneAgentSettings.Description);` <br> • `ColoredConsole.WritePrimaryLogLine($"Remote agent: {customerToneAgent.Name} at {customerToneAgentSettings.Url}");` |
-| **TODO 9** | Ask for the tone of a customer message | • `const string CustomerMessage = "I have been waiting for my order for two weeks and nobody answers my emails!";` <br> • `ColoredConsole.WriteUserLine($"Customer message: {CustomerMessage}");` <br> • `AgentResponse toneResponse = await customerToneAgent.RunAsync($"What is the tone of this customer message: \"{CustomerMessage}\"").WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Tone: {toneResponse.Text}");` |
+| **TODO 9** | Ask for the tone of a customer message | • The customer message: `CustomerMessages.WaitingForOrder` <br> • `ColoredConsole.WriteUserLine($"Customer message: {CustomerMessages.WaitingForOrder}");` <br> • Question: `Questions.ToneOfCustomerMessage`, a format string whose `{0}` is the customer message <br> • `AgentResponse toneResponse = await customerToneAgent.RunAsync(string.Format(CultureInfo.InvariantCulture, Questions.ToneOfCustomerMessage, CustomerMessages.WaitingForOrder)).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Tone: {toneResponse.Text}");` |
 
 ---
 
@@ -170,8 +174,8 @@ When you already know the URL of an agent (configuration, private registry), you
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 10** | Create the remote AuthAgent in one call | • `A2ACardResolver cardResolver = new(new Uri($"{authAgentSettings.Url}/"));` <br> • `AIAgent authAgent = await cardResolver.GetAIAgentAsync().WithSpinner("Reading the agent card");` — reads the card and calls `AsAIAgent()` for you |
-| **TODO 11** | Create the local agent with the remote agent as a tool | • `AIAgent assistant = chatClient.AsAIAgent(instructions: "You are a helpful assistant. Use the available tools to answer the user's questions.", name: "Assistant", tools: [authAgent.AsAIFunction()]);` <br> • The tool is named after the remote agent (`AuthAgent`) and described by its card description |
-| **TODO 12** | Run the local agent and display the result | • `AgentResponse response = await assistant.RunAsync("I need a new API key. Generate one, check that it is valid, and give me the key and the result of the check.").WithSpinner("Running the local agent");` <br> • `WriteToolCalls(response);` <br> • `ColoredConsole.WriteAssistantLine($"Assistant: {response.Text}");` <br> • `WriteTokenUsage(response);` |
+| **TODO 11** | Create the local agent with the remote agent as a tool | • `AIAgent assistant = chatClient.AsAIAgent(instructions: Agents.Assistant.Instructions, name: Agents.Assistant.Name, tools: [authAgent.AsAIFunction()]);` <br> • The tool is named after the remote agent (`AuthAgent`) and described by its card description |
+| **TODO 12** | Run the local agent and display the result | • `AgentResponse response = await assistant.RunAsync(Questions.GenerateAndCheckApiKey).WithSpinner("Running the local agent");` <br> • `WriteToolCalls(response);` <br> • `ColoredConsole.WriteAssistantLine($"Assistant: {response.Text}");` <br> • `WriteTokenUsage(response);` |
 
 ---
 
@@ -184,9 +188,9 @@ The second turn asks for "the key you just generated" without giving it. The cod
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 13** | Create the remote AuthAgent and a session | • Same as TODO 10: `A2ACardResolver cardResolver = new(new Uri($"{authAgentSettings.Url}/"));` then `AIAgent authAgent = await cardResolver.GetAIAgentAsync().WithSpinner("Reading the agent card");` <br> • `AgentSession session = await authAgent.CreateSessionAsync();` |
-| **TODO 14** | First turn: generate a key | • `AgentResponse generateResponse = await authAgent.RunAsync("Generate a new API key", session).WithSpinner("Calling the remote agent");` <br> • `string apiKey = FindApiKey(generateResponse.Text);` <br> • `ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");` <br> • `WriteContextId("turn 1", session);` |
-| **TODO 15** | Second turn, same session: ask for the key again and check it | • `const string FollowUpQuestion = "Give me again the API key you just generated, exactly as it is, and check that it is valid.";` <br> • `AgentResponse followUpResponse = await authAgent.RunAsync(FollowUpQuestion, session).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");` <br> • `ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");` <br> • `WriteContextId("turn 2", session);` — the same id as turn 1 |
-| **TODO 16** | The same question without the session | • `AgentResponse newConversationResponse = await authAgent.RunAsync(FollowUpQuestion).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}");` <br> • The same `-> Answer contains the key of turn 1` line with `newConversationResponse` |
+| **TODO 14** | First turn: generate a key | • `AgentResponse generateResponse = await authAgent.RunAsync(Questions.GenerateApiKey, session).WithSpinner("Calling the remote agent");` <br> • `string apiKey = FindApiKey(generateResponse.Text);` <br> • `ColoredConsole.WriteAssistantLine($"Generated API key: {apiKey}");` <br> • `WriteContextId("turn 1", session);` |
+| **TODO 15** | Second turn, same session: ask for the key again and check it | • Question: `Questions.KeyYouJustGenerated` (it asks for "the API key you just generated" without giving it) <br> • `AgentResponse followUpResponse = await authAgent.RunAsync(Questions.KeyYouJustGenerated, session).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"Same session: {followUpResponse.Text}");` <br> • `ColoredConsole.WriteSecondaryLogLine($"  -> Answer contains the key of turn 1: {(followUpResponse.Text.Contains(apiKey, StringComparison.Ordinal) ? "yes" : "no")}");` <br> • `WriteContextId("turn 2", session);` — the same id as turn 1 |
+| **TODO 16** | The same question without the session | • `AgentResponse newConversationResponse = await authAgent.RunAsync(Questions.KeyYouJustGenerated).WithSpinner("Calling the remote agent");` <br> • `ColoredConsole.WriteAssistantLine($"New conversation: {newConversationResponse.Text}");` <br> • The same `-> Answer contains the key of turn 1` line with `newConversationResponse` |
 
 ---
 
@@ -215,7 +219,7 @@ Lab06_A2AClient (this lab)                               Lab06_A2AServer
 ──────────────────────────                               ───────────────
 Scenario 1  A2ACardResolver.GetAgentCardAsync() ──GET──▶  /a2a/authAgent/.well-known/agent-card.json
             AgentCard.AsAIAgent()
-            authAgent.RunAsync("Generate a new API key") ──POST (A2A message)──▶ AuthAgent
+            authAgent.RunAsync(Questions.GenerateApiKey) ──POST (A2A message)──▶ AuthAgent
                                                                                  ├─ model (server)
                                                          ◀── A2A message ─────── └─ generate_api_key
 Scenario 2  new A2AClient(url).AsAIAgent(name, ...) ──POST (JSON-RPC)──▶ /a2a/customerToneAgent
@@ -364,6 +368,7 @@ The keys are random and the wording of the answers varies. The explanation given
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Name and instructions of the local agent, questions and customer message, the same for everyone
 - `A2AClient.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs`, `RemoteAgentSettings.cs` - Settings classes

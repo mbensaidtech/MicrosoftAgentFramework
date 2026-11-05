@@ -36,6 +36,7 @@ Lab10_ExposeAIAgentAsMCPTool/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions, description and questions of the agents
 │   ├── Tools/
 │   │   └── CompanyTools.cs         <-- The tools of the CompanyAssistant agent (provided)
 │   ├── McpConsole.cs               <-- Display helpers (provided)
@@ -98,6 +99,7 @@ The stdio server of scenarios 2 and 3 is a second process of the same program: i
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names and the instructions of the agents, the description of the `CompanyAssistant` (the description of its MCP tool) and the questions of the scenarios (see Step 3).
 - `Tools/CompanyTools.cs` — the company data (5 employees, 4 meeting rooms, 2 bookings) and the tools of the `CompanyAssistant` agent, with their `[Description]` attributes: `GetEmployeeInfo`, `GetMeetingRooms` and `BookMeetingRoom` (public), plus private helpers that are not given to the agent. Same file as Lab 03.
 - `McpConsole.cs` — display helpers, imported with `using static` so you can call them directly:
   - `WriteTools(tools)` shows what an MCP client sees for each tool: its name, its description and the JSON schema of its input;
@@ -109,6 +111,8 @@ The stdio server of scenarios 2 and 3 is a second process of the same program: i
 ### Step 3: Complete the Program.cs
 
 Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions, the description and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.CompanyAssistant.Name`, `Agents.CompanyAssistant.Instructions`, `Agents.CompanyAssistant.Description`, `Agents.OfficeAssistant.Name`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The questions (`Questions.EmployeeInfoEmp003`, `Questions.RoomsForTenPeople`, and `Questions.BookRoomBTomorrow`, a format string whose `{0}` is the date of tomorrow) are already in the `query` and `prompt` variables of the skeleton.
 
 The program reads two optional command-line switches, already in place at the top of `Program.cs`:
 
@@ -137,7 +141,7 @@ Used by every scenario and by the stdio server.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Create the `CompanyAssistant` agent with the company tools | • `var companyTools = new CompanyTools();` <br> • `AIAgent companyAssistant = chatClient.AsAIAgent(instructions: "You are a helpful assistant that can help with company tasks. Answer with the facts returned by the tools.", name: "CompanyAssistant", description: "Answers questions about the employees and the meeting rooms of the company, and books meeting rooms.", tools: [AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"), AIFunctionFactory.Create(companyTools.GetMeetingRooms, "get_meeting_rooms"), AIFunctionFactory.Create(companyTools.BookMeetingRoom, "book_meeting_room")]);` <br> • Same as Lab 03, plus a **description**: the name and the description of the agent become those of the MCP tool |
+| **TODO 4** | Create the `CompanyAssistant` agent with the company tools | • `var companyTools = new CompanyTools();` <br> • `AIAgent companyAssistant = chatClient.AsAIAgent(instructions: Agents.CompanyAssistant.Instructions, name: Agents.CompanyAssistant.Name, description: Agents.CompanyAssistant.Description, tools: [AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"), AIFunctionFactory.Create(companyTools.GetMeetingRooms, "get_meeting_rooms"), AIFunctionFactory.Create(companyTools.BookMeetingRoom, "book_meeting_room")]);` <br> • Same as Lab 03, plus a **description**: the name and the description of the agent become those of the MCP tool |
 | **TODO 5** | Turn the agent into a function | • `AIFunction companyAssistantFunction = companyAssistant.AsAIFunction();` <br> • The function has one string parameter, `query`; invoking it runs the agent and returns the text of its answer <br> • No session is given: every call runs the agent in a **new session** |
 | **TODO 6** | Wrap the function in an MCP server tool | • `McpServerTool companyAssistantTool = McpServerTool.Create(companyAssistantFunction);` |
 
@@ -186,8 +190,8 @@ The `OfficeAssistant` agent has a single tool: the `CompanyAssistant`, received 
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 16** | Start the stdio server and connect to it | • Same as TODO 13 and TODO 14, in one statement: `await using McpClient mcpClient = await McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions { Name = "CompanyAssistant over stdio", Command = "dotnet", Arguments = [Assembly.GetEntryAssembly()!.Location, "--stdio"], StandardErrorLines = line => ColoredConsole.WriteSecondaryLogLine($"[server] {line}") }));` |
-| **TODO 17** | Get the MCP tools and create the `OfficeAssistant` | • `IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();` <br> • `AIAgent officeAssistant = chatClient.AsAIAgent(instructions: "You are the personal assistant of the employees. Delegate every question or task about the company to the CompanyAssistant tool, then report its answer briefly.", name: "OfficeAssistant", tools: [.. mcpTools.Cast<AITool>()]);` <br> • An `McpClientTool` is an `AIFunction` (Lab 04): the agent calls it like a .NET tool, and the call goes to the MCP server |
-| **TODO 18** | Run the `OfficeAssistant` and display what happened | • `AgentResponse response = await officeAssistant.RunAsync(prompt).WithSpinner("Running the OfficeAssistant");` <br> • `WriteToolCalls(response);` <br> • `ColoredConsole.WritePrimaryLogLine("Agent answer:");` `ColoredConsole.WriteSecondaryLogLine(response.Text);` <br> • `WriteTokenUsage(response);` |
+| **TODO 17** | Get the MCP tools and create the `OfficeAssistant` | • `IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();` <br> • `AIAgent officeAssistant = chatClient.AsAIAgent(instructions: Agents.OfficeAssistant.Instructions, name: Agents.OfficeAssistant.Name, tools: [.. mcpTools.Cast<AITool>()]);` <br> • The instructions tell it to delegate every question or task about the company to the `CompanyAssistant` tool <br> • An `McpClientTool` is an `AIFunction` (Lab 04): the agent calls it like a .NET tool, and the call goes to the MCP server |
+| **TODO 18** | Run the `OfficeAssistant` and display what happened | • `prompt` is `string.Format(CultureInfo.InvariantCulture, Questions.BookRoomBTomorrow, tomorrow)`, already in the skeleton <br> • `AgentResponse response = await officeAssistant.RunAsync(prompt).WithSpinner("Running the OfficeAssistant");` <br> • `WriteToolCalls(response);` <br> • `ColoredConsole.WritePrimaryLogLine("Agent answer:");` `ColoredConsole.WriteSecondaryLogLine(response.Text);` <br> • `WriteTokenUsage(response);` |
 
 ---
 
@@ -395,6 +399,7 @@ Answers vary from one run to another. In scenario 3 the `OfficeAssistant` calls 
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions, description and questions of the agents, the same for everyone
 - `ExposeAIAgentAsMCPTool.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

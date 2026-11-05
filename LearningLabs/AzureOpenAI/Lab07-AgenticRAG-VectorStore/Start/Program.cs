@@ -100,8 +100,9 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Semantic search - without an agent ===");
 
-    // TODO 10: Search the 3 FAQ entries closest to a question and display them with WriteSearchResult(rank, result)
-    // Hint: string question = "Is there a phone number I can call for help?"; (shares no word with faq-010, which it is about)
+    // TODO 10: Search the 3 FAQ entries closest to the question Questions.PhoneNumberForHelp (provided in LabPrompts.cs)
+    // and display them with WriteSearchResult(rank, result)
+    // Hint: string question = Questions.PhoneNumberForHelp; (shares no word with faq-010, which it is about)
     //       ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
     //       await foreach (VectorSearchResult<FaqRecord> result in faqCollection.SearchAsync(question, top: 3)) { ... }
 }
@@ -120,12 +121,12 @@ if (ShouldRunScenario(3))
     // Hint: FaqSearchTool faqSearchTool = new(faqCollection);
     //       AITool searchFaqTool = AIFunctionFactory.Create(faqSearchTool.SearchFaqAsync, "search_faq");
 
-    // TODO 12: Create the agent with the tool (see the README for the instructions)
-    // Hint: chatClient.AsAIAgent(instructions: "...", name: "FaqAgent", tools: [searchFaqTool])
+    // TODO 12: Create the agent with the tool, and the instructions and the name of Agents.Faq
+    // Hint: chatClient.AsAIAgent(instructions: Agents.Faq.Instructions, name: Agents.Faq.Name, tools: [searchFaqTool])
     // AIAgent faqAgent = ...
 
-    // TODO 13: Run the agent with a question, then display the tool calls and the answer
-    // Hint: string question = "I received a broken item yesterday. What should I do?";
+    // TODO 13: Run the agent with the question Questions.BrokenItem, then display the tool calls and the answer
+    // Hint: string question = Questions.BrokenItem;
     //       ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
     //       AgentResponse response = await faqAgent.RunAsync(question).WithSpinner("Running agent");
     //       WriteToolCalls(response); then ColoredConsole.WritePrimaryLogLine($"Agent: {response.Text}")
@@ -156,21 +157,22 @@ if (ShouldRunScenario(4))
     // Hint: new TextSearchProviderOptions { SearchTime = TextSearchProviderOptions.TextSearchBehavior.BeforeAIInvoke, RecentMessageMemoryLimit = 2 }
     // TextSearchProviderOptions textSearchOptions = ...
 
-    // TODO 17: Create the agent with ChatClientAgentOptions: Name, ChatOptions.Instructions (see the README),
+    // TODO 17: Create the agent with ChatClientAgentOptions: Name and ChatOptions.Instructions of Agents.FaqRag,
     // AIContextProviders = [new TextSearchProvider(SearchFaqForProviderAsync, textSearchOptions)]
     // and a ChatHistoryProvider that keeps the provider messages out of the stored history (see the README)
     // AIAgent ragAgent = ...
 
-    // TODO 18: Create a session and ask a first question in it (no spinner: the provider writes to the console during the run)
+    // TODO 18: Create a session and ask the first question Questions.SendBackJacket in it
+    // (no spinner: the provider writes to the console during the run)
     // Hint: AgentSession session = await ragAgent.CreateSessionAsync();
-    //       string firstQuestion = "I want to send back a jacket I bought last week. How does it work?";
+    //       string firstQuestion = Questions.SendBackJacket;
     //       ColoredConsole.WriteSecondaryLogLine($"Question: {firstQuestion}");
     //       AgentResponse firstResponse = await ragAgent.RunAsync(firstQuestion, session);
     //       ColoredConsole.WritePrimaryLogLine($"Agent: {firstResponse.Text}");
     //       WriteTokenUsage(firstResponse, "Token Usage (first question):")
 
-    // TODO 19: Ask a follow-up question in the same session, and display the answer and its token usage
-    // Hint: string followUpQuestion = "And how long until I get my money back?";
+    // TODO 19: Ask the follow-up question Questions.MoneyBackDelay in the same session, and display the answer and its token usage
+    // Hint: string followUpQuestion = Questions.MoneyBackDelay;
     //       same code as TODO 18, with WriteTokenUsage(followUpResponse, "Token Usage (follow-up):")
 }
 

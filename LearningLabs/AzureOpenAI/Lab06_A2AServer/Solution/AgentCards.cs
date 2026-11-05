@@ -6,6 +6,7 @@ namespace A2AServer;
 /// Contains static methods for creating the agent card of each agent.
 /// An agent card is the discovery document of an A2A agent: who it is, what it can do (skills),
 /// and where and how to call it (supported interfaces: URL + protocol binding + protocol version).
+/// The name and the description of each card are those of the agent, provided in LabPrompts.cs.
 /// </summary>
 public static class AgentCards
 {
@@ -41,8 +42,8 @@ public static class AgentCards
 
         return new AgentCard
         {
-            Name = "AuthAgent",
-            Description = "An authentication agent specialized in generating and validating API keys. Only handles authentication-related tasks.",
+            Name = Agents.Auth.Name,
+            Description = Agents.Auth.Description,
             Version = "1.0.0",
             DefaultInputModes = ["text/plain"],
             DefaultOutputModes = ["text/plain"],
@@ -69,8 +70,8 @@ public static class AgentCards
 
         return new AgentCard
         {
-            Name = "CustomerToneAgent",
-            Description = "A customer tone assistant that can detect the tone of a customer's message.",
+            Name = Agents.CustomerTone.Name,
+            Description = Agents.CustomerTone.Description,
             Version = "1.0.0",
             DefaultInputModes = ["text/plain"],
             DefaultOutputModes = ["text/plain"],
