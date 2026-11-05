@@ -189,17 +189,20 @@ async function applyLanguage(lang) {
 function renderRail() {
   const list = document.getElementById("lab-list");
   document.getElementById("lab-count").textContent = String(state.labs.length);
-  list.replaceChildren(...state.labs.map((lab) => {
+  // The catalog order is the learning path: the list shows the step in it; the lab number (its folder) comes second.
+  list.replaceChildren(...state.labs.map((lab, index) => {
+    const step = index + 1;
     const item = el("button", "lab-item");
     item.type = "button";
     item.setAttribute("aria-current", String(lab.id === state.currentId));
-    item.setAttribute("aria-label", t("rail.select", { title: labText(lab, "title") }));
-    item.append(el("span", "lab-item-num", lab.number), el("span", "lab-item-title", labText(lab, "title")));
+    item.setAttribute("aria-label", t("rail.select", { step, title: labText(lab, "title"), number: lab.number }));
+    item.append(el("span", "lab-item-num", String(step)), el("span", "lab-item-title", labText(lab, "title")));
 
     const meta = el("span", "lab-item-meta");
     meta.append(lab.activeRunId ? pill("running", t("status.running")) : pill(lab.progress, t(`progress.${lab.progress}`)));
     const last = latestRun(lab);
     if (last) meta.append(el("span", "num", fmtDuration(last.durationMs)));
+    meta.append(el("span", "lab-item-ref", t("lab.kicker", { number: lab.number })));
     item.append(meta);
 
     item.addEventListener("click", () => selectLab(lab.id));

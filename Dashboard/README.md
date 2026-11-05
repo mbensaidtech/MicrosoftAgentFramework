@@ -54,7 +54,7 @@ To configure them without a terminal, use the **Azure OpenAI settings** (see bel
 | Labs run in pairs (companion) | a lab can declare a `companion` project (the reference solution of another lab): a server started before the lab and stopped after it, or a client run against the lab once it is ready. Its output is shown as `companion` lines — see [Labs run in pairs](#labs-run-in-pairs-companion) |
 | AI models | top-bar button (status of the LLM: *API key* / *Microsoft Entra ID* / *Not configured*) opening the **AI models** settings: the LLM and the embedding model, each with the **trainer's configuration** (unlocked with the access code announced by the trainer) or **my configuration** (an Azure OpenAI form), shared by every migrated lab — see [AI models settings](#ai-models-settings) |
 | Reset exercises | **Reset exercises…** under the lab list, **Reset this exercise…** in the History tab (shown once the exercise was started): one exercise, several or all back to *Not started* (their runs and their `_StartCompleted/` folder), after confirmations proportional to the risk — see [Reset exercises](#reset-exercises) |
-| Journey | a column left of the lab list: overall progress, the state of every exercise, XP, rank, milestones, distinctions and the next mission, recomputed from the local history and refreshed by itself — see [Journey](#journey) |
+| Journey | a column left of the lab list or a band above it (your choice): overall progress, the state of every exercise, XP, rank, milestones, distinctions and the next mission, recomputed from the local history and refreshed by itself — see [Journey](#journey) |
 
 ## Architecture
 
@@ -266,18 +266,18 @@ Each exercise is shown with its name (its lab folder, e.g. `Lab01-FirstBasicAIAg
 
 ## Journey
 
-The column left of the lab list (a band above it below 1280 px wide) turns the progress into a route through the course.
+A column left of the lab list (**vertical**) or a band above it (**horizontal**, everything on one line when the width allows) turns the progress into a route through the course. The switch in its header chooses the layout, remembered by the browser (`labbench.journeyLayout`); below 1280 px wide it is always the band. Its tiles adapt to the width they get (container queries).
 Everything is computed by the server from `Dashboard/.data/history.json` (`Journey/LearningJourney.cs`): nothing else is stored, a reset of exercises lowers it, and nothing is sent to the trainer.
 
 | Part | What it shows |
 |---|---|
-| Core | One arc per exercise in catalog order (wider gaps between levels): green *completed*, amber *in progress* (the share of checks of its best run), red dashed *to resume*, blue pulse *running*; a blue dot marks the lab open on the right. Inside: the percentage completed and, in blue, the XP toward the next rank. |
+| Rings | Two concentric rings: outside, in green, the share of exercises completed; inside, in blue, the XP toward the next rank. Beside them, the exercises completed and the XP, then the XP still needed for the next rank and *How XP is earned*. |
 | Rank and XP | *Foundations* → *Tooling* (15 % of the course base XP) → *Integration* (35 %) → *Orchestration* (60 %) → *Mastery* (85 %). XP: 100 per Beginner exercise, 150 per Intermediate one, 200 per Advanced one; +50 when it passes on the first attempt, +25 when its solution was not run before; an exercise in progress earns `base × 0.5 × best checks / checks`. Running a solution never earns XP. |
-| Trajectory | The exercises as waypoints, one group per level (the gate lights up when every exercise of the level is completed), joined by a trail; selecting one opens the lab. *To resume* = passed before, but the latest attempt (a Start run not cancelled) failed or timed out: it still counts as completed, like in the lab list and on the trainer's dashboard. |
+| Trajectory | One chip per exercise, numbered by its **step in the learning path** (the catalog order: the lab number is its folder, shown in the chip's tooltip), one group per level (checked when every exercise of the level is completed): green *completed*, amber ring *in progress* (the share of checks of its best run), red with a dot *to resume*, blue pulse *running*, blue ring for the lab open on the right; a legend underneath. Selecting one opens the lab. *To resume* = passed before, but the latest attempt (a Start run not cancelled) failed or timed out: it still counts as completed, like in the lab list and on the trainer's dashboard. |
 | Next mission | The exercise in progress run most recently, else the first one to resume, else the next one to start, with **Continue** and the XP still within reach. |
-| Distinctions | *First steps*, *First try*, *No safety net* (completed without running its solution before), *Persistence* (3 unsuccessful attempts or more before passing), *Milestone cleared*, *Summit*; each insignia shows how to earn it. |
+| Distinctions | *First steps*, *First try*, *No safety net* (completed without running its solution before), *Persistence* (3 unsuccessful attempts or more before passing), *Milestone cleared*, *Summit*; each medal shows how to earn it. |
 
-It refreshes when a run starts or ends, after a reset, when the page comes back to the front and every 20 seconds while it is visible (a run from another tab). A completed exercise, a new rank, a cleared milestone or a distinction is celebrated once, when it happens on the open page (short card, also announced to screen readers); never on load, on a language switch or after a reset. `prefers-reduced-motion` turns every animation off.
+It refreshes when a run starts or ends, after a reset, when the page comes back to the front and every 20 seconds while it is visible (a run from another tab). A completed exercise, a new rank, a cleared milestone or a distinction is celebrated once, when it happens on the open page (a short notification, also announced to screen readers); never on load, on a language switch or after a reset. `prefers-reduced-motion` turns every animation off.
 
 ## Reporting to the admin dashboard
 

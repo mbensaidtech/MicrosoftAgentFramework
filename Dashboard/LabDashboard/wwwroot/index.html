@@ -13,6 +13,10 @@
       var lang = localStorage.getItem("labbench.lang") || (navigator.language || "en").slice(0, 2);
       document.documentElement.lang = lang === "fr" ? "fr" : "en";
     } catch (e) { /* storage unavailable: English */ }
+    // Apply the saved journey layout (vertical column or horizontal band) before the first paint too.
+    try {
+      document.documentElement.dataset.journeyLayout = localStorage.getItem("labbench.journeyLayout") === "horizontal" ? "horizontal" : "vertical";
+    } catch (e) { document.documentElement.dataset.journeyLayout = "vertical"; }
   </script>
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/journey.css">
@@ -103,11 +107,20 @@
   </div>
 
   <div class="wrap shell">
-    <!-- JOURNEY: progress core, trajectory, next mission and distinctions, rendered by js/journey.js from GET /api/journey. -->
+    <!-- JOURNEY: progress rings, trajectory, next mission and distinctions, rendered by js/journey.js from GET /api/journey.
+         Shown as a column (vertical) or a band above the labs (horizontal), as chosen with the switch of its header. -->
     <aside class="journey" id="journey" aria-labelledby="journey-title">
       <div class="journey-head">
         <h2 id="journey-title" class="caps" data-i18n="journey.title">Journey</h2>
         <span class="count mono" id="journey-count"></span>
+        <div class="jr-switch" id="journey-layout" role="group" data-i18n-aria="journey.layout.aria">
+          <button type="button" data-layout="vertical" aria-pressed="true" data-i18n-aria="journey.layout.vertical" data-i18n-title="journey.layout.vertical">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2"/><path d="M6 2.8v10.4"/></svg>
+          </button>
+          <button type="button" data-layout="horizontal" aria-pressed="false" data-i18n-aria="journey.layout.horizontal" data-i18n-title="journey.layout.horizontal">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2"/><path d="M1.8 6.8h12.4"/></svg>
+          </button>
+        </div>
       </div>
       <div class="journey-body" id="journey-body"></div>
       <p class="sr-only" id="journey-live" aria-live="polite"></p>

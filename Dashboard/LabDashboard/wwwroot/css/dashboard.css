@@ -83,8 +83,11 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line2); border-botto
 .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--acc) 88%, var(--txt)); color: var(--acc-ink); }
 
 /* ---------- Shell ---------- */
-/* Journey (css/journey.css), lab list, lab view. Below 1280px the journey becomes a band above the other two. */
-.shell { display: grid; grid-template-columns: 228px 264px minmax(0, 1fr); gap: 28px 32px; padding-top: 28px; padding-bottom: 56px; }
+/* Journey (css/journey.css), lab list, lab view. The journey is a column on the left (vertical layout) or a band above
+   the other two (horizontal layout, chosen in its header); below 1280px it is always the band. */
+.shell { display: grid; grid-template-columns: 244px 264px minmax(0, 1fr); gap: 28px 32px; padding-top: 28px; padding-bottom: 56px; }
+:root[data-journey-layout="horizontal"] .shell { grid-template-columns: 264px minmax(0, 1fr); }
+:root[data-journey-layout="horizontal"] .journey { grid-column: 1 / -1; }
 @media (max-width: 1280px) {
   .shell { grid-template-columns: 264px minmax(0, 1fr); }
   .journey { grid-column: 1 / -1; }
@@ -98,7 +101,9 @@ kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line2); border-botto
 .lab-item:hover { border-color: var(--line2); }
 .lab-item[aria-current="true"] { border-color: var(--line2); background: var(--panel); box-shadow: 0 1px 2px var(--shade); }
 .lab-item[aria-current="true"]::before { content: ""; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--acc); }
-.lab-item-num { grid-row: span 2; font: 500 12px var(--mono); color: var(--txt4); padding-top: 1px; }
+.lab-item-num { grid-row: span 2; min-width: 2ch; text-align: right; font: 500 12px var(--mono); color: var(--txt4); padding-top: 1px; }
+.lab-item-meta .num { white-space: nowrap; }
+.lab-item-ref { margin-left: auto; font: 11px var(--mono); color: var(--txt4); white-space: nowrap; }
 .lab-item[aria-current="true"] .lab-item-num { color: var(--acc); }
 .lab-item-title { font-size: 13px; font-weight: 560; letter-spacing: -.01em; color: var(--txt); }
 .lab-item-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--txt3); }
