@@ -42,6 +42,8 @@ const state = {
   // the error of the last action, a request in flight, and the countdown of the code entry. Never a code nor a key.
   trainer: { view: null, unlock: null, ticked: new Set(), flowError: null, loading: false, failed: false, busy: false, busyText: "", timer: null },
   reporting: null, reportingTimer: null, helpBusy: false,
+  // Storage of the labs that keep data outside of the application (GET /settings/storage: Storage:Mode, its source), a save in flight.
+  labStorage: null, labStorageBusy: false,
 };
 
 // ---------- helpers ----------
@@ -175,6 +177,7 @@ async function applyLanguage(lang) {
   renderReadme();
   renderHistory();
   renderAbout();
+  renderStorageBar();
   renderReadouts();
   renderTerminalTitle();
   renderScenarios();
@@ -244,6 +247,10 @@ async function selectLab(id) {
   resetInput();
   wireSolution(main);
   main.querySelector('[data-action="open-settings"]').addEventListener("click", (event) => openSettings("models", { kind: event.currentTarget.dataset.kind }));
+  main.querySelector('[data-action="change-storage"]').addEventListener("click", () => openSettings("storage"));
+  renderStorageBar();
+  // Read again at each opening: the mode may have been changed with dotnet user-secrets meanwhile.
+  if (state.details.lab.storage) loadLabStorage().then(renderStorageBar);
   main.querySelector('[data-action="help"]').addEventListener("click", openHelp);
   main.querySelector('[data-action="reset-lab"]').addEventListener("click", () => openReset(state.currentId));
   renderHelpButtons();
@@ -1129,7 +1136,7 @@ function clearSettingsErrors() {
   markSettingsTabErrors();
 }
 
-const settingsTabs = ["models", "workshop"];
+const settingsTabs = ["models", "storage", "workshop"];
 
 /** Shows one tab of the settings dialog (roving tabindex), optionally focusing its first field (in a given model card). */
 function selectSettingsTab(name, { focusField = false, kind = null } = {}) {
@@ -1149,6 +1156,10 @@ function selectSettingsTab(name, { focusField = false, kind = null } = {}) {
 
 /** The first visible field of a tab, or of a model card; a card showing no field (trainer mode) focuses its mode switch. */
 function focusSettingsField(tab, kind = null) {
+  if (tab === "storage") {
+    document.querySelector('#storage-modes input:checked:not(:disabled)')?.focus();
+    return;
+  }
   const root = document.getElementById(tab === "models" ? `model-card-${kind ?? "chat"}` : `settings-panel-${tab}`);
   const visible = (node) => !node.disabled && node.getClientRects().length > 0;
   const target = [...root.querySelectorAll('input:not([type="radio"])')].find(visible)
@@ -1156,9 +1167,9 @@ function focusSettingsField(tab, kind = null) {
   target?.focus();
 }
 
-/** AI models: each card saves itself, so the footer only closes the dialog. Workshop: Cancel and Save. */
+/** AI models and Storage save themselves, so the footer only closes the dialog. Workshop: Cancel and Save. */
 function renderSettingsFooter() {
-  const models = state.settingsTab === "models";
+  const models = state.settingsTab !== "workshop";
   document.getElementById("settings-foot-save").hidden = models;
   const cancel = document.getElementById("settings-foot-cancel");
   cancel.dataset.i18n = models ? "settings.close" : "settings.cancel";
@@ -1185,6 +1196,10 @@ function renderSettingsNav() {
   document.getElementById("settings-nav-models-dot").className = `status-dot ${dot}`;
   document.getElementById("settings-nav-models-state").textContent = t(`config.${kind}`);
 
+  const mode = state.labStorage?.mode;
+  document.getElementById("settings-nav-storage-dot").className = `status-dot ${mode ? "ok" : ""}`;
+  document.getElementById("settings-nav-storage-state").textContent = mode ? storageModeText(mode) : t("storage.unknown");
+
   const status = state.reporting;
   const workshop = !status ? { key: "unknown", dot: "" }
     : status.standalone ? { key: "standalone", dot: "" }
@@ -1200,6 +1215,7 @@ function renderSettingsNav() {
 /** Renders the status; fills the inputs only when asked, so that a language switch keeps what the user typed. */
 function renderSettings({ fill = false } = {}) {
   renderModels({ fill: fill ? modelKinds : [] });
+  renderStorageSettings();
   renderReportingSettings({ fill });
   renderSettingsNav();
   renderSettingsFooter();
@@ -1362,9 +1378,10 @@ function showStoreError(code, file) {
   node.textContent = code ? t(`settings.store.${code}`, { file: file ?? state.models?.secretsFile ?? "" }) : "";
 }
 
-/** Opens the settings on a tab: "models" (the AI models the labs use; `kind` = the card to focus) or "workshop" (username and workshop key). */
+/** Opens the settings on a tab: "models" (the AI models the labs use; `kind` = the card to focus), "storage" (Storage:Mode of Lab05 and Lab12)
+ * or "workshop" (username and workshop key). */
 async function openSettings(tab = "models", { kind = null } = {}) {
-  await Promise.all([loadSettings(), loadReportingStatus()]);
+  await Promise.all([loadSettings(), loadReportingStatus(), loadLabStorage()]);
   const name = settingsTabs.includes(tab) ? tab : "models";
   state.modelAsk = { chat: null, embedding: null };
   Object.assign(state.trainer, { view: null, flowError: null, failed: false });
@@ -1382,6 +1399,79 @@ function clearSecretInputs() {
   for (const kind of modelKinds) document.getElementById(modelIds(kind, "apiKey").input).value = "";
   document.getElementById("rep-key").value = "";
   document.getElementById("trainer-code-input").value = "";
+}
+
+// ---------- storage of the labs (Storage:Mode) ----------
+async function loadLabStorage() {
+  try {
+    state.labStorage = await api.get("/settings/storage");
+  } catch {
+    state.labStorage = null;
+  }
+}
+
+/** The name of a mode ("MongoDB without Docker"…), or the value itself when the labs do not know it (a variable set by hand). */
+function storageModeText(mode) {
+  const key = `storage.mode.${mode}`;
+  return t(key) !== key ? t(key) : mode;
+}
+
+/** The Storage tab: the mode in use, ticked; a Storage__Mode variable of this computer wins, so the choice is then locked. */
+function renderStorageSettings() {
+  const status = state.labStorage;
+  const locked = !status || status.source === "environment" || state.labStorageBusy;
+  for (const input of document.querySelectorAll('#storage-modes input[name="storage-mode"]')) {
+    input.checked = input.value === status?.mode;
+    input.disabled = locked;
+  }
+  const source = document.getElementById("storage-source");
+  source.className = `field-source ${status?.source ?? ""}`;
+  source.textContent = !status ? t("storage.unknown")
+    : status.source === "environment" ? t("storage.sourceEnvironment", { variable: status.environmentVariable, mode: status.mode })
+    : status.source === "dashboard" ? t("storage.sourceDashboard", { mode: storageModeText(status.mode) })
+    : t("storage.sourceDefault");
+}
+
+/** The bar of the run panel, for the labs that keep data outside of the application (labs.json "storage"). */
+function renderStorageBar() {
+  const main = state.view;
+  const bar = main && $(main, "storageBar");
+  if (!bar) return;
+  bar.hidden = !state.details?.lab?.storage;
+  if (bar.hidden) return;
+  const status = state.labStorage;
+  $(main, "storageText").textContent = !status ? t("storage.unknown")
+    : t(status.source === "environment" ? "storage.barEnvironment" : "storage.bar",
+      { mode: storageModeText(status.mode), variable: status.environmentVariable });
+}
+
+/** Saves the mode as soon as it is chosen; the next run of Lab05 or Lab12 (dashboard or dotnet run) uses it. */
+async function saveLabStorage(mode) {
+  if (state.labStorageBusy || mode === state.labStorage?.mode) return;
+  const error = document.getElementById("err-storage");
+  error.hidden = true;
+  document.getElementById("settings-store-error").hidden = true;
+  state.labStorageBusy = true;
+  renderStorageSettings();
+  try {
+    const { ok, status, payload } = await api.send("PUT", "/settings/storage", { mode });
+    if (ok) {
+      state.labStorage = payload;
+      toast(t("storage.saved", { mode: storageModeText(payload.mode) }));
+    } else if (storeErrors.includes(payload.error)) {
+      showStoreError(payload.error, payload.file);
+    } else {
+      error.hidden = false;
+      error.textContent = t("settings.saveError", { status });
+    }
+  } catch {
+    toast(t("settings.saveError", { status: "—" }));
+  } finally {
+    state.labStorageBusy = false;
+    renderStorageSettings();
+    renderSettingsNav();
+    renderStorageBar();
+  }
 }
 
 function closeSettings() {
@@ -1987,6 +2077,9 @@ function wireSettings() {
     document.getElementById(`settings-tab-${settingsTabs[next]}`).focus();
   });
   dialog.querySelectorAll('[data-action="close-settings"]').forEach((b) => b.addEventListener("click", closeSettings));
+  document.getElementById("storage-modes").addEventListener("change", (event) => {
+    if (event.target.name === "storage-mode") saveLabStorage(event.target.value);
+  });
   dialog.addEventListener("cancel", () => {
     clearSecretInputs();
     dropTrainerUnlock();

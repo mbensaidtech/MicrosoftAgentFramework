@@ -61,6 +61,7 @@ builder.Services.AddSingleton(options);
 builder.Services.AddSingleton(labCatalog);
 builder.Services.AddSingleton<RunHistoryStore>();
 builder.Services.AddSingleton(services => AzureOpenAISettingsStore.ForCatalog(services.GetRequiredService<LabCatalog>()));
+builder.Services.AddSingleton(services => new LabStorageSettings(services.GetRequiredService<AzureOpenAISettingsStore>()));
 builder.Services.AddSingleton<LabRunner>();
 builder.Services.AddSingleton<LabResetService>();
 
@@ -326,6 +327,25 @@ api.MapDelete("/settings/azure-openai/api-key", async (AzureOpenAISettingsStore 
         AzureOpenAISettingsStatus status = settings.GetStatus();
         reporting.ReportSettingsChanged(status);
         return Results.Ok(status);
+    }
+    catch (AzureOpenAISettingsStoreException ex)
+    {
+        return SettingsStoreError(ex, settings);
+    }
+});
+
+// Storage of the labs that keep data outside of the application (Lab05 scenario 3, Lab12): Storage:Mode in the same user secrets,
+// what `dotnet user-secrets set "Storage:Mode" ...` writes. Used at the next run, from the dashboard and from dotnet run.
+api.MapGet("/settings/storage", (LabStorageSettings storage) => storage.GetStatus());
+
+api.MapPut("/settings/storage", async (LabStorageUpdate update, LabStorageSettings storage, AzureOpenAISettingsStore settings) =>
+{
+    try
+    {
+        string? error = await storage.SaveAsync(update);
+        return error is null
+            ? Results.Ok(storage.GetStatus())
+            : Results.BadRequest(new { errors = new Dictionary<string, string> { ["mode"] = error } });
     }
     catch (AzureOpenAISettingsStoreException ex)
     {
@@ -635,6 +655,7 @@ internal sealed record LabSummary(
     string Level,
     int TimeoutSeconds,
     bool Interactive,
+    bool Storage,
     int InputIdleTimeoutSeconds,
     LabCompanion? Companion,
     IReadOnlyDictionary<string, LabTranslation> Translations,
@@ -657,7 +678,7 @@ internal sealed record LabSummary(
 
         return new LabSummary(
             lab.Id, lab.Number, lab.Track, lab.Title, lab.Summary, lab.Level, lab.TimeoutSeconds,
-            lab.Interactive, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress, hasCompletedCopy,
+            lab.Interactive, lab.Storage, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress, hasCompletedCopy,
             LabResetService.FolderName(lab),
             lastStart is null ? null : lastStart with { Log = [] },
             lastSolution is null ? null : lastSolution with { Log = [] },

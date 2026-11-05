@@ -421,6 +421,7 @@ details.fig:not([open]) > summary { border-bottom: 0; }
 .model-resource { min-width: 0; margin: 14px 0 0; padding: 0; border: 0; }
 .model-resource legend { padding: 0; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--txt); }
 .choice-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.choice-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .choice { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 9px 11px; border: 1px solid var(--line2); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; transition: border-color .15s, background-color .15s; }
 .choice:hover { border-color: var(--txt4); }
 .choice:has(input:checked) { border-color: color-mix(in srgb, var(--acc) 55%, var(--line2)); background: var(--accbg); }
@@ -632,3 +633,9 @@ details.fig:not([open]) > summary { border-bottom: 0; }
   .scenario label { flex-basis: 100%; }
   .scenario-badges { padding-left: 25px; }
 }
+
+/* Storage of the labs that keep data outside of the application (Lab05, Lab12): the mode in use, above the scenarios of the run panel. */
+.storage-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 8px 14px; font-size: 12.5px; color: var(--txt2); border-bottom: 1px solid var(--line); }
+.storage-bar .ico { color: var(--acc); }
+.storage-bar .btn { margin-left: auto; }
+.storage-modes .choice small code { font: 11px var(--mono); }

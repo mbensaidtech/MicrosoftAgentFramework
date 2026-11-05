@@ -427,6 +427,7 @@
       "startProject": "Start/AIAgentWithThreads.csproj",
       "solutionProject": "Solution/AIAgentWithThreads.csproj",
       "timeoutSeconds": 180,
+      "storage": true,
       "expectations": [
         {
           "id": "config",
@@ -766,6 +767,7 @@
       "startProject": "Start/AIAgentWithAIContextProvider.csproj",
       "solutionProject": "Solution/AIAgentWithAIContextProvider.csproj",
       "timeoutSeconds": 240,
+      "storage": true,
       "interactive": true,
       "expectations": [
         {

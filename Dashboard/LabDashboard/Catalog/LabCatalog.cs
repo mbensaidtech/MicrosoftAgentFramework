@@ -91,6 +91,12 @@ public sealed record LabDefinition
     /// <summary>The program reads standard input (<c>Console.ReadLine</c>): the dashboard keeps stdin open and asks the learner.</summary>
     public bool Interactive { get; init; }
 
+    /// <summary>
+    /// The lab keeps data outside of the application, in the storage chosen by <c>Storage:Mode</c> (MongoDB in Docker, MongoDB without Docker,
+    /// or a JSON file): the dashboard shows the mode in use and lets the learner change it.
+    /// </summary>
+    public bool Storage { get; init; }
+
     /// <summary>An interactive run whose prompt stays unanswered this long times out. The lab timeout is paused while it waits.</summary>
     public int InputIdleTimeoutSeconds { get; init; } = 600;
 
