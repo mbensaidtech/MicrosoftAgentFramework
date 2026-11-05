@@ -28,6 +28,7 @@ Then you will observe a run with the standard tool, **OpenTelemetry**: Agent Fra
   - the resource **API key**, or
   - Azure CLI logged in (`az login`) with the **Cognitive Services OpenAI User** role on the resource
 - Lab 01 (client and agent) and Lab 03 (function tools) are recommended
+- Optional, only for the [Grafana bonus](#bonus-optional-see-the-run-in-grafana): Docker
 
 ## Project Structure
 
@@ -39,13 +40,17 @@ Lab11-AIAgentWithCustomHttpTransport/
 │   ├── LabPrompts.cs                       <-- Provided: names, instructions and questions of the agents
 │   ├── HttpConsole.cs                      <-- Provided: display helpers (headers with masked credentials, JSON bodies)
 │   ├── TraceConsole.cs                     <-- Provided: displays the OpenTelemetry spans as a tree (scenario 3)
+│   ├── GrafanaExport.cs                    <-- Provided, bonus only: sends the spans to a local Grafana (off by default)
 │   ├── Tools/WeatherTools.cs               <-- Provided: the function tool of scenario 2
 │   ├── ConfigurationHelper.cs
 │   ├── AzureOpenAISettings.cs
 │   ├── appsettings.json
 │   └── AIAgentWithCustomHttpTransport.csproj
-└── Solution/                               <-- Reference solution
-    └── ...
+├── Solution/                               <-- Reference solution
+│   └── ...
+└── Grafana/                                <-- Bonus only (Docker): a local Grafana with a ready-made dashboard
+    ├── docker-compose.yml
+    └── dashboards/
 ```
 
 ## Instructions
@@ -94,6 +99,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
   - `WriteTokenUsage(response)` writes the token usage of an agent run.
 - `Tools/WeatherTools.cs` — `GetWeather(location)`, the tool of the official "add tools" getting-started sample. It always answers *cloudy with a high of 15 degrees Celsius*: a value the model cannot guess.
 - `TraceConsole.cs` — `WriteSpanTree(spans)` writes the spans recorded by OpenTelemetry as a tree (each span under its parent), with their duration and the token counts of their `gen_ai.usage.*` attributes. It never prints a prompt or an answer.
+- `GrafanaExport.cs` — only for the optional [Grafana bonus](#bonus-optional-see-the-run-in-grafana): it does nothing unless the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable is set. You can ignore it.
 - `HttpLoggingHandler.WriteTraffic` (in `Program.cs`, provided) — when `false`, the handler still counts and forwards the requests but writes nothing: scenario 3 turns the HTTP log off while OpenTelemetry records the run.
 
 ### Step 3: Complete the Program.cs
@@ -264,7 +270,55 @@ invoke_agent TravelAssistant(<agent id>) (4057 ms) - input tokens 204, output to
 - **Span names** follow the OpenTelemetry GenAI semantic conventions: `invoke_agent <agent>` (agent level), `chat <model>` (one model call), `execute_tool <tool>` (one tool call). Each span has `gen_ai.*` attributes: operation, provider, model, token usage...
 - **The inside of an agent called as a tool.** The `AgentResponse` of the travel assistant counts only **its own** model calls: 204 = 83 + 121 input tokens. The weather agent used 171 more input tokens, visible only in its spans. This is what the official guidance means: *"If you need observability into inner agent behavior, use tracing"* ([Agents as tools](https://learn.microsoft.com/agent-framework/journey/agents-as-tools?pivots=programming-language-csharp)).
 - **Agent level or chat client level.** The agent level gives one span per run; the chat client level gives the model and tool calls. With sensitive data, both levels record the conversation: *"you might choose to enable observability only on the chat client or only on the agent to avoid duplication"* ([Observability](https://learn.microsoft.com/agent-framework/agents/observability?pivots=programming-language-csharp)).
-- **Where the spans go.** The lab keeps them in memory to print them. In an application, the tracer provider exports them: `AddOtlpExporter()` to the Aspire Dashboard or any OpenTelemetry backend, `AddAzureMonitorTraceExporter()` to Application Insights, `AddConsoleExporter()` for a quick look.
+- **Where the spans go.** The lab keeps them in memory to print them. In an application, the tracer provider exports them: `AddOtlpExporter()` to Grafana (Tempo for the traces) or any OpenTelemetry backend, `AddAzureMonitorTraceExporter()` to Application Insights, `AddConsoleExporter()` for a quick look.
+
+## Bonus (optional): see the run in Grafana
+
+> **Optional, needs Docker.** Skip this section if you do not have Docker: the lab does not depend on it, and without the `OTEL_EXPORTER_OTLP_ENDPOINT` variable the program behaves exactly as described above.
+
+Scenario 3 prints the spans in the console. In a real application, they go to an observability backend. This bonus sends the same spans to a local **Grafana** (traces stored in **Tempo**), with a ready-made dashboard.
+
+**1. Start Grafana** (from the `Grafana` folder of the lab):
+
+```bash
+cd Grafana
+docker compose up -d
+```
+
+The `grafana/otel-lgtm` image is Grafana's all-in-one image for development: an OpenTelemetry collector (OTLP on ports `4317` gRPC and `4318` HTTP), Tempo, Prometheus, Loki and Grafana. The first start downloads the image (about 900 MB on disk).
+
+**2. Run the lab with the OTLP endpoint** (your solution in `Start`, or the `Solution` folder):
+
+```bash
+# macOS / Linux
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 dotnet run
+```
+
+```powershell
+# Windows (PowerShell)
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317"; dotnet run
+```
+
+The first line of the output confirms it: `Grafana bonus: the spans are also sent to http://localhost:4317/ ...`. The rest of the output does not change.
+
+**3. Open the dashboard**: <http://localhost:3000> → **Dashboards** → **Lab 11** → **Lab 11 - Observe an agent** (no login). The spans arrive at the end of the run: refresh the page a few seconds after it (up to about 20 seconds just after Grafana starts).
+
+| Panel | What it shows |
+|-------|---------------|
+| Agent runs, Model calls, Tool calls, HTTP requests | Number of `invoke_agent`, `chat`, `execute_tool` and HTTP spans in the time range |
+| Input tokens, Output tokens | Sum over the `chat` spans, one per model call (an `invoke_agent` span repeats the tokens of its own model calls: summing both would count them twice) |
+| Traces | One row per trace: one per run of scenario 3, one per HTTP request in scenarios 1 and 2 (they are not instrumented, only `HttpClient` is). **Click a trace ID** to open the trace |
+| Agent runs, model calls and tool calls | Every `gen_ai` span: operation, agent, tool, tokens, duration |
+| Duration by operation | Number of spans and average duration of `invoke_agent`, `chat` and `execute_tool` |
+| HTTP requests | The requests that `HttpLoggingHandler` prints, seen by OpenTelemetry: status, URL, duration |
+
+In the trace of scenario 3 you find the tree of the console, plus one `POST` span under each `chat` span: the HTTP request of that model call, recorded by `HttpClient` itself.
+
+**How it works.** `GrafanaExport.cs` (provided, one line at the top of `Program.cs`) creates a **second tracer provider**, next to the one of TODO 15: several providers can listen to the same activity source, each with its own exporters. This one listens to the lab's source and to `System.Net.Http` (the activity source built into `HttpClient` since .NET 9), and sends the spans with `AddOtlpExporter()` (package `OpenTelemetry.Exporter.OpenTelemetryProtocol`). The exporter reads `OTEL_EXPORTER_OTLP_ENDPOINT` itself: with your company's Grafana, only the address of its OpenTelemetry collector changes.
+
+Only the spans are exported, not the metrics: in this lab both the agent and its chat client are instrumented, and both record `gen_ai.client.token.usage`, so the metric would count each model call twice (see *Agent level or chat client level* above).
+
+**Stop Grafana** with `docker compose down` (in the `Grafana` folder). The data is not kept: the next start is empty.
 
 ## Key Concepts
 
@@ -464,6 +518,9 @@ The JSON bodies above are shortened to one line per message; the real output is 
 | Scenario 3: no `chat` or `execute_tool` span | The chat client is not instrumented: check the `clientFactory` of `AsAIAgent` (TODO 16–17) |
 | Scenario 3: no `invoke_agent` span | The agent is not instrumented: check `.AsBuilder().UseOpenTelemetry(...).Build()` after `AsAIAgent(...)` |
 | Scenario 3 prints the HTTP log | `loggingHandler.WriteTraffic = false;` must come before the run (TODO 18) |
+| Bonus: `Grafana bonus: nothing listens on localhost:4317` | Grafana is not started: `docker compose up -d` in the `Grafana` folder (`docker ps` shows `lab11-grafana`), or remove the `OTEL_EXPORTER_OTLP_ENDPOINT` variable to run without it |
+| Bonus: the dashboard is empty | Wait a few seconds after the end of the run and refresh (Tempo indexes the spans with a short delay, longer just after it starts), check the time range (top right), and check that the output starts with `Grafana bonus: the spans are also sent to ...` |
+| Bonus: `docker compose up` fails with `port is already allocated` | Another program uses port 3000, 4317 or 4318: stop it, or change the left side of the port in `docker-compose.yml` (for 4317, also change `OTEL_EXPORTER_OTLP_ENDPOINT`) |
 | `AggregateException: Retry failed after 4 tries. (The operation was cancelled because it exceeded the configured timeout of 0:00:30...)` | Each attempt took longer than `NetworkTimeout` (slow or reasoning model, long answer) and the SDK retried 3 times: raise `NetworkTimeout` (TODO 2). Each attempt appears as a new `HTTP REQUEST` in the log |
 
 ## Security
@@ -472,6 +529,7 @@ The JSON bodies above are shortened to one line per message; the real output is 
 - **Bodies contain the conversation.** Prompts, answers and tool results may hold personal or confidential data: in a real application, do not log bodies by default, and keep such logs out of shared files and dashboards.
 - **Logs cost time.** Buffering and printing every body slows each call; this logging is for learning and debugging.
 - **Traces too can hold the conversation.** With `EnableSensitiveData = true`, the spans contain the prompts, answers, tool arguments and results: *"Only enable sensitive data in development or testing environments, as it might expose user information in production logs and traces."* Without it (scenario 3), they hold names, durations and token counts.
+- **The Grafana bonus is for your machine only.** Its Grafana has no login and its collector accepts any data: keep the ports local, and do not reuse this setup outside development.
 
 ## Provided Files
 
@@ -483,6 +541,7 @@ The following files are provided and should not be modified:
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
 - `HttpConsole.cs` - Display helpers for the HTTP traffic (credentials masked) and the token usage
 - `TraceConsole.cs` - Displays the OpenTelemetry spans as a tree
+- `GrafanaExport.cs` - Bonus only: sends the spans to a local Grafana when `OTEL_EXPORTER_OTLP_ENDPOINT` is set
 - `Tools/WeatherTools.cs` - The function tool of scenario 2
 
 The following files should be modified:
@@ -499,6 +558,7 @@ The following files should be modified:
 | `Microsoft.Extensions.Configuration.*` | `appsettings.json`, user secrets and environment variables, bound to `AzureOpenAISettings` |
 | `OpenTelemetry` | OpenTelemetry SDK: `TracerProvider` (scenario 3). The instrumentation itself (`UseOpenTelemetry`) is part of Agent Framework and `Microsoft.Extensions.AI` |
 | `OpenTelemetry.Exporter.InMemory` | Keeps the finished spans in a list, so that the lab can print them. In an application: `OpenTelemetry.Exporter.OpenTelemetryProtocol` (OTLP), `Azure.Monitor.OpenTelemetry.Exporter` or `OpenTelemetry.Exporter.Console` |
+| `OpenTelemetry.Exporter.OpenTelemetryProtocol` | Bonus only: the OTLP exporter used by `GrafanaExport.cs` |
 
 `DelegatingHandler`, `HttpClientHandler` and `HttpClient` are part of .NET: no package is needed for the transport.
 
@@ -508,9 +568,9 @@ The following files should be modified:
 - **Pipeline policy instead of a transport**: a `PipelinePolicy` added with `clientOptions.AddPolicy(policy, PipelinePosition.BeforeTransport)` runs inside the SDK pipeline without replacing the `HttpClient` (`PerCall`: once per call, `PerTry`: once per attempt, `BeforeTransport`: right before the transport, after authentication). The official Foundry hosting samples use one to rewrite the request URI.
 - **`IHttpClientFactory`**: in an application with dependency injection, register the handler with `services.AddHttpClient("openai").AddHttpMessageHandler<HttpLoggingHandler>()` and give `HttpClientPipelineTransport` the client created by the factory (see [Outgoing request middleware](https://learn.microsoft.com/aspnet/core/fundamentals/http-requests#outgoing-request-middleware)).
 - **The same handler for other clients**: an MCP `HttpClientTransport` also accepts your `HttpClient`; the official sample `Agent_MCP_PerRun_AuthHeaders` uses a `DelegatingHandler` to add an `Authorization` header to each MCP request.
-- **See the traces in a dashboard**: run the Aspire Dashboard (`docker run --rm -it -d -p 18888:18888 -p 4317:18889 --name aspire-dashboard mcr.microsoft.com/dotnet/aspire-dashboard:latest`), add `.AddOtlpExporter()` to the tracer provider (package `OpenTelemetry.Exporter.OpenTelemetryProtocol`) and open `http://localhost:18888` (see [Observability](https://learn.microsoft.com/agent-framework/agents/observability?pivots=programming-language-csharp)).
-- **HTTP spans inside the trace**: `.AddHttpClientInstrumentation()` (package `OpenTelemetry.Instrumentation.Http`) adds a span for each HTTP request under its `chat` span — the official sample `AgentOpenTelemetry` does it.
-- **Metrics**: a `MeterProvider` with `AddMeter(sourceName)` collects `gen_ai.client.token.usage` and `gen_ai.client.operation.duration` — the numbers to watch for cost and latency.
+- **See the traces in Grafana**: the [Grafana bonus](#bonus-optional-see-the-run-in-grafana) does it with Docker. In your own TODO 15, `.AddOtlpExporter()` next to `.AddInMemoryExporter(spans)` sends the same spans (package `OpenTelemetry.Exporter.OpenTelemetryProtocol`). In Grafana, **Explore** → **Tempo** searches them by service or span name (see [Observability](https://learn.microsoft.com/agent-framework/agents/observability?pivots=programming-language-csharp)).
+- **HTTP spans inside the trace**: `.AddSource("System.Net.Http")` adds a span for each HTTP request under its `chat` span (built into `HttpClient` since .NET 9; the Grafana bonus does it). `.AddHttpClientInstrumentation()` (package `OpenTelemetry.Instrumentation.Http`) does the same with more options — the official sample `AgentOpenTelemetry` uses it.
+- **Metrics**: a `MeterProvider` with `AddMeter(sourceName)` collects `gen_ai.client.token.usage` and `gen_ai.client.operation.duration` — the numbers to watch for cost and latency. Instrument only one level (agent or chat client) for metrics: with both, as in this lab, each model call is counted twice.
 - **Higher-level interception**: the agent and function-calling middleware of Lab 03 (`AsBuilder().Use(...)`) work on messages and function calls instead of HTTP.
 - **Streaming**: with `RunStreamingAsync`, the response is `text/event-stream`; the handler sees it as soon as the headers arrive, and `WriteBodyAsync` leaves the stream to the SDK.
 

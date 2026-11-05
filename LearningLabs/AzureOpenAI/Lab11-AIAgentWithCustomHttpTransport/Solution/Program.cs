@@ -27,6 +27,10 @@ ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 
 bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
+// BONUS (optional, needs Docker): also send the spans to a local Grafana (GrafanaExport.cs; README, "Bonus: see the run in Grafana").
+// Provided, nothing to write: it does nothing unless the OTEL_EXPORTER_OTLP_ENDPOINT environment variable is set.
+using GrafanaExport? grafanaExport = GrafanaExport.StartIfConfigured();
+
 #region Setup: Configuration and Client Initialization
 
 // Step 1: Load Azure OpenAI settings from configuration
@@ -132,7 +136,7 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteUserLine($"User: {prompt}");
 
     // Step 1: Create the tracer provider. It listens to the activity source of the lab, and keeps the finished spans
-    // in a list so that the lab can display them (in an application: an OTLP exporter to the Aspire Dashboard, or Azure Monitor)
+    // in a list so that the lab can display them (in an application: an OTLP exporter to Grafana, or Azure Monitor)
     const string TelemetrySourceName = "AIAgentWithCustomHttpTransport";
     List<Activity> spans = [];
     using TracerProvider tracerProvider = Sdk.CreateTracerProviderBuilder()

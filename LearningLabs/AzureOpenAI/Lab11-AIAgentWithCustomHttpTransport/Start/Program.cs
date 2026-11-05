@@ -27,6 +27,10 @@ ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 
 bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
+// BONUS (optional, needs Docker): also send the spans to a local Grafana (GrafanaExport.cs; README, "Bonus: see the run in Grafana").
+// Provided, nothing to write: it does nothing unless the OTEL_EXPORTER_OTLP_ENDPOINT environment variable is set.
+using GrafanaExport? grafanaExport = GrafanaExport.StartIfConfigured();
+
 #region Setup: Configuration and Client Initialization
 
 // Step 1: Load Azure OpenAI settings from configuration

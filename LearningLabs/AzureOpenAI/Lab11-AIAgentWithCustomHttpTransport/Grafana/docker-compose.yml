@@ -1,0 +1,19 @@
+# BONUS (optional) for Lab 11: a local Grafana that receives the spans of the lab.
+# Start:  docker compose up -d      (from this folder)    Grafana: http://localhost:3000 (no login)
+# Stop:   docker compose down       (the data is not kept: each start is empty)
+#
+# grafana/otel-lgtm is Grafana's all-in-one image for development: an OpenTelemetry collector (OTLP on 4317 gRPC / 4318 HTTP),
+# Tempo (traces), Prometheus (metrics), Loki (logs) and Grafana, with their data sources already configured.
+# Not for production: one container, no persistence, no authentication.
+services:
+  grafana:
+    image: grafana/otel-lgtm:0.37.0
+    container_name: lab11-grafana
+    ports:                    # bound to 127.0.0.1: reachable from this machine only
+      - "127.0.0.1:3000:3000"   # Grafana
+      - "127.0.0.1:4317:4317"   # OTLP gRPC (the default of the .NET OTLP exporter)
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+    volumes:
+      # The "Lab 11 - Observe an agent" dashboard, provisioned at start (read only)
+      - ./dashboards/provisioning.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/lab11.yaml:ro
+      - ./dashboards/lab11-observe-an-agent.json:/otel-lgtm/lab11-observe-an-agent.json:ro

@@ -1,0 +1,10 @@
+# Grafana provisioning: loads the dashboard of Lab 11 at start, in the "Lab 11" folder.
+apiVersion: 1
+
+providers:
+  - name: "Lab 11 - Observe an agent"
+    type: file
+    folder: "Lab 11"
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/lab11-observe-an-agent.json

@@ -22,6 +22,8 @@
     <!-- OpenTelemetry SDK (scenario 3): tracer provider, and an exporter that keeps the finished spans in a list. -->
     <PackageReference Include="OpenTelemetry" Version="1.20.1" />
     <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.20.1" />
+    <!-- BONUS (optional, needs Docker): OTLP exporter used by GrafanaExport.cs to send the spans to a local Grafana. -->
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
   </ItemGroup>
 
   <ItemGroup>
