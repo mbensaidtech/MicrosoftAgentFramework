@@ -214,6 +214,25 @@ if (ShouldRunScenario(6))
     ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {responsesResponse.Usage?.InputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {responsesResponse.Usage?.OutputTokenCount}");
     ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {responsesResponse.Usage?.TotalTokenCount}");
+
+    // Step 4: Ask a follow-up question that only makes sense after the first one ("its" is Italy).
+    // In scenarios 1 to 5, each RunAsync is independent: the agent remembers nothing of the previous question.
+    // Here, the id of the first response is passed as the ConversationId of the run: the Responses API chains the new request
+    // to the stored response (previous_response_id), so the service brings back the history. Only the new question is sent.
+    ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });
+    AgentResponse followUpResponse = await responsesAgent.RunAsync("And what is its population?", options: followUpOptions).WithSpinner("Running agent");
+
+    // Step 5: Display the follow-up answer, its own response id and its token usage
+    // (the input tokens now include the first question and answer, added by the service)
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine($"=== Follow-up question, chained to {responsesResponse.ResponseId} ===");
+    ColoredConsole.WritePrimaryLogLine(followUpResponse.Text);
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteSecondaryLogLine($"Follow-up response id: {followUpResponse.ResponseId}");
+    ColoredConsole.WritePrimaryLogLine("Token Usage (follow-up, history kept by the service): ");
+    ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {followUpResponse.Usage?.InputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {followUpResponse.Usage?.OutputTokenCount}");
+    ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {followUpResponse.Usage?.TotalTokenCount}");
 }
 
 #endregion

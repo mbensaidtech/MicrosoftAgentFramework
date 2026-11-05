@@ -169,6 +169,19 @@ public class OutputAnalyzerTests
         "  Input tokens: 41",
         "  Output tokens: 53",
         "  Total tokens: 94",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Follow-up question, chained to resp_01175645f19f9df4006ae27b961d1481949a862274d21e65a8 ===",
+        "As of 2023, Italy's population is estimated to be around 58 million people. For the most accurate and up-to-date statistics, it's best to consult official sources like national statistics agencies or demographic databases. If you have any other questions, just let me know!",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Follow-up response id: resp_01175645f19f9df4006ae27b9c3d1481949a862274d21e65b1",
+        "Token Usage (follow-up, history kept by the service):",
+        "  Input tokens: 95",
+        "  Output tokens: 56",
+        "  Total tokens: 151",
     ];
 
     // Standard output of the Lab01 exercise as delivered, every scenario run (recorded when `--scenarios all` could still force them): only

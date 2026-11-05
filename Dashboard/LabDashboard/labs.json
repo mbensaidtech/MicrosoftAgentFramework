@@ -69,6 +69,11 @@
           "id": "scenario6-usage",
           "description": "Scenario 6 - token usage of the Responses API run displayed",
           "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario6-follow-up",
+          "description": "Scenario 6 - the follow-up question was answered in the same conversation (population of Italy)",
+          "pattern": "(?i)\\b\\d[\\d,. \u00a0\u202f]*\\s*(?:million|inhabitants|people|residents)\\b"
         }
       ],
       "translations": {
@@ -95,7 +100,8 @@
             "scenario5-usage": "Scénario 5 - consommation de tokens du streaming affichée",
             "scenario6": "Scénario 6 - l'agent sur l'API Responses a répondu",
             "scenario6-response-id": "Scénario 6 - la réponse a été stockée par le service (id resp_...)",
-            "scenario6-usage": "Scénario 6 - consommation de tokens de l'exécution sur l'API Responses affichée"
+            "scenario6-usage": "Scénario 6 - consommation de tokens de l'exécution sur l'API Responses affichée",
+            "scenario6-follow-up": "Scénario 6 - la question de suivi a obtenu une réponse dans la même conversation (population de l'Italie)"
           }
         }
       }

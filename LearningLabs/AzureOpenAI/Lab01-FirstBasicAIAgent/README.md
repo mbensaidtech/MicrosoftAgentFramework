@@ -4,7 +4,7 @@
 
 In this lab, you will create your first AI Agent using **Microsoft Agent Framework** with **Azure OpenAI**.
 
-You will learn how to connect to Azure OpenAI, create agents with different configurations, read token usage, stream a response, and run the same agent on the **Responses API**, the API that Microsoft recommends for new Azure OpenAI applications.
+You will learn how to connect to Azure OpenAI, create agents with different configurations, read token usage, stream a response, and run the same agent on the **Responses API**, the API that Microsoft recommends for new Azure OpenAI applications, where the service can keep the conversation for you.
 
 ## What You Will Learn
 
@@ -16,6 +16,7 @@ You will learn how to connect to Azure OpenAI, create agents with different conf
 - How to read token usage from a response (including reasoning tokens)
 - How to stream a response with `RunStreamingAsync()` and still get its token usage
 - How to create the same agent on the **Responses API** (`GetResponsesClient().AsAIAgent(model: ...)`), and how to choose between Chat Completions and Responses
+- How to continue a conversation on the Responses API by passing the id of the previous response (`ResponseId`) with the next question
 
 ## Prerequisites
 
@@ -149,6 +150,7 @@ Open `Start/Program.cs` and complete the TODOs:
 |------|-------------|-------|
 | **TODO 22** | Create the agent on the Responses API | • `AIAgent responsesAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: "...", name: "GeographyAgent");` <br> • Same `OpenAIClient` as before: only the API changes. With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` around it <br> • `AsAIAgent(model: ...)` for a `ResponsesClient` comes from the `OpenAI.Responses` namespace (already imported) |
 | **TODO 23** | Run the agent and display the answer, the response id and the usage | • `AgentResponse responsesResponse = await responsesAgent.RunAsync("Hello, what is the surface area of Italy?").WithSpinner("Running agent");` <br> • `RunAsync`, `AgentResponse` and `Usage` are the same as with Chat Completions: the agent hides the API <br> • `responsesResponse.ResponseId` (`resp_...`): by default the service **stores** the response, and can keep the conversation itself (see [Chat Completions or Responses?](#chat-completions-or-responses)) <br> • Display it as `ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");` (the label of the [Expected Output](#expected-output)), then the usage as in TODO 18 |
+| **TODO 24** | Ask a follow-up question in the same conversation | • The question `"And what is its population?"` only makes sense after the first one: *its* is Italy. In scenarios 1 to 5, each `RunAsync` is independent and the agent would not know what *its* refers to <br> • Pass the id of the first response as the `ConversationId` of the run: `ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });` <br> • `AgentResponse followUpResponse = await responsesAgent.RunAsync("And what is its population?", options: followUpOptions).WithSpinner("Running agent");` <br> • The Responses API chains the new request to the stored response (`previous_response_id`): the **service** adds the first question and answer, only the new question is sent. The input tokens of the follow-up include them <br> • Display `ColoredConsole.WriteInfoLine($"=== Follow-up question, chained to {responsesResponse.ResponseId} ===");`, the answer, `$"Follow-up response id: {followUpResponse.ResponseId}"` and the usage under `"Token Usage (follow-up, history kept by the service): "` (labels of the [Expected Output](#expected-output)) <br> • To continue further, pass `followUpResponse.ResponseId` with the third question: each response id points to the whole conversation up to it |
 
 ---
 
@@ -187,6 +189,7 @@ To run only some scenarios: `dotnet run -- --scenarios 5` ([Choose the scenarios
 | `Usage` | Token consumption metrics (Input/Output/Reasoning/Total) |
 | `GetResponsesClient()` / `ResponsesClient` | Client for the **Responses API**; `AsAIAgent(model: deployment, ...)` creates the same kind of `ChatClientAgent` on it |
 | `ResponseId` | Id of the response given by the service (`resp_...` with the Responses API, `chatcmpl-...` with Chat Completions) |
+| `ChatClientAgentRunOptions` / `ChatOptions.ConversationId` | Options of one run. With the Responses API, a `resp_...` id as `ConversationId` continues the conversation from that stored response (`previous_response_id`); a `conv_...` id continues a conversation object |
 
 ## Chat Completions or Responses?
 
@@ -199,6 +202,8 @@ Microsoft recommends the **Responses API** for new Azure OpenAI applications: *"
 | Background responses (long runs, continuation tokens) | No | Yes |
 | History reduction and compaction by Agent Framework | Yes | No when the service keeps the history |
 | Models | Widest compatibility | Models and regions that support the Responses API |
+
+Scenario 6 shows the first row: the follow-up question only sends the new message and the id of the previous response, and the service brings back the history. With Chat Completions, the same follow-up needs the history on the client side: Lab 05 does it with an `AgentSession`.
 
 **The next labs use Chat Completions** on purpose: sessions, persistence and context providers (Labs 05, 07, 12) teach how Agent Framework manages the history, which requires the history to stay on the client side. Everything else you learn works the same with Responses. Lab 05 shows what changes when the service keeps the conversation.
 
@@ -287,9 +292,18 @@ Token Usage (Responses API):
   Input tokens: 41
   Output tokens: 21
   Total tokens: 62
+----------------------------------------
+=== Follow-up question, chained to resp_0c48cf898ad0... ===
+Italy's population is approximately 59 million people.
+----------------------------------------
+Follow-up response id: resp_0c48cf898ad0...
+Token Usage (follow-up, history kept by the service):
+  Input tokens: 75
+  Output tokens: 12
+  Total tokens: 87
 ```
 
-Answers vary from one run to another.
+Answers vary from one run to another. The follow-up answer names Italy although the question does not: the service added the first exchange, which is also why its input tokens are higher than those of the first question.
 
 ## Troubleshooting
 

@@ -182,6 +182,14 @@ if (ShouldRunScenario(6))
     // Hint: AgentResponse responsesResponse = await responsesAgent.RunAsync(...).WithSpinner("Running agent");
     //       ColoredConsole.WriteSecondaryLogLine($"Response id (stored by the service): {responsesResponse.ResponseId}");
     //       then responsesResponse.Usage as in TODO 18
+
+    // TODO 24: Ask the follow-up question "And what is its population?" in the same conversation, then display the answer,
+    // its response id and its token usage
+    // Hint: pass the id of the first response as the ConversationId of the run, the service chains the request to it:
+    //       ChatClientAgentRunOptions followUpOptions = new(new AIExtensions.ChatOptions { ConversationId = responsesResponse.ResponseId });
+    //       AgentResponse followUpResponse = await responsesAgent.RunAsync("And what is its population?", options: followUpOptions).WithSpinner("Running agent");
+    //       ColoredConsole.WriteInfoLine($"=== Follow-up question, chained to {responsesResponse.ResponseId} ===");
+    //       then followUpResponse.Text, followUpResponse.ResponseId and followUpResponse.Usage (labels of the README Expected Output)
 }
 
 #endregion
