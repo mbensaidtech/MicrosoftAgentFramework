@@ -40,6 +40,7 @@ Lab01-UseAgentAsTool/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions and questions of the agents
 │   ├── Models/
 │   │   └── QualityReview.cs        <-- The typed review returned by the reviewer (scenario 1)
 │   ├── Tools/
@@ -94,6 +95,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names, the instructions and the descriptions of the agents, the descriptions of the agent tools and the messages sent to the agents (see Step 3).
 - `MockedData/sav-rules.yml` — the after-sales rules of the store (returns, refunds, exchanges, warranty, delivery problems). The after-sales expert answers with them, the reviewer checks with them.
 - `Models/QualityReview.cs` — the review the code asks the reviewer for: a `Score` from 1 to 10 and a `Feedback`. The `[Description]` attributes go into the JSON schema sent to the model.
 - `Tools/OrderTools.cs` — `GetOrder(orderId)`, the order system of the store (mocked; dates are relative to today). Only the order specialist has this tool.
@@ -106,7 +108,9 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.FrontDesk.Name`, `Agents.FrontDesk.Instructions`, `Agents.TicketSpecialist.Description`, `ToolDescriptions.AskOrderSpecialist`, `CustomerMessages.BrokenLaptopScreen`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. The instructions of the after-sales expert and of the reviewer end with the after-sales rules, read from `MockedData/sav-rules.yml` at run time: they are format strings, whose `{0}` you fill with `string.Format` (as the message that gives an answer to the reviewer, `ReviewRequests.QuestionAndAnswer`). The names of the tools (`ask_order_specialist`, `ask_after_sales_expert`) are identifiers that you write in the code; their descriptions, written for the model, are provided (`ToolDescriptions`).
 
 ---
 
@@ -119,7 +123,7 @@ TODO 1 to 3 are the same as in Lab 01 of the Azure OpenAI track.
 | **TODO 1** | Create the `OpenAIClientOptions` for the Azure OpenAI v1 endpoint | • `new OpenAIClientOptions { Endpoint = ... }` <br> • `AzureOpenAIEndpoint.ToV1Uri(settings.Endpoint)` (from `CommonUtilities`) returns the `.../openai/v1/` URI |
 | **TODO 2** | Create the `OpenAIClient` | • API key: `new OpenAIClient(new ApiKeyCredential(settings.APIKey), clientOptions)` <br> • Entra ID: `new OpenAIClient(new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"), clientOptions)` <br> • Use a conditional on `string.IsNullOrWhiteSpace(settings.APIKey)` to support both |
 | **TODO 3** | Get a `ChatClient` for the deployment | • `ChatClient chatClient = client.GetChatClient(settings.ChatDeploymentName);` |
-| **TODO 4** | Load the after-sales rules and create the after-sales expert | • `string savRules = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "MockedData", "sav-rules.yml"));` <br> • `AIAgent afterSalesAgent = chatClient.AsAIAgent(instructions: $"""...""", name: "AfterSalesExpert");` with these instructions, followed by an empty line and `{savRules}`: *"You are the after-sales expert of an online store. Answer in a few sentences, using only the rules below. If the rules do not cover the question, say so."* <br> • The agent is created once and used by scenarios 1 and 2: it keeps no conversation by itself |
+| **TODO 4** | Load the after-sales rules and create the after-sales expert | • `string savRules = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "MockedData", "sav-rules.yml"));` <br> • `AIAgent afterSalesAgent = chatClient.AsAIAgent(instructions: string.Format(CultureInfo.InvariantCulture, Agents.AfterSalesExpert.Instructions, savRules), name: Agents.AfterSalesExpert.Name);` <br> • `Agents.AfterSalesExpert.Instructions` is a format string: the instructions, an empty line, then `{0}`, replaced by the rules (`CultureInfo` is in `System.Globalization`, already imported) <br> • The agent is created once and used by scenarios 1 and 2: it keeps no conversation by itself |
 
 ---
 
@@ -131,11 +135,11 @@ The agent being checked has no say: it does not decide whether it is reviewed, a
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 5** | Create the reviewer agent | • `AIAgent reviewerAgent = chatClient.AsAIAgent(instructions: $"""...""", name: "QualityReviewer");` <br> • Instructions, followed by an empty line and `{savRules}`: *"You review the answers of the after-sales service of an online store before they are sent to a customer. Score each answer with the rules below:* <br> *- 9 to 10: correct according to the rules and answers the question* <br> *- 7 to 8: correct, but incomplete or unclear* <br> *- 4 to 6: partly wrong, or misses an important condition* <br> *- 1 to 3: contradicts the rules, or promises something the store does not offer"* |
-| **TODO 6** | The after-sales expert answers the customer | • `const string CustomerQuestion = "I bought headphones 10 days ago. They are unused and still in their original packaging. Can I return them and get a refund?";` <br> • `ColoredConsole.WriteUserLine($"Customer: {CustomerQuestion}");` <br> • `AgentResponse answer = await afterSalesAgent.RunAsync(CustomerQuestion).WithSpinner("Running the after-sales expert");` <br> • `ColoredConsole.WriteAssistantLine($"{afterSalesAgent.Name}: {answer.Text}");` <br> • `WriteTokenUsage($"Token Usage ({afterSalesAgent.Name})", answer);` |
+| **TODO 5** | Create the reviewer agent | • `AIAgent reviewerAgent = chatClient.AsAIAgent(instructions: string.Format(CultureInfo.InvariantCulture, Agents.QualityReviewer.Instructions, savRules), name: Agents.QualityReviewer.Name);` <br> • A format string, like the instructions of the after-sales expert: `{0}` is the rules <br> • The instructions give the reviewer a rubric (9 to 10: correct and answers the question; 7 to 8: correct but incomplete or unclear; 4 to 6: partly wrong; 1 to 3: contradicts the rules): it makes the scores more stable |
+| **TODO 6** | The after-sales expert answers the customer | • Customer message: `CustomerMessages.HeadphonesReturn` (headphones bought 10 days ago, unused, in their original packaging: can they be returned and refunded?) <br> • `ColoredConsole.WriteUserLine($"Customer: {CustomerMessages.HeadphonesReturn}");` <br> • `AgentResponse answer = await afterSalesAgent.RunAsync(CustomerMessages.HeadphonesReturn).WithSpinner("Running the after-sales expert");` <br> • `ColoredConsole.WriteAssistantLine($"{afterSalesAgent.Name}: {answer.Text}");` <br> • `WriteTokenUsage($"Token Usage ({afterSalesAgent.Name})", answer);` |
 | **TODO 7** | Write the decision rule of the code | • `const int MinimumScore = 7;` <br> • `string Decide(QualityReview review) => review.Score is >= MinimumScore and <= 10 ? "Decision: sent to the customer" : $"Decision: held back for a human agent (score below {MinimumScore})";` <br> • The review comes from a model: a score outside 1–10 is not trusted |
-| **TODO 8** | Review the answer and decide | • `AgentResponse<QualityReview> review = await reviewerAgent.RunAsync<QualityReview>($"Customer question: {CustomerQuestion}\nAnswer to review: {answer.Text}").WithSpinner("Running the reviewer");` <br> • `WriteReview(review.Result);` <br> • `ColoredConsole.WritePrimaryLogLine(Decide(review.Result));` <br> • `WriteTokenUsage($"Token Usage ({reviewerAgent.Name})", review);` |
-| **TODO 9** | Review a wrong answer written by hand | • `const string WrongAnswer = "Of course! You can return any product within 90 days, even used, and we refund you in cash within 24 hours.";` <br> • `ColoredConsole.WriteAssistantLine($"Answer written by hand (wrong on purpose): {WrongAnswer}");` <br> • Then the same steps as TODO 8 with `WrongAnswer`, in a `wrongReview` variable |
+| **TODO 8** | Review the answer and decide | • The message to the reviewer is `ReviewRequests.QuestionAndAnswer`, a format string: `{0}` is the question of the customer, `{1}` the answer to review <br> • `AgentResponse<QualityReview> review = await reviewerAgent.RunAsync<QualityReview>(string.Format(CultureInfo.InvariantCulture, ReviewRequests.QuestionAndAnswer, CustomerMessages.HeadphonesReturn, answer.Text)).WithSpinner("Running the reviewer");` <br> • `WriteReview(review.Result);` <br> • `ColoredConsole.WritePrimaryLogLine(Decide(review.Result));` <br> • `WriteTokenUsage($"Token Usage ({reviewerAgent.Name})", review);` |
+| **TODO 9** | Review a wrong answer written by hand | • The answer: `ReviewRequests.WrongAnswer` (any product within 90 days, even used, refunded in cash within 24 hours: it contradicts the rules) <br> • `ColoredConsole.WriteAssistantLine($"Answer written by hand (wrong on purpose): {ReviewRequests.WrongAnswer}");` <br> • Then the same steps as TODO 8 with `ReviewRequests.WrongAnswer` as the answer, in a `wrongReview` variable |
 
 ---
 
@@ -145,10 +149,10 @@ A front desk agent answers customers, but it knows neither the orders nor the af
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 10** | Create the order specialist | • `AIAgent orderAgent = chatClient.AsAIAgent(instructions: "You are the order specialist of an online store. Look up the orders with get_order and answer only with the facts of the order data.", name: "OrderSpecialist", tools: [AIFunctionFactory.Create(OrderTools.GetOrder, "get_order")]);` |
-| **TODO 11** | Turn the two specialists into tools and display them | • `AIFunction orderTool = orderAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_order_specialist", Description = "Asks the order specialist about an order: product, status, purchase and delivery dates. Include the order number in the query." });` <br> • `AIFunction afterSalesTool = afterSalesAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_after_sales_expert", Description = "Asks the after-sales expert about the rules of the store: returns, refunds, exchanges, warranty and delivery problems. The expert does not see the conversation: give it all the facts it needs." });` <br> • `WriteAgentTools([orderTool, afterSalesTool]);` — each tool has a single `query` parameter |
-| **TODO 12** | Create the front desk agent | • `AIAgent frontDeskAgent = chatClient.AsAIAgent(instructions: "You are the front desk of the customer service of an online store. You know neither the orders nor the after-sales rules: ask the specialists with your tools, then answer the customer in a few sentences.", name: "FrontDesk", tools: [orderTool, afterSalesTool]);` |
-| **TODO 13** | Run the front desk | • `const string CustomerMessage = "Hello, my order ORD-1042 arrived yesterday and the laptop screen is broken. What can I do?";` <br> • `ColoredConsole.WriteUserLine($"Customer: {CustomerMessage}");` <br> • `AgentResponse response = await frontDeskAgent.RunAsync(CustomerMessage).WithSpinner("Running the front desk");` |
+| **TODO 10** | Create the order specialist | • `AIAgent orderAgent = chatClient.AsAIAgent(instructions: Agents.OrderSpecialist.Instructions, name: Agents.OrderSpecialist.Name, tools: [AIFunctionFactory.Create(OrderTools.GetOrder, "get_order")]);` <br> • The instructions name the tool `get_order`: keep this name in `AIFunctionFactory.Create` |
+| **TODO 11** | Turn the two specialists into tools and display them | • `AIFunction orderTool = orderAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_order_specialist", Description = ToolDescriptions.AskOrderSpecialist });` <br> • `AIFunction afterSalesTool = afterSalesAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_after_sales_expert", Description = ToolDescriptions.AskAfterSalesExpert });` <br> • Read the two descriptions in `LabPrompts.cs`: they say what each specialist knows and what the query must contain (the order number, all the facts) <br> • `WriteAgentTools([orderTool, afterSalesTool]);` — each tool has a single `query` parameter |
+| **TODO 12** | Create the front desk agent | • `AIAgent frontDeskAgent = chatClient.AsAIAgent(instructions: Agents.FrontDesk.Instructions, name: Agents.FrontDesk.Name, tools: [orderTool, afterSalesTool]);` <br> • Its instructions say it knows neither the orders nor the after-sales rules: it must ask the specialists |
+| **TODO 13** | Run the front desk | • Customer message: `CustomerMessages.BrokenLaptopScreen` (order ORD-1042 arrived yesterday with a broken laptop screen) <br> • `ColoredConsole.WriteUserLine($"Customer: {CustomerMessages.BrokenLaptopScreen}");` <br> • `AgentResponse response = await frontDeskAgent.RunAsync(CustomerMessages.BrokenLaptopScreen).WithSpinner("Running the front desk");` |
 | **TODO 14** | Display the delegations, then the answer | • `WriteDelegations(response);` <br> • `ColoredConsole.WriteAssistantLine($"{frontDeskAgent.Name}: {response.Text}");` <br> • Compare each `query` with the customer message: it is all the specialist received |
 | **TODO 15** | Display the token usage | • `WriteTokenUsage($"Token Usage ({frontDeskAgent.Name} only, without the specialists)", response);` |
 
@@ -162,9 +166,9 @@ Here, **the code calls the tools itself** with `InvokeAsync` and the `query` arg
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 16** | Create the ticket specialist | • `AIAgent ticketAgent = chatClient.AsAIAgent(instructions: """...""", name: "TicketSpecialist", description: "Keeps the support ticket of the current customer case up to date. Give it each new fact about the case.");` <br> • Instructions: *"You keep the support ticket of ONE customer case up to date. Each message gives new facts about the case. Answer only with the complete ticket, with every fact you know, in this format:* <br> *Order: <order number, or unknown>* <br> *Problem: <problem, or unknown>* <br> *Customer request: <request, or unknown>"* |
+| **TODO 16** | Create the ticket specialist | • `AIAgent ticketAgent = chatClient.AsAIAgent(instructions: Agents.TicketSpecialist.Instructions, name: Agents.TicketSpecialist.Name, description: Agents.TicketSpecialist.Description);` <br> • The instructions ask for the complete ticket after each message, with every fact known, in a fixed format (`Order`, `Problem`, `Customer request`, `unknown` when a fact is missing) <br> • The description becomes the description of the tool (TODO 17) |
 | **TODO 17** | Turn it into two tools, without and with a session | • `AIFunction toolWithoutSession = ticketAgent.AsAIFunction();` <br> • `AgentSession ticketSession = await ticketAgent.CreateSessionAsync();` <br> • `AIFunction toolWithSession = ticketAgent.AsAIFunction(session: ticketSession);` <br> • `ColoredConsole.WritePrimaryLogLine($"Tool {toolWithoutSession.Name}: {toolWithoutSession.Description}");` — without options, the name and the description come from the agent |
-| **TODO 18** | Give the two facts to each tool, then display the last ticket | • `string[] caseFacts = ["Order ORD-1042: the laptop screen arrived broken.", "The customer wants a replacement."];` <br> • `(string Heading, AIFunction Tool)[] variants = [("Ticket after the second call - a new session for each call", toolWithoutSession), ("Ticket after the second call - one session for every call", toolWithSession)];` <br> • `foreach ((string heading, AIFunction tool) in variants)`: for each fact, `ColoredConsole.WriteWarningLine($"[Call] {tool.Name}(query: \"{fact}\")");` then `ticket = await tool.InvokeAsync(new AIFunctionArguments { ["query"] = fact }).AsTask().WithSpinner("Calling the specialist");` (with `object? ticket = null;` before the loop on the facts) <br> • After the facts: `WriteTicket(heading, ticket?.ToString() ?? string.Empty, "ORD-1042");` |
+| **TODO 18** | Give the two facts to each tool, then display the last ticket | • `string[] caseFacts = [CaseFacts.BrokenScreen, CaseFacts.ReplacementRequested];` — only the first fact gives the order number (ORD-1042) <br> • `(string Heading, AIFunction Tool)[] variants = [("Ticket after the second call - a new session for each call", toolWithoutSession), ("Ticket after the second call - one session for every call", toolWithSession)];` <br> • `foreach ((string heading, AIFunction tool) in variants)`: for each fact, `ColoredConsole.WriteWarningLine($"[Call] {tool.Name}(query: \"{fact}\")");` then `ticket = await tool.InvokeAsync(new AIFunctionArguments { ["query"] = fact }).AsTask().WithSpinner("Calling the specialist");` (with `object? ticket = null;` before the loop on the facts) <br> • After the facts: `WriteTicket(heading, ticket?.ToString() ?? string.Empty, "ORD-1042");` |
 | **TODO 19** | Say why there is no token usage | • `ColoredConsole.WriteSecondaryLogLine("Token usage: not available, an agent tool returns only the text of the answer.");` |
 
 ---
@@ -217,7 +221,7 @@ Every agent is an `AIAgent`: a local `ChatClientAgent`, a remote A2A agent (Lab 
 
 ## Try it: a vague description
 
-In scenario 2, replace the `Description` of `ask_after_sales_expert` with `"An agent"`, and remove *"Include the order number in the query."* from the other one. Run the scenario several times and look at the delegations: the queries the front desk writes are poorer, and it may skip a specialist — *"if the tool description is vague, the model may call the wrong agent or skip it entirely"* ([Agents as tools](https://learn.microsoft.com/agent-framework/journey/agents-as-tools?pivots=programming-language-csharp)). The description is the only documentation the model reads.
+In scenario 2, in `Program.cs`, replace the `Description` of `ask_after_sales_expert` (`ToolDescriptions.AskAfterSalesExpert`) with `"An agent"`, and the description of the other one with `ToolDescriptions.AskOrderSpecialist` without *"Include the order number in the query."* (write it as a string; leave `LabPrompts.cs` unchanged). Run the scenario several times and look at the delegations: the queries the front desk writes are poorer, and it may skip a specialist — *"if the tool description is vague, the model may call the wrong agent or skip it entirely"* ([Agents as tools](https://learn.microsoft.com/agent-framework/journey/agents-as-tools?pivots=programming-language-csharp)). The description is the only documentation the model reads.
 
 ## Key Concepts
 
@@ -325,6 +329,7 @@ Answers, scores and queries vary from one run to another. In scenario 2, the fro
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and descriptions of the agents, descriptions of the agent tools and messages sent to the agents, the same for everyone
 - `UseAgentAsTool.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
@@ -359,7 +364,7 @@ The following files should be modified:
 | Before (preview) | Now (1.26.0) |
 |------------------|--------------|
 | `Azure.AI.OpenAI` / `AzureOpenAIClient` | `OpenAI` / `OpenAIClient` + Azure OpenAI v1 endpoint |
-| `AgentFactory` / `AgentBuilder` and one section per agent in `appsettings.json` | `chatClient.AsAIAgent(instructions: ..., name: ...)` written in `Program.cs` |
+| `AgentFactory` / `AgentBuilder` and one section per agent in `appsettings.json` | `chatClient.AsAIAgent(instructions: ..., name: ...)` written in `Program.cs`, with the texts provided in `LabPrompts.cs` |
 | `ChatClientAgent` created with `CreateAIAgent` | `AIAgent` created with `AsAIAgent` |
 | `AgentRunResponse<T>` | `AgentResponse<T>` |
 | One orchestrator calling four agents as tools, including two "judges" | Scenario 1: the reviewer is called **by the code**, which decides; the agent being checked no longer chooses to be reviewed nor reads the verdict |

@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Globalization;
 using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -47,9 +48,11 @@ Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 // TODO 3: Get a ChatClient (Chat Completions API) for the deployment: every agent of this lab uses it
 // ChatClient chatClient = ...
 
-// TODO 4: Load the after-sales rules (MockedData/sav-rules.yml) and create the after-sales expert, used by scenarios 1 and 2
+// TODO 4: Load the after-sales rules (MockedData/sav-rules.yml) and create the after-sales expert of Agents.AfterSalesExpert
+// (provided in LabPrompts.cs), used by scenarios 1 and 2
 // Hint: string savRules = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "MockedData", "sav-rules.yml"));
-//       chatClient.AsAIAgent(instructions: <see the README, the rules are appended to the instructions>, name: "AfterSalesExpert")
+//       chatClient.AsAIAgent(instructions: string.Format(CultureInfo.InvariantCulture, Agents.AfterSalesExpert.Instructions, savRules),
+//           name: Agents.AfterSalesExpert.Name) - the instructions are a format string whose {0} is the rules
 // AIAgent afterSalesAgent = ...
 
 #endregion
@@ -61,13 +64,15 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 1: Delegation by code - a reviewer agent checks the answer ===");
 
-    // TODO 5: Create the reviewer agent: it knows the same rules, and scores the answers (see the README for the instructions)
+    // TODO 5: Create the reviewer agent of Agents.QualityReviewer: it knows the same rules, and scores the answers
+    // Hint: same as TODO 4, with string.Format(CultureInfo.InvariantCulture, Agents.QualityReviewer.Instructions, savRules)
+    //       and Agents.QualityReviewer.Name
     // AIAgent reviewerAgent = ...
 
-    // TODO 6: Have the after-sales expert answer the customer (a direct call), then display the answer and the token usage
-    // Hint: const string CustomerQuestion = "I bought headphones 10 days ago. ..." (see the README);
-    //       ColoredConsole.WriteUserLine($"Customer: {CustomerQuestion}");
-    //       await afterSalesAgent.RunAsync(CustomerQuestion).WithSpinner("Running the after-sales expert");
+    // TODO 6: Have the after-sales expert answer the customer message CustomerMessages.HeadphonesReturn (a direct call),
+    // then display the answer and the token usage
+    // Hint: ColoredConsole.WriteUserLine($"Customer: {CustomerMessages.HeadphonesReturn}");
+    //       await afterSalesAgent.RunAsync(CustomerMessages.HeadphonesReturn).WithSpinner("Running the after-sales expert");
     //       ColoredConsole.WriteAssistantLine($"{afterSalesAgent.Name}: {answer.Text}");
     //       WriteTokenUsage($"Token Usage ({afterSalesAgent.Name})", answer)
     // AgentResponse answer = ...
@@ -78,13 +83,16 @@ if (ShouldRunScenario(1))
     //           ? "Decision: sent to the customer" : $"Decision: held back for a human agent (score below {MinimumScore})";
 
     // TODO 8: Give the answer to the reviewer and get a typed review back, then display the review, the decision and the token usage
-    // Hint: await reviewerAgent.RunAsync<QualityReview>($"Customer question: {CustomerQuestion}\nAnswer to review: {answer.Text}")
+    // The message to the reviewer is ReviewRequests.QuestionAndAnswer, a format string: {0} is the question, {1} the answer
+    // Hint: await reviewerAgent.RunAsync<QualityReview>(
+    //           string.Format(CultureInfo.InvariantCulture, ReviewRequests.QuestionAndAnswer, CustomerMessages.HeadphonesReturn, answer.Text))
     //       .WithSpinner("Running the reviewer"); WriteReview(review.Result);
     //       ColoredConsole.WritePrimaryLogLine(Decide(review.Result)); WriteTokenUsage($"Token Usage ({reviewerAgent.Name})", review)
     // AgentResponse<QualityReview> review = ...
 
-    // TODO 9: Same review for a wrong answer written by hand (see the README): the decision must hold it back
-    // Hint: ColoredConsole.WriteAssistantLine($"Answer written by hand (wrong on purpose): {WrongAnswer}"), then as TODO 8
+    // TODO 9: Same review for the wrong answer written by hand ReviewRequests.WrongAnswer: the decision must hold it back
+    // Hint: ColoredConsole.WriteAssistantLine($"Answer written by hand (wrong on purpose): {ReviewRequests.WrongAnswer}"),
+    //       then as TODO 8 with ReviewRequests.WrongAnswer as the answer
     // AgentResponse<QualityReview> wrongReview = ...
 }
 
@@ -97,22 +105,25 @@ if (ShouldRunScenario(2))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 2: Delegation by the model - specialist agents as tools ===");
 
-    // TODO 10: Create the order specialist, with its own tool get_order (OrderTools.GetOrder, in Tools/OrderTools.cs)
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: "OrderSpecialist", tools: [AIFunctionFactory.Create(OrderTools.GetOrder, "get_order")])
+    // TODO 10: Create the order specialist of Agents.OrderSpecialist, with its own tool get_order (OrderTools.GetOrder, in Tools/OrderTools.cs)
+    // Hint: chatClient.AsAIAgent(instructions: Agents.OrderSpecialist.Instructions, name: Agents.OrderSpecialist.Name,
+    //           tools: [AIFunctionFactory.Create(OrderTools.GetOrder, "get_order")])
     // AIAgent orderAgent = ...
 
-    // TODO 11: Turn the two specialists into tools with a name and a description, then display what the model will see
-    // Hint: orderAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_order_specialist", Description = "..." }),
-    //       same for afterSalesAgent ("ask_after_sales_expert"), then WriteAgentTools([orderTool, afterSalesTool])
+    // TODO 11: Turn the two specialists into tools with a name and a description (ToolDescriptions), then display what the model will see
+    // Hint: orderAgent.AsAIFunction(new AIFunctionFactoryOptions { Name = "ask_order_specialist", Description = ToolDescriptions.AskOrderSpecialist }),
+    //       same for afterSalesAgent ("ask_after_sales_expert", ToolDescriptions.AskAfterSalesExpert),
+    //       then WriteAgentTools([orderTool, afterSalesTool])
     // AIFunction orderTool = ...
     // AIFunction afterSalesTool = ...
 
-    // TODO 12: Create the front desk agent, with the two specialists as tools
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: "FrontDesk", tools: [orderTool, afterSalesTool])
+    // TODO 12: Create the front desk agent of Agents.FrontDesk, with the two specialists as tools
+    // Hint: chatClient.AsAIAgent(instructions: Agents.FrontDesk.Instructions, name: Agents.FrontDesk.Name, tools: [orderTool, afterSalesTool])
     // AIAgent frontDeskAgent = ...
 
-    // TODO 13: Run the front desk with the customer message (see the README)
-    // Hint: ColoredConsole.WriteUserLine($"Customer: {CustomerMessage}"); await frontDeskAgent.RunAsync(CustomerMessage).WithSpinner("Running the front desk")
+    // TODO 13: Run the front desk with the customer message CustomerMessages.BrokenLaptopScreen
+    // Hint: ColoredConsole.WriteUserLine($"Customer: {CustomerMessages.BrokenLaptopScreen}");
+    //       await frontDeskAgent.RunAsync(CustomerMessages.BrokenLaptopScreen).WithSpinner("Running the front desk")
     // AgentResponse response = ...
 
     // TODO 14: Display the delegations, then the answer
@@ -131,8 +142,9 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
     ColoredConsole.WriteInfoLine("=== Scenario 3: Keep the context of a specialist with a session ===");
 
-    // TODO 16: Create the ticket specialist, with a description (see the README for the instructions)
-    // Hint: chatClient.AsAIAgent(instructions: ..., name: "TicketSpecialist", description: "...")
+    // TODO 16: Create the ticket specialist of Agents.TicketSpecialist, with its description
+    // Hint: chatClient.AsAIAgent(instructions: Agents.TicketSpecialist.Instructions, name: Agents.TicketSpecialist.Name,
+    //           description: Agents.TicketSpecialist.Description)
     // AIAgent ticketAgent = ...
 
     // TODO 17: Turn it into two tools, without and with a session, and display the name and the description of the tool
@@ -142,8 +154,8 @@ if (ShouldRunScenario(3))
     // AIFunction toolWithoutSession = ...
     // AIFunction toolWithSession = ...
 
-    // TODO 18: Give the same two facts to each tool, one call per fact, and display the ticket returned by the last call
-    // Hint: string[] caseFacts = ["Order ORD-1042: the laptop screen arrived broken.", "The customer wants a replacement."];
+    // TODO 18: Give the same two facts (CaseFacts) to each tool, one call per fact, and display the ticket returned by the last call
+    // Hint: string[] caseFacts = [CaseFacts.BrokenScreen, CaseFacts.ReplacementRequested];
     //       for each tool: ticket = await tool.InvokeAsync(new AIFunctionArguments { ["query"] = fact }).AsTask().WithSpinner("Calling the specialist");
     //       then WriteTicket("Ticket after the second call - ...", ticket?.ToString() ?? string.Empty, "ORD-1042") (see the README)
 
