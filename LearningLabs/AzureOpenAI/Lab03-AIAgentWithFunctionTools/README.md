@@ -32,6 +32,7 @@ Lab03-AIAgentWithFunctionTools/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: names, instructions and questions of the agents
 │   ├── Tools/
 │   │   ├── CompanyTools.cs         <-- Employee & meeting room tools (instance methods)
 │   │   └── NotificationTools.cs    <-- Notification tools (static methods using IServiceProvider)
@@ -85,6 +86,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names, the instructions and the questions of the agents (see Step 3).
 - `Tools/CompanyTools.cs` — the company "internal systems". Each public method is a tool candidate: `GetEmployeeInfo`, `GetMeetingRooms`, `BookMeetingRoom`. The `[Description]` attributes on the methods and on their parameters are sent to the model with the tool: the method description helps the model decide **when** to call it, the parameter descriptions tell it **what** to pass (for example the `yyyy-MM-dd` date format). Scenario 2 does not give this class to the agent: a plugin decides which of its features become tools.
 - `Tools/NotificationTools.cs` — **static** tools whose first parameter is an `IServiceProvider`: they resolve the `INotificationRepository` from it (scenario 3).
 - `Repositories/` — the notification store used by `NotificationTools`.
@@ -92,7 +94,11 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.CompanyAssistant.Name`, `Agents.CompanyAssistant.Instructions`, `Questions.EmployeeInfo`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code. Two questions contain a date computed at run time (`Questions.BookPastAndTomorrowMeetings`, `Questions.EmployeeInfoAndBooking`): they are format strings, whose `{0}` you fill with `string.Format`.
+
+The messages returned by the plugin when it refuses a booking (TODO 11) are not in `LabPrompts.cs`: writing the check and the message the model will read is the objective of this TODO.
 
 ---
 
@@ -116,8 +122,8 @@ You create each tool yourself with `AIFunctionFactory.Create()`, from a method o
 |------|-------------|-------|
 | **TODO 4** | Create the tools | • `var companyTools = new CompanyTools();` <br> • `List<AITool> tools = [ ... ];` with `AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info")`, `AIFunctionFactory.Create(companyTools.GetMeetingRooms, "get_meeting_rooms")` and `AIFunctionFactory.Create(companyTools.BookMeetingRoom, "book_meeting_room")` |
 | **TODO 5** | Display what the model receives for each tool | • `ColoredConsole.WritePrimaryLogLine("Tools available to the agent:");` <br> • `foreach (AITool tool in tools) { ColoredConsole.WriteSecondaryLogLine($"- {tool.Name}: {tool.Description}"); }` <br> • The description is the `[Description]` of the method |
-| **TODO 6** | Create the agent with its tools | • `AIAgent companyAgent = chatClient.AsAIAgent(instructions: "You are a helpful assistant that can help with company tasks.", name: "CompanyAssistant", tools: tools);` |
-| **TODO 7** | Run the agent and display the answer | • `AgentResponse response = await companyAgent.RunAsync("Get the information of the employee with the ID EMP001").WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` <br> • The agent calls `get_employee_info` by itself: you don't call the tool, the framework does |
+| **TODO 6** | Create the agent with its tools | • `AIAgent companyAgent = chatClient.AsAIAgent(instructions: Agents.CompanyAssistant.Instructions, name: Agents.CompanyAssistant.Name, tools: tools);` |
+| **TODO 7** | Run the agent and display the answer | • `AgentResponse response = await companyAgent.RunAsync(Questions.EmployeeInfo).WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` <br> • The agent calls `get_employee_info` by itself: you don't call the tool, the framework does |
 | **TODO 8** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -126,15 +132,15 @@ You create each tool yourself with `AIFunctionFactory.Create()`, from a method o
 
 Giving the agent every public method of a class is convenient, but dangerous: any public method added later (for example a `CancelAllBookings` for an admin screen) silently becomes a tool that the model can call. A **plugin** does the opposite: it declares the tools it exposes, and only those (official sample [`Agent_Step12_Plugins`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/Agents/Agent_Step12_Plugins)). It is also the right place to **check the arguments chosen by the model**: for your application they are untrusted input, like the data of a web form ([Agent Safety](https://learn.microsoft.com/agent-framework/concepts/agents/safety?pivots=programming-language-csharp)).
 
-`MeetingRoomPlugin` is at the end of `Program.cs`: it wraps `CompanyTools` and exposes two tools. The prompt asks for two bookings: one in the past, which the plugin must refuse, and one tomorrow.
+`MeetingRoomPlugin` is at the end of `Program.cs`: it wraps `CompanyTools` and exposes two tools. The question (`Questions.BookPastAndTomorrowMeetings`) asks for two bookings: one in the past, which the plugin must refuse, and one tomorrow.
 
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 9** | Create the plugin and get its tools | • `MeetingRoomPlugin plugin = new(new CompanyTools());` <br> • `List<AITool> tools = [.. plugin.AsAITools()];` <br> • `ColoredConsole.WriteSecondaryLogLine($"Tools declared by the plugin: {string.Join(", ", tools.Select(tool => tool.Name))}");` |
 | **TODO 10** | `AsAITools()` — declare the tools of the plugin | • `yield return AIFunctionFactory.Create(GetMeetingRooms, "get_meeting_rooms");` <br> • `yield return AIFunctionFactory.Create(BookMeetingRoom, "book_meeting_room");` <br> • Remove the `yield break;` line. Only the methods listed here can be called by the model |
 | **TODO 11** | `BookMeetingRoom` — check the date chosen by the model | • `if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day)) return $"Cannot book: '{date}' is not a date in the format yyyy-MM-dd.";` <br> • `if (day < DateOnly.FromDateTime(DateTime.Today)) return $"Cannot book: {date} is in the past (today is {DateTime.Today:yyyy-MM-dd}).";` <br> • **Return** the problem as text, do not throw: the model reads the result and can tell the user or try again (an exception would only give it a generic error) |
-| **TODO 12** | Create the agent | • Same as TODO 6 with the `tools` of the plugin |
-| **TODO 13** | Run the agent, then display what the tools returned and the answer | • `string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);` <br> • Prompt: `"What are the available meeting rooms? Then book the room ROOM-A for the employee with the ID EMP001 on 2025-12-16 from 10:00 to 11:00 for a 'Sprint Review', " + $"and the room ROOM-B for the employee with the ID EMP002 on {tomorrow} from 14:00 to 15:00 for a 'Design Review'."` <br> • `AgentResponse response = await companyAgent.RunAsync(...).WithSpinner("Running agent");` <br> • `WriteToolResults(response);` then `ColoredConsole.WritePrimaryLogLine(response.Text);` |
+| **TODO 12** | Create the agent | • Same as TODO 6 (`Agents.CompanyAssistant`) with the `tools` of the plugin |
+| **TODO 13** | Run the agent, then display what the tools returned and the answer | • `string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);` <br> • Question: `Questions.BookPastAndTomorrowMeetings`, a format string whose `{0}` is the date of tomorrow: `string.Format(CultureInfo.InvariantCulture, Questions.BookPastAndTomorrowMeetings, tomorrow)` <br> • It asks for the meeting rooms, then for two bookings: ROOM-A on 2025-12-16 (in the past: the plugin must refuse it) and ROOM-B tomorrow <br> • `AgentResponse response = await companyAgent.RunAsync(string.Format(...)).WithSpinner("Running agent");` <br> • `WriteToolResults(response);` then `ColoredConsole.WritePrimaryLogLine(response.Text);` |
 | **TODO 14** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -147,8 +153,8 @@ Tools often need services (a repository, an HTTP client...). The agent can recei
 |------|-------------|-------|
 | **TODO 15** | Register the services | • `ServiceCollection services = new();` <br> • `services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();` |
 | **TODO 16** | Build the service provider | • `IServiceProvider serviceProvider = services.BuildServiceProvider();` |
-| **TODO 17** | Create the agent with the static tools and the service provider | • `AIAgent notificationAgent = chatClient.AsAIAgent(instructions: "You are a helpful assistant that can send and retrieve notifications.", name: "NotificationAssistant", tools: [ ... ], services: serviceProvider);` <br> • Tools: `AIFunctionFactory.Create(NotificationTools.SendNotification, "send_notification")` and `AIFunctionFactory.Create(NotificationTools.GetNotificationsForRecipient, "get_notifications_for_recipient")` |
-| **TODO 18** | Run the agent and display the answer | • Prompt: `"Send a notification to 'Mohammed' with the message 'Meeting at 3pm tomorrow'. Then show me all notifications for Mohammed."` <br> • Same pattern as TODO 7 |
+| **TODO 17** | Create the agent with the static tools and the service provider | • `AIAgent notificationAgent = chatClient.AsAIAgent(instructions: Agents.NotificationAssistant.Instructions, name: Agents.NotificationAssistant.Name, tools: [ ... ], services: serviceProvider);` <br> • Tools: `AIFunctionFactory.Create(NotificationTools.SendNotification, "send_notification")` and `AIFunctionFactory.Create(NotificationTools.GetNotificationsForRecipient, "get_notifications_for_recipient")` |
+| **TODO 18** | Run the agent and display the answer | • Question: `Questions.SendAndShowNotifications`: send a notification to Mohammed, then show all his notifications (two tool calls) <br> • Same pattern as TODO 7 |
 | **TODO 19** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -160,8 +166,8 @@ A **function calling middleware** is called for every tool call made by the agen
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 20** | Write the middleware (local function at the end of `Program.cs`) | • Signature (already in the skeleton): `async ValueTask<object?> FunctionCallMiddleware(AIAgent agent, FunctionInvocationContext context, Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>> next, CancellationToken cancellationToken)` <br> • `string arguments = string.Join(", ", context.Arguments.Select(argument => $"{argument.Key}: {argument.Value}"));` <br> • `ColoredConsole.WriteWarningLine($"[Middleware] Calling {context.Function.Name}({arguments})");` <br> • `object? result = await next(context, cancellationToken);` <br> • `ColoredConsole.WriteWarningLine($"[Middleware] {context.Function.Name} returned: {result?.ToString()?.Split('\n')[0]}");` <br> • `return result;` |
-| **TODO 21** | Create the agent of scenario 1 and wrap it with the middleware | • `var companyTools = new CompanyTools();` then the same `AsAIAgent(...)` call as TODO 6, with the three tools of TODO 4 written directly in `tools: [ ... ]` <br> • `AIAgent tracedAgent = companyAgent.AsBuilder().Use(FunctionCallMiddleware).Build();` |
-| **TODO 22** | Run the wrapped agent and display the answer | • `AgentResponse response = await tracedAgent.RunAsync("Get the information of the employee EMP003, then book the room ROOM-B for this employee on {DateTime.Today.AddDays(2):yyyy-MM-dd} from 14:00 to 15:00 for a 'Design Review'.");` (an interpolated string: `$"..."`) <br> • **No** `.WithSpinner()` here: the spinner would overwrite the lines written by the middleware <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` |
+| **TODO 21** | Create the agent of scenario 1 and wrap it with the middleware | • `var companyTools = new CompanyTools();` then the same `AsAIAgent(...)` call as TODO 6 (`Agents.CompanyAssistant`), with the three tools of TODO 4 written directly in `tools: [ ... ]` <br> • `AIAgent tracedAgent = companyAgent.AsBuilder().Use(FunctionCallMiddleware).Build();` |
+| **TODO 22** | Run the wrapped agent and display the answer | • Question: `Questions.EmployeeInfoAndBooking`, a format string whose `{0}` is the date in two days: get the information of EMP003, then book ROOM-B for this employee <br> • `string inTwoDays = DateTime.Today.AddDays(2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);` <br> • `AgentResponse response = await tracedAgent.RunAsync(string.Format(CultureInfo.InvariantCulture, Questions.EmployeeInfoAndBooking, inTwoDays));` <br> • **No** `.WithSpinner()` here: the spinner would overwrite the lines written by the middleware <br> • `ColoredConsole.WriteSecondaryLogLine(response.Text);` |
 | **TODO 23** | Display token usage | • `WriteTokenUsage(response)` |
 
 ---
@@ -307,6 +313,7 @@ Answers vary from one run to another. In scenario 4, the model sometimes also ca
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, the same for everyone
 - `AIAgentWithFunctionTools.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

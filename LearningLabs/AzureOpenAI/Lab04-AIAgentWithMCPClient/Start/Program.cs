@@ -91,13 +91,14 @@ if (ShouldRunScenario(2))
     // TODO 8: Get the tools of the MCP server (same call as TODO 6)
     // IList<McpClientTool> mcpTools = ...
 
-    // TODO 9: Create the agent with ChatClientAgentOptions
-    // Hint: chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "HuggingFaceAssistant", ChatOptions = new ChatOptions { ... } })
-    //       with Instructions (see the README), Tools = [.. mcpTools.Cast<AITool>()], MaxOutputTokens = 1000, Temperature = 0.2f
+    // TODO 9: Create the agent with ChatClientAgentOptions, and the name and the instructions of Agents.HuggingFaceAssistant
+    // (provided in LabPrompts.cs)
+    // Hint: chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.HuggingFaceAssistant.Name, ChatOptions = new ChatOptions { ... } })
+    //       with Instructions = Agents.HuggingFaceAssistant.Instructions, Tools = [.. mcpTools.Cast<AITool>()], MaxOutputTokens = 1000, Temperature = 0.2f
     // AIAgent agent = ...
 
-    // TODO 10: Run the agent with structured output
-    // Hint: await agent.RunAsync<HuggingFaceSearchResult>("Search 4 Hugging Face models for text embedding.").WithSpinner("Running agent with MCP tools")
+    // TODO 10: Run the agent with structured output and the question Questions.TextEmbeddingModels
+    // Hint: await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent with MCP tools")
     // AgentResponse<HuggingFaceSearchResult> response = ...
 
     // TODO 11: Display the structured result
@@ -126,10 +127,10 @@ if (ShouldRunScenario(3))
     // Hint: List<AITool> selectedTools = [.. mcpTools.Where(tool => tool.Name == "hub_repo_search")];
     //       ColoredConsole.WriteSecondaryLogLine($"Tools given to the agent: {string.Join(", ", selectedTools.Select(tool => tool.Name))}")
 
-    // TODO 15: Create the same agent as in TODO 9, with Tools = selectedTools
+    // TODO 15: Create the same agent as in TODO 9 (Agents.HuggingFaceAssistant), with Tools = selectedTools
     // AIAgent agent = ...
 
-    // TODO 16: Run the same request as in TODO 10
+    // TODO 16: Run the same request as in TODO 10 (Questions.TextEmbeddingModels)
     // Hint: .WithSpinner("Running agent with the selected MCP tool")
     // AgentResponse<HuggingFaceSearchResult> response = ...
 

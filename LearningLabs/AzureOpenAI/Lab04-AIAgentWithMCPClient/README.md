@@ -33,6 +33,7 @@ Lab04-AIAgentWithMCPClient/
 ├── README.md
 ├── Start/                          <-- Your working folder
 │   ├── Program.cs                  <-- Complete the TODOs here
+│   ├── LabPrompts.cs               <-- Provided: name, instructions and question of the agent
 │   ├── Models/
 │   │   └── HuggingFaceModel.cs     <-- Structured output types (provided)
 │   ├── AgentConsole.cs             <-- Display helper (provided)
@@ -98,13 +99,16 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the name, the instructions and the question of the agent (see Step 3).
 - `Models/HuggingFaceModel.cs` — `HuggingFaceSearchResult` (a list of `HuggingFaceModel`: `Name`, `Task`, `Library`, `Link`), the structured output of scenarios 2 and 3. As in Lab 02, the `[Description]` attributes are copied into the JSON schema sent to the model.
 - `MCPServerSettings.cs` — the `Endpoint` of an MCP server and its optional `BearerToken`. `ConfigurationHelper.GetMCPServerSettings("HuggingFace")` reads the `MCPServers:HuggingFace` section and checks that the endpoint is an `https://` URL.
 - `AgentConsole.cs` — `WriteTokenUsage(response)` displays the token usage of a run (same helper as Lab 03). `Program.cs` imports it with `using static`.
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The name, the instructions and the question of the agent are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.HuggingFaceAssistant.Name`, `Agents.HuggingFaceAssistant.Instructions`, `Questions.TextEmbeddingModels`) instead of writing your own texts. Everyone works with the same agent and gets comparable answers, and you can focus on the Agent Framework code.
 
 ---
 
@@ -140,8 +144,8 @@ No model is involved here: you talk to the MCP server only.
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 8** | Get the tools of the server | • Same call as TODO 6 |
-| **TODO 9** | Create the agent with `ChatClientAgentOptions` | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "HuggingFaceAssistant", ChatOptions = new ChatOptions { ... } });` <br> • `Instructions = "You are a helpful assistant that searches the Hugging Face Hub with the tools of the Hugging Face MCP server. Only return models found by the tools."` <br> • `Tools = [.. mcpTools.Cast<AITool>()]` <br> • `MaxOutputTokens = 1000`, `Temperature = 0.2f` (a low temperature makes the tool calls more predictable) |
-| **TODO 10** | Run the agent with structured output | • `AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>("Search 4 Hugging Face models for text embedding.").WithSpinner("Running agent with MCP tools");` <br> • The agent calls the MCP tools first, then answers with JSON that matches the schema of `HuggingFaceSearchResult` |
+| **TODO 9** | Create the agent with `ChatClientAgentOptions` | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.HuggingFaceAssistant.Name, ChatOptions = new ChatOptions { ... } });` <br> • `Instructions = Agents.HuggingFaceAssistant.Instructions` (search the Hub with the MCP tools, and only return models found by the tools) <br> • `Tools = [.. mcpTools.Cast<AITool>()]` <br> • `MaxOutputTokens = 1000`, `Temperature = 0.2f` (a low temperature makes the tool calls more predictable) |
+| **TODO 10** | Run the agent with structured output | • `AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent with MCP tools");` <br> • The agent calls the MCP tools first, then answers with JSON that matches the schema of `HuggingFaceSearchResult` |
 | **TODO 11** | Display the structured result | • `ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models:");` <br> • `foreach (HuggingFaceModel model in response.Result.Models)`: `ColoredConsole.WriteSecondaryLogLine($"  Name: {model.Name}");`, same for `Task`, `Library` and `Link`, then `ColoredConsole.WriteEmptyLine();` |
 | **TODO 12** | Display the MCP tools the agent called | • `ColoredConsole.WritePrimaryLogLine("MCP tools called by the agent:");` <br> • `foreach (FunctionCallContent call in response.Messages.SelectMany(message => message.Contents).OfType<FunctionCallContent>())` <br> • `string arguments = string.Join(", ", call.Arguments?.Select(argument => $"{argument.Key}: {argument.Value}") ?? []);` <br> • `ColoredConsole.WriteSecondaryLogLine($"- {call.Name}({arguments})");` <br> • `response.Messages` keeps every message of the run: the function calls requested by the model and their results, then the final answer |
 | **TODO 13** | Display token usage | • `WriteTokenUsage(response)` |
@@ -285,6 +289,7 @@ Remote MCP servers are third-party services: your prompts and the tool arguments
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Name, instructions and question of the agent, the same for everyone
 - `AIAgentWithMCPClient.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI

@@ -67,24 +67,11 @@ if (ShouldRunScenario(1))
 
     // Step 1: Create an agent whose instructions describe the expected JSON format
     AIAgent restaurantAgent = chatClient.AsAIAgent(
-        instructions: """
-            You are a culinary expert assistant. When asked about a restaurant, always respond with valid JSON in this exact format:
-            {
-                "Name": "restaurant name",
-                "ChefName": "head chef name",
-                "Cuisine": "French|Italian|Japanese|Chinese|Mexican|Indian|Spanish|American|Mediterranean|Thai|Korean|Vietnamese|Other",
-                "MichelinStars": number (0-3),
-                "AveragePricePerPerson": number (in euros),
-                "City": "city name",
-                "Country": "country name",
-                "YearEstablished": number
-            }
-            Only respond with the JSON, no other text.
-            """,
-        name: "RestaurantInfoAgent");
+        instructions: Agents.RestaurantInfoJsonFormat.Instructions,
+        name: Agents.RestaurantInfoJsonFormat.Name);
 
     // Step 2: Run the agent with a restaurant question (with spinner to show loading)
-    AgentResponse response = await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.").WithSpinner("Running agent");
+    AgentResponse response = await restaurantAgent.RunAsync(Questions.LeBernardinAsJson).WithSpinner("Running agent");
 
     // Step 3: Parse the JSON text ourselves - nothing guarantees that the model followed the format
     ColoredConsole.WriteInfoLine("=== Scenario 1: Manually defined structured output ===");
@@ -117,12 +104,12 @@ if (ShouldRunScenario(2))
 
     // Step 1: Create an agent with simple instructions - no JSON format needed
     AIAgent restaurantAgent = chatClient.AsAIAgent(
-        instructions: "You are a culinary expert assistant that answers questions about restaurants.",
-        name: "RestaurantInfoAgent");
+        instructions: Agents.RestaurantInfo.Instructions,
+        name: Agents.RestaurantInfo.Name);
 
     // Step 2: Run the agent with RunAsync<T>: the framework generates the JSON schema from the Restaurant type,
     // sends it as the response format of this run, and deserializes the answer
-    AgentResponse<Restaurant> response = await restaurantAgent.RunAsync<Restaurant>("Tell me about the restaurant 'Le Bernardin' in New York.").WithSpinner("Running agent");
+    AgentResponse<Restaurant> response = await restaurantAgent.RunAsync<Restaurant>(Questions.LeBernardin).WithSpinner("Running agent");
 
     // Step 3: Display the strongly-typed result
     ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output with RunAsync<T> ===");
@@ -144,10 +131,10 @@ if (ShouldRunScenario(3))
     // Step 1: Create an agent whose ChatOptions define the instructions and the response format of every run
     AIAgent restaurantAgent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = "RestaurantInfoAgent",
+        Name = Agents.RestaurantInfo.Name,
         ChatOptions = new AIExtensions.ChatOptions
         {
-            Instructions = "You are a culinary expert assistant that answers questions about restaurants.",
+            Instructions = Agents.RestaurantInfo.Instructions,
             // JSON schema generated from the Restaurant type (its [Description] becomes the schema description)
             ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo"),
             // Strict mode (an option of the OpenAI provider): the service enforces the schema - exact property names, no extra property.
@@ -157,7 +144,7 @@ if (ShouldRunScenario(3))
     });
 
     // Step 2: Run the agent with the non-generic RunAsync (with spinner to show loading)
-    AgentResponse response = await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.").WithSpinner("Running agent");
+    AgentResponse response = await restaurantAgent.RunAsync(Questions.LeBernardin).WithSpinner("Running agent");
 
     // Step 3: The answer is JSON text that follows the schema: use it as is (logs, other agents...) or deserialize it
     ColoredConsole.WriteInfoLine("=== Scenario 3: Structured output configured on the agent ===");
@@ -182,8 +169,8 @@ if (ShouldRunScenario(4))
 
     // Step 1: Create an agent with simple instructions - no response format on the agent itself
     AIAgent restaurantAgent = chatClient.AsAIAgent(
-        instructions: "You are a culinary expert assistant that answers questions about restaurants.",
-        name: "RestaurantInfoAgent");
+        instructions: Agents.RestaurantInfo.Instructions,
+        name: Agents.RestaurantInfo.Name);
 
     // Step 2: Define the response format for this run only, in strict mode like scenario 3
     // (the AdditionalProperties of the run options reach the model call, as those of ChatOptions)
@@ -197,7 +184,7 @@ if (ShouldRunScenario(4))
     // (no spinner here: the text itself shows the progress)
     ColoredConsole.WriteInfoLine("=== Scenario 4: Structured output with AgentRunOptions and streaming ===");
     List<AgentResponseUpdate> updates = [];
-    await foreach (AgentResponseUpdate update in restaurantAgent.RunStreamingAsync("Tell me about the restaurant 'Le Bernardin' in New York.", options: runOptions))
+    await foreach (AgentResponseUpdate update in restaurantAgent.RunStreamingAsync(Questions.LeBernardin, options: runOptions))
     {
         Console.Write(update.Text);
         updates.Add(update);

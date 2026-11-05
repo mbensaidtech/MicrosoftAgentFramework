@@ -102,11 +102,10 @@ if (ShouldRunScenario(2))
     // Step 2: Create the agent with ChatClientAgentOptions: instructions, tools and chat options live in ChatOptions
     AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = "HuggingFaceAssistant",
+        Name = Agents.HuggingFaceAssistant.Name,
         ChatOptions = new ChatOptions
         {
-            Instructions = "You are a helpful assistant that searches the Hugging Face Hub with the tools of the Hugging Face MCP server. " +
-                           "Only return models found by the tools.",
+            Instructions = Agents.HuggingFaceAssistant.Instructions,
             Tools = [.. mcpTools.Cast<AITool>()],
             MaxOutputTokens = 1000,
             Temperature = 0.2f
@@ -115,8 +114,7 @@ if (ShouldRunScenario(2))
 
     // Step 3: Run the agent with structured output (with spinner to show loading):
     // it calls the MCP tools, then answers with a HuggingFaceSearchResult
-    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(
-        "Search 4 Hugging Face models for text embedding.").WithSpinner("Running agent with MCP tools");
+    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent with MCP tools");
 
     // Step 4: Display the structured result
     ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models:");
@@ -159,11 +157,10 @@ if (ShouldRunScenario(3))
     // Step 2: Create the same agent as in scenario 2, with the selected tools only
     AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = "HuggingFaceAssistant",
+        Name = Agents.HuggingFaceAssistant.Name,
         ChatOptions = new ChatOptions
         {
-            Instructions = "You are a helpful assistant that searches the Hugging Face Hub with the tools of the Hugging Face MCP server. " +
-                           "Only return models found by the tools.",
+            Instructions = Agents.HuggingFaceAssistant.Instructions,
             Tools = selectedTools,
             MaxOutputTokens = 1000,
             Temperature = 0.2f
@@ -171,8 +168,7 @@ if (ShouldRunScenario(3))
     });
 
     // Step 3: Run the same request as in scenario 2 (with spinner to show loading)
-    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(
-        "Search 4 Hugging Face models for text embedding.").WithSpinner("Running agent with the selected MCP tool");
+    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent with the selected MCP tool");
 
     // Step 4: Display the names of the models found
     ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models: {string.Join(", ", response.Result.Models.Select(model => model.Name))}");

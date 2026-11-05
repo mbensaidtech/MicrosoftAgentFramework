@@ -79,12 +79,12 @@ if (ShouldRunScenario(1))
 
     // Step 3: Create the agent with its tools
     AIAgent companyAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant that can help with company tasks.",
-        name: "CompanyAssistant",
+        instructions: Agents.CompanyAssistant.Instructions,
+        name: Agents.CompanyAssistant.Name,
         tools: tools);
 
     // Step 4: Run the agent (with spinner to show loading): it calls get_employee_info, then answers with the result
-    AgentResponse response = await companyAgent.RunAsync("Get the information of the employee with the ID EMP001").WithSpinner("Running agent");
+    AgentResponse response = await companyAgent.RunAsync(Questions.EmployeeInfo).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine(response.Text);
 
     // Step 5: Display token usage (total of every model call made during the run)
@@ -108,15 +108,14 @@ if (ShouldRunScenario(2))
 
     // Step 2: Create the agent with the tools of the plugin
     AIAgent companyAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant that can help with company tasks.",
-        name: "CompanyAssistant",
+        instructions: Agents.CompanyAssistant.Instructions,
+        name: Agents.CompanyAssistant.Name,
         tools: tools);
 
     // Step 3: Run the agent: the first booking is in the past (the plugin refuses it), the second one is tomorrow
     string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     AgentResponse response = await companyAgent.RunAsync(
-        "What are the available meeting rooms? Then book the room ROOM-A for the employee with the ID EMP001 on 2025-12-16 from 10:00 to 11:00 for a 'Sprint Review', " +
-        $"and the room ROOM-B for the employee with the ID EMP002 on {tomorrow} from 14:00 to 15:00 for a 'Design Review'.").WithSpinner("Running agent");
+        string.Format(CultureInfo.InvariantCulture, Questions.BookPastAndTomorrowMeetings, tomorrow)).WithSpinner("Running agent");
 
     // Step 4: Display what the tools returned to the model, then the answer
     WriteToolResults(response);
@@ -145,8 +144,8 @@ if (ShouldRunScenario(3))
     // Step 3: Create the agent with static tools and give it the service provider:
     // the IServiceProvider parameter of each tool is filled by the framework and hidden from the model
     AIAgent notificationAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant that can send and retrieve notifications.",
-        name: "NotificationAssistant",
+        instructions: Agents.NotificationAssistant.Instructions,
+        name: Agents.NotificationAssistant.Name,
         tools:
         [
             AIFunctionFactory.Create(NotificationTools.SendNotification, "send_notification"),
@@ -155,8 +154,7 @@ if (ShouldRunScenario(3))
         services: serviceProvider);
 
     // Step 4: Run the agent (with spinner to show loading): send a notification, then read it back
-    AgentResponse response = await notificationAgent.RunAsync(
-        "Send a notification to 'Mohammed' with the message 'Meeting at 3pm tomorrow'. Then show me all notifications for Mohammed.").WithSpinner("Running agent");
+    AgentResponse response = await notificationAgent.RunAsync(Questions.SendAndShowNotifications).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine(response.Text);
 
     // Step 5: Display token usage
@@ -175,8 +173,8 @@ if (ShouldRunScenario(4))
     // Step 1: Create the same agent as in scenario 1
     var companyTools = new CompanyTools();
     AIAgent companyAgent = chatClient.AsAIAgent(
-        instructions: "You are a helpful assistant that can help with company tasks.",
-        name: "CompanyAssistant",
+        instructions: Agents.CompanyAssistant.Instructions,
+        name: Agents.CompanyAssistant.Name,
         tools:
         [
             AIFunctionFactory.Create(companyTools.GetEmployeeInfo, "get_employee_info"),
@@ -191,8 +189,9 @@ if (ShouldRunScenario(4))
         .Build();
 
     // Step 3: Run the wrapped agent (no spinner: the middleware writes to the console during the run)
+    string inTwoDays = DateTime.Today.AddDays(2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     AgentResponse response = await tracedAgent.RunAsync(
-        $"Get the information of the employee EMP003, then book the room ROOM-B for this employee on {DateTime.Today.AddDays(2):yyyy-MM-dd} from 14:00 to 15:00 for a 'Design Review'.");
+        string.Format(CultureInfo.InvariantCulture, Questions.EmployeeInfoAndBooking, inTwoDays));
     ColoredConsole.WriteSecondaryLogLine(response.Text);
 
     // Step 4: Display token usage

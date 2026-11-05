@@ -38,6 +38,7 @@ Lab05-AIAgentWithThreads/
 ├── README.md
 ├── Start/                                  <-- Your working folder
 │   ├── Program.cs                          <-- Complete the TODOs here
+│   ├── LabPrompts.cs                       <-- Provided: name, instructions and questions of the agent
 │   ├── Stores/
 │   │   └── MongoChatHistoryProvider.cs     <-- ChatHistoryProvider on MongoDB (scenario 3)
 │   ├── MongoDB/
@@ -116,11 +117,13 @@ Scenarios 1 and 2 do not need MongoDB. To skip scenario 3: `dotnet run -- --scen
   The provider instance is shared by all the sessions of the agent, so it keeps **no session data in its fields**. The key of the conversation (`SessionDbKey`) is stored **in the session**, through `ProviderSessionState<State>`: `GetOrInitializeState(session)` reads it from `AgentSession.StateBag`, or creates a new key the first time. That is why the key is saved and restored with the session.
 - `ConfigurationHelper.cs` — `ConnectToMongoDbAsync()` connects to the database of the configuration and checks that MongoDB answers (clear error message when it is not started).
 - `SessionConsole.cs` — `WriteSerializedSession(json)` displays a serialized session, `WriteTurn(question, response, storedMessages)` one turn of a conversation (scenario 2) and `WriteTokenUsage(response)` the token usage of a run. `Program.cs` imports them with `using static`, so you can call them directly.
-- `Program.cs` — the constants `AgentName`, `AgentInstructions`, `FirstQuestion`, `IntermediateQuestion` (scenario 2) and `FollowUpQuestion` are shared by the three scenarios, and displayed at the start.
+- `LabPrompts.cs` — the name and the instructions of the agent (`Agents.Global`) and the questions of the conversation (`Questions.First`, `Questions.Intermediate` for scenario 2, and `Questions.FollowUp`), shared by the three scenarios and displayed at the start of `Program.cs`.
 
 ### Step 4: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs:
+Open `Start/Program.cs` and complete the TODOs.
+
+The name, the instructions and the questions of the agent are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.Global.Name`, `Agents.Global.Instructions`, `Questions.First`, `Questions.FollowUp`...) instead of writing your own texts. Everyone works with the same agent and gets comparable answers, and you can focus on the Agent Framework code.
 
 ---
 
@@ -142,12 +145,12 @@ An agent created without a `ChatHistoryProvider` uses an `InMemoryChatHistoryPro
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Create the agent | • `AIAgent agent = chatClient.AsAIAgent(instructions: AgentInstructions, name: AgentName);` |
-| **TODO 5** | Create a session and ask the first question in it | • `AgentSession session = await agent.CreateSessionAsync();` <br> • `ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");` <br> • `AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");` |
+| **TODO 4** | Create the agent | • `AIAgent agent = chatClient.AsAIAgent(instructions: Agents.Global.Instructions, name: Agents.Global.Name);` |
+| **TODO 5** | Create a session and ask the first question in it | • `AgentSession session = await agent.CreateSessionAsync();` <br> • `ColoredConsole.WritePrimaryLogLine($"User: {Questions.First}");` <br> • `AgentResponse firstResponse = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");` |
 | **TODO 6** | Display the chat history kept in the session | • `List<AIExtensions.ChatMessage> messages = agent.GetService<InMemoryChatHistoryProvider>()!.GetMessages(session);` <br> • `ColoredConsole.WriteInfoLine($"Messages in the session: {messages.Count} ({string.Join(", ", messages.Select(message => message.Role))})");` <br> • Expected: `2 (user, assistant)` |
 | **TODO 7** | Serialize the session | • `JsonElement serializedSession = await agent.SerializeSessionAsync(session);` <br> • `WriteSerializedSession(serializedSession);` <br> • The JSON contains the two messages, under `stateBag` → `InMemoryChatHistoryProvider` |
 | **TODO 8** | Save the session as text, then restore it | • `string savedSession = JsonSerializer.Serialize(serializedSession);` (this is what you would write to a file or a database) <br> • `ColoredConsole.WriteDividerLine();` then `ColoredConsole.WriteInfoLine("Restoring the session from the saved JSON...");` <br> • `AgentSession resumedSession = await agent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));` |
-| **TODO 9** | Ask the follow-up question in the restored session | • `ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");` <br> • `AgentResponse followUpResponse = await agent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");` <br> • `WriteTokenUsage(followUpResponse);` <br> • The agent answers with the population of **Paris** and the name **Ada**: both come from the history |
+| **TODO 9** | Ask the follow-up question in the restored session | • `ColoredConsole.WritePrimaryLogLine($"User: {Questions.FollowUp}");` <br> • `AgentResponse followUpResponse = await agent.RunAsync(Questions.FollowUp, resumedSession).WithSpinner("Running agent");` <br> • `ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");` <br> • `WriteTokenUsage(followUpResponse);` <br> • The agent answers with the population of **Paris** and the name **Ada**: both come from the history |
 
 ---
 
@@ -157,11 +160,11 @@ Without a limit, every run sends the **whole** history back to the model: the co
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 10** | Create the agent with a bounded history | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = AgentName, ChatOptions = new() { Instructions = AgentInstructions }, ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { ChatReducer = new AIExtensions.MessageCountingChatReducer(2) }) });` <br> • With `ChatClientAgentOptions`, the instructions go to `ChatOptions.Instructions` <br> • The chat reducers of `Microsoft.Extensions.AI` are still **experimental** (`MEAI001`): keep the `#pragma` around the code |
+| **TODO 10** | Create the agent with a bounded history | • `AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.Global.Name, ChatOptions = new() { Instructions = Agents.Global.Instructions }, ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions { ChatReducer = new AIExtensions.MessageCountingChatReducer(2) }) });` <br> • With `ChatClientAgentOptions`, the instructions go to `ChatOptions.Instructions` <br> • The chat reducers of `Microsoft.Extensions.AI` are still **experimental** (`MEAI001`): keep the `#pragma` around the code |
 | **TODO 11** | Get the provider and create a session | • `InMemoryChatHistoryProvider chatHistory = agent.GetService<InMemoryChatHistoryProvider>()!;` <br> • `AgentSession session = await agent.CreateSessionAsync();` |
-| **TODO 12** | First turn | • `AgentResponse response = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");` <br> • `WriteTurn(FirstQuestion, response, chatHistory.GetMessages(session).Count);` |
-| **TODO 13** | Second turn | • Same with `IntermediateQuestion` (`response = ...`): the session now holds 4 messages |
-| **TODO 14** | Third turn | • Same with `FollowUpQuestion`: before the run, the reducer keeps the last 2 messages of the history. The agent knows "that city" (Rome) but **not** the name given in the first turn |
+| **TODO 12** | First turn | • `AgentResponse response = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");` <br> • `WriteTurn(Questions.First, response, chatHistory.GetMessages(session).Count);` |
+| **TODO 13** | Second turn | • Same with `Questions.Intermediate` (`response = ...`): the session now holds 4 messages |
+| **TODO 14** | Third turn | • Same with `Questions.FollowUp`: before the run, the reducer keeps the last 2 messages of the history. The agent knows "that city" (Rome) but **not** the name given in the first turn |
 | **TODO 15** | Display token usage | • `WriteTokenUsage(response);` the input tokens stay flat from the second turn on |
 
 ---
@@ -173,7 +176,7 @@ Same pattern with `MongoChatHistoryProvider`. This time, you simulate a **restar
 | TODO | Description | Hints |
 |------|-------------|-------|
 | **TODO 16** | Connect to MongoDB | • `IMongoDatabase database = await ConfigurationHelper.ConnectToMongoDbAsync();` |
-| **TODO 17** | Write a function that creates the agent on a database | • `Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions { Name = AgentName, ChatOptions = new() { Instructions = AgentInstructions }, ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase) });` |
+| **TODO 17** | Write a function that creates the agent on a database | • `Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.Global.Name, ChatOptions = new() { Instructions = Agents.Global.Instructions }, ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase) });` |
 | **TODO 18** | Create the agent and a session, and ask the first question | • `AIAgent agent = createAgent(database);` <br> • Then the same code as TODO 5 |
 | **TODO 19** | Serialize the session and save it as text | • `JsonElement serializedSession = await agent.SerializeSessionAsync(session);` <br> • `WriteSerializedSession(serializedSession);` <br> • `string savedSession = JsonSerializer.Serialize(serializedSession);` |
 | **TODO 20** | Simulate a restart and restore the session with a new agent | • `ColoredConsole.WriteDividerLine();` then `ColoredConsole.WriteInfoLine("Simulating a restart: new agent, new MongoDB connection, session restored from the saved JSON...");` <br> • `AIAgent restartedAgent = createAgent(await ConfigurationHelper.ConnectToMongoDbAsync());` <br> • `AgentSession resumedSession = await restartedAgent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));` |
@@ -355,6 +358,7 @@ Answers vary from one run to another; the keys are new at each run.
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Name, instructions and questions of the agent, the same for everyone
 - `AIAgentWithThreads.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration, connects to MongoDB
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
@@ -398,7 +402,7 @@ The following files should be modified:
 | `ChatClientAgentOptions.Instructions` | `ChatClientAgentOptions.ChatOptions.Instructions` |
 | Extract the thread id from the serialized state, rebuild an `AgentThreadState` JSON (`models/AgentThreadState.cs`, `ExtractThreadIdFromState`) | Save the whole serialized session and restore it as is; read the key with the provider (`GetSessionDbKey(session)`) |
 | `Microsoft.SemanticKernel.Connectors.InMemory` / `.MongoDB` (preview) | Official `MongoDB.Driver` 3.x (the vector store scenario became the chat reducer scenario) |
-| Agent name and instructions in `appsettings.json` (`AzureOpenAI:Agents:GlobalAgent`) | Constants at the top of `Program.cs` |
+| Agent name and instructions in `appsettings.json` (`AzureOpenAI:Agents:GlobalAgent`) | Constants provided in `LabPrompts.cs` (`Agents.Global`) |
 | MongoDB with a password in `appsettings.json` + Mongo Express | MongoDB without authentication bound to `127.0.0.1`, no secret in `appsettings.json`; `mongosh` to look at the data |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
 | — | Scenario 1: the default in-memory chat history, inside the session |

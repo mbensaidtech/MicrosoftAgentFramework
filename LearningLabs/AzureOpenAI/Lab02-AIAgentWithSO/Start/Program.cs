@@ -63,12 +63,13 @@ if (ShouldRunScenario(1))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 4: Create an agent whose instructions describe the expected JSON format (see the README for the instructions)
-    // Hint: chatClient.AsAIAgent(instructions: "...", name: "RestaurantInfoAgent")
+    // TODO 4: Create an agent with the instructions and the name of Agents.RestaurantInfoJsonFormat (provided in LabPrompts.cs):
+    // its instructions describe the expected JSON format
+    // Hint: chatClient.AsAIAgent(instructions: Agents.RestaurantInfoJsonFormat.Instructions, name: Agents.RestaurantInfoJsonFormat.Name)
     // AIAgent restaurantAgent = ...
 
-    // TODO 5: Run the agent with the restaurant question, asking for JSON only
-    // Hint: await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.").WithSpinner("Running agent")
+    // TODO 5: Run the agent with the question Questions.LeBernardinAsJson, which asks for JSON only
+    // Hint: await restaurantAgent.RunAsync(Questions.LeBernardinAsJson).WithSpinner("Running agent")
     // AgentResponse response = ...
 
     ColoredConsole.WriteInfoLine("=== Scenario 1: Manually defined structured output ===");
@@ -90,10 +91,11 @@ if (ShouldRunScenario(2))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 8: Create an agent with simple instructions - no JSON format needed
+    // TODO 8: Create an agent with the instructions and the name of Agents.RestaurantInfo - no JSON format needed
     // AIAgent restaurantAgent = ...
 
-    // TODO 9: Run the agent with RunAsync<Restaurant>: the framework generates the JSON schema and deserializes the answer
+    // TODO 9: Run the agent with RunAsync<Restaurant> and the question Questions.LeBernardin:
+    // the framework generates the JSON schema and deserializes the answer
     // AgentResponse<Restaurant> response = ...
 
     ColoredConsole.WriteInfoLine("=== Scenario 2: Automatically generated structured output with RunAsync<T> ===");
@@ -115,11 +117,12 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteDividerLine();
 
     // TODO 12: Create an agent with ChatClientAgentOptions whose ChatOptions define the instructions and the response format
-    // Hint: ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
+    // Hint: Name = Agents.RestaurantInfo.Name, Instructions = Agents.RestaurantInfo.Instructions,
+    //       ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")
     //       and AdditionalProperties = new() { ["strict"] = true } (strict mode: the service enforces the schema)
     // AIAgent restaurantAgent = ...
 
-    // TODO 13: Run the agent with the non-generic RunAsync
+    // TODO 13: Run the agent with the non-generic RunAsync and the question Questions.LeBernardin
     // AgentResponse response = ...
 
     ColoredConsole.WriteInfoLine("=== Scenario 3: Structured output configured on the agent ===");
@@ -140,7 +143,7 @@ if (ShouldRunScenario(4))
 {
     ColoredConsole.WriteDividerLine();
 
-    // TODO 16: Create an agent with simple instructions - no response format on the agent itself
+    // TODO 16: Create an agent with the instructions and the name of Agents.RestaurantInfo - no response format on the agent itself
     // AIAgent restaurantAgent = ...
 
     // TODO 17: Define the response format for this run only
@@ -148,7 +151,7 @@ if (ShouldRunScenario(4))
 
     ColoredConsole.WriteInfoLine("=== Scenario 4: Structured output with AgentRunOptions and streaming ===");
 
-    // TODO 18: Stream the answer with RunStreamingAsync("Tell me about the restaurant 'Le Bernardin' in New York.", options: runOptions)
+    // TODO 18: Stream the answer with RunStreamingAsync(Questions.LeBernardin, options: runOptions)
     // Hint: write each update.Text with Console.Write and keep the updates in a List<AgentResponseUpdate>
     //       (no .WithSpinner() here: the spinner would overwrite the streamed text)
 

@@ -69,12 +69,12 @@ if (ShouldRunScenario(1))
     // Hint: ColoredConsole.WritePrimaryLogLine("Tools available to the agent:"), then for each tool:
     //       ColoredConsole.WriteSecondaryLogLine($"- {tool.Name}: {tool.Description}")
 
-    // TODO 6: Create the agent with its tools
-    // Hint: chatClient.AsAIAgent(instructions: "You are a helpful assistant that can help with company tasks.", name: "CompanyAssistant", tools: tools)
+    // TODO 6: Create the agent with its tools, and the instructions and the name of Agents.CompanyAssistant (provided in LabPrompts.cs)
+    // Hint: chatClient.AsAIAgent(instructions: Agents.CompanyAssistant.Instructions, name: Agents.CompanyAssistant.Name, tools: tools)
     // AIAgent companyAgent = ...
 
-    // TODO 7: Run the agent and display the answer
-    // Hint: await companyAgent.RunAsync("Get the information of the employee with the ID EMP001").WithSpinner("Running agent"),
+    // TODO 7: Run the agent with the question Questions.EmployeeInfo and display the answer
+    // Hint: await companyAgent.RunAsync(Questions.EmployeeInfo).WithSpinner("Running agent"),
     //       then ColoredConsole.WriteSecondaryLogLine(response.Text)
     // AgentResponse response = ...
 
@@ -98,12 +98,14 @@ if (ShouldRunScenario(2))
 
     // TODO 10 and TODO 11: complete MeetingRoomPlugin at the end of this file
 
-    // TODO 12: Create the agent with the tools of the plugin (same instructions and name as TODO 6)
+    // TODO 12: Create the agent with the tools of the plugin (same Agents.CompanyAssistant as TODO 6)
     // AIAgent companyAgent = ...
 
-    // TODO 13: Run the agent (see the README for the prompt: one booking in the past, one tomorrow), then display
-    // what the tools returned with WriteToolResults(response), and the answer
-    // Hint: string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    // TODO 13: Run the agent with the question Questions.BookPastAndTomorrowMeetings (one booking in the past, one tomorrow),
+    // then display what the tools returned with WriteToolResults(response), and the answer
+    // Hint: the question is a format string, {0} is the date of tomorrow:
+    //       string tomorrow = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    //       string.Format(CultureInfo.InvariantCulture, Questions.BookPastAndTomorrowMeetings, tomorrow)
     // AgentResponse response = ...
 
     // TODO 14: Display token usage
@@ -125,12 +127,13 @@ if (ShouldRunScenario(3))
     // TODO 16: Build the service provider
     // IServiceProvider serviceProvider = ...
 
-    // TODO 17: Create the agent with the static tools of NotificationTools and the service provider
+    // TODO 17: Create the agent with the static tools of NotificationTools and the service provider,
+    // and the instructions and the name of Agents.NotificationAssistant
     // Hint: tools: [AIFunctionFactory.Create(NotificationTools.SendNotification, "send_notification"), ...],
     //       services: serviceProvider
     // AIAgent notificationAgent = ...
 
-    // TODO 18: Run the agent and display the answer (see the README for the prompt)
+    // TODO 18: Run the agent with the question Questions.SendAndShowNotifications and display the answer
     // AgentResponse response = ...
 
     // TODO 19: Display token usage
@@ -147,11 +150,14 @@ if (ShouldRunScenario(4))
 
     // TODO 20: Write the FunctionCallMiddleware local function at the end of this file (see the skeleton there)
 
-    // TODO 21: Create the same agent as in scenario 1, then wrap it with the middleware
+    // TODO 21: Create the same agent as in scenario 1 (Agents.CompanyAssistant), then wrap it with the middleware
     // Hint: companyAgent.AsBuilder().Use(FunctionCallMiddleware).Build()
     // AIAgent tracedAgent = ...
 
-    // TODO 22: Run the wrapped agent and display the answer (see the README for the prompt)
+    // TODO 22: Run the wrapped agent with the question Questions.EmployeeInfoAndBooking and display the answer
+    // Hint: the question is a format string, {0} is the date in two days:
+    //       string inTwoDays = DateTime.Today.AddDays(2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    //       string.Format(CultureInfo.InvariantCulture, Questions.EmployeeInfoAndBooking, inTwoDays)
     // Don't use .WithSpinner() here: the middleware writes to the console during the run
     // AgentResponse response = ...
 

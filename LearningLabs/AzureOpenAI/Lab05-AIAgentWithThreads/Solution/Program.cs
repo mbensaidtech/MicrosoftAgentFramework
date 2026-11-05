@@ -26,13 +26,6 @@ ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 
 bool ShouldRunScenario(int scenario) => scenarioSelection.ShouldRun(scenario);
 
-// The same agent and the same conversation in every scenario: only where the chat history is kept, and how much of it, changes.
-const string AgentName = "GlobalAgent";
-const string AgentInstructions = "You are a global agent that can answer questions about any topic. The response should be very short and concise.";
-const string FirstQuestion = "Hello, my name is Ada. What is the capital of France?";
-const string IntermediateQuestion = "And what is the capital of Italy?";
-const string FollowUpQuestion = "What is the population of that city? And what is my name?";
-
 #region Setup: Configuration and Client Initialization
 
 // Step 1: Load Azure OpenAI settings from configuration
@@ -41,8 +34,8 @@ Console.WriteLine($"Endpoint: {settings.Endpoint}");
 Console.WriteLine($"Deployment: {settings.ChatDeploymentName}");
 
 // The conversation of every scenario: the same agent, the same questions
-ColoredConsole.WritePrimaryLogLine($"{AgentName} instructions: {AgentInstructions}");
-ColoredConsole.WriteSecondaryLogLine($"Questions: \"{FirstQuestion}\", then \"{FollowUpQuestion}\" (scenario 2 asks \"{IntermediateQuestion}\" in between)");
+ColoredConsole.WritePrimaryLogLine($"{Agents.Global.Name} instructions: {Agents.Global.Instructions}");
+ColoredConsole.WriteSecondaryLogLine($"Questions: \"{Questions.First}\", then \"{Questions.FollowUp}\" (scenario 2 asks \"{Questions.Intermediate}\" in between)");
 
 // Step 2: Create an OpenAIClient that targets the Azure OpenAI v1 endpoint (https://<resource>.openai.azure.com/openai/v1/)
 // - API key when one is configured
@@ -73,12 +66,12 @@ if (ShouldRunScenario(1))
     ColoredConsole.WriteInfoLine("=== Scenario 1: Session with the default in-memory chat history ===");
 
     // Step 1: Create the agent. Without a ChatHistoryProvider, it uses an InMemoryChatHistoryProvider
-    AIAgent agent = chatClient.AsAIAgent(instructions: AgentInstructions, name: AgentName);
+    AIAgent agent = chatClient.AsAIAgent(instructions: Agents.Global.Instructions, name: Agents.Global.Name);
 
     // Step 2: Create a session and ask the first question in this session
     AgentSession session = await agent.CreateSessionAsync();
-    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
-    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    ColoredConsole.WritePrimaryLogLine($"User: {Questions.First}");
+    AgentResponse firstResponse = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
 
     // Step 3: Look at the chat history: the InMemoryChatHistoryProvider keeps it inside the session
@@ -96,8 +89,8 @@ if (ShouldRunScenario(1))
     AgentSession resumedSession = await agent.DeserializeSessionAsync(JsonSerializer.Deserialize<JsonElement>(savedSession));
 
     // Step 6: Ask a follow-up question in the restored session: "that city" and "my name" come from the history
-    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
-    AgentResponse followUpResponse = await agent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
+    ColoredConsole.WritePrimaryLogLine($"User: {Questions.FollowUp}");
+    AgentResponse followUpResponse = await agent.RunAsync(Questions.FollowUp, resumedSession).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
 
     // Step 7: Display token usage
@@ -120,8 +113,8 @@ if (ShouldRunScenario(2))
 #pragma warning disable MEAI001
     AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = AgentName,
-        ChatOptions = new() { Instructions = AgentInstructions },
+        Name = Agents.Global.Name,
+        ChatOptions = new() { Instructions = Agents.Global.Instructions },
         ChatHistoryProvider = new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
         {
             ChatReducer = new AIExtensions.MessageCountingChatReducer(2)
@@ -135,15 +128,15 @@ if (ShouldRunScenario(2))
 
     // Step 3: Two turns in the same session; after each one, look at how many messages the session keeps.
     // The reducer runs before the history is given to the next run: the session briefly holds 4 messages, the model gets 2 of them.
-    AgentResponse response = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
-    WriteTurn(FirstQuestion, response, chatHistory.GetMessages(session).Count);
+    AgentResponse response = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");
+    WriteTurn(Questions.First, response, chatHistory.GetMessages(session).Count);
 
-    response = await agent.RunAsync(IntermediateQuestion, session).WithSpinner("Running agent");
-    WriteTurn(IntermediateQuestion, response, chatHistory.GetMessages(session).Count);
+    response = await agent.RunAsync(Questions.Intermediate, session).WithSpinner("Running agent");
+    WriteTurn(Questions.Intermediate, response, chatHistory.GetMessages(session).Count);
 
     // Step 4: The follow-up question: "that city" is in the last turn (kept), "my name" was in the first one (dropped)
-    response = await agent.RunAsync(FollowUpQuestion, session).WithSpinner("Running agent");
-    WriteTurn(FollowUpQuestion, response, chatHistory.GetMessages(session).Count);
+    response = await agent.RunAsync(Questions.FollowUp, session).WithSpinner("Running agent");
+    WriteTurn(Questions.FollowUp, response, chatHistory.GetMessages(session).Count);
 
     // Step 5: Display token usage
     WriteTokenUsage(response);
@@ -164,16 +157,16 @@ if (ShouldRunScenario(3))
     // Step 2: Write a function that creates the agent with a MongoChatHistoryProvider on a database
     Func<IMongoDatabase, AIAgent> createAgent = mongoDatabase => chatClient.AsAIAgent(new ChatClientAgentOptions
     {
-        Name = AgentName,
-        ChatOptions = new() { Instructions = AgentInstructions },
+        Name = Agents.Global.Name,
+        ChatOptions = new() { Instructions = Agents.Global.Instructions },
         ChatHistoryProvider = new MongoChatHistoryProvider(mongoDatabase)
     });
 
     // Step 3: Create the agent and a session, and ask the first question
     AIAgent agent = createAgent(database);
     AgentSession session = await agent.CreateSessionAsync();
-    ColoredConsole.WritePrimaryLogLine($"User: {FirstQuestion}");
-    AgentResponse firstResponse = await agent.RunAsync(FirstQuestion, session).WithSpinner("Running agent");
+    ColoredConsole.WritePrimaryLogLine($"User: {Questions.First}");
+    AgentResponse firstResponse = await agent.RunAsync(Questions.First, session).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine($"Agent: {firstResponse.Text}");
 
     // Step 4: Serialize the session and save it as text
@@ -193,8 +186,8 @@ if (ShouldRunScenario(3))
     ColoredConsole.WriteInfoLine($"Restored session - chat history stored in MongoDB under the key: {chatHistoryProvider.GetSessionDbKey(resumedSession)}");
 
     // Step 7: Ask the follow-up question to the new agent: the history comes from MongoDB
-    ColoredConsole.WritePrimaryLogLine($"User: {FollowUpQuestion}");
-    AgentResponse followUpResponse = await restartedAgent.RunAsync(FollowUpQuestion, resumedSession).WithSpinner("Running agent");
+    ColoredConsole.WritePrimaryLogLine($"User: {Questions.FollowUp}");
+    AgentResponse followUpResponse = await restartedAgent.RunAsync(Questions.FollowUp, resumedSession).WithSpinner("Running agent");
     ColoredConsole.WriteSecondaryLogLine($"Agent: {followUpResponse.Text}");
 
     // Step 8: Display token usage

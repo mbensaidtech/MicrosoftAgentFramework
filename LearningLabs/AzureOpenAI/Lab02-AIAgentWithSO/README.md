@@ -32,6 +32,7 @@ Lab02-AIAgentWithSO/
 ├── README.md
 ├── Start/                      <-- Your working folder
 │   ├── Program.cs              <-- Complete the TODOs here
+│   ├── LabPrompts.cs           <-- Provided: names, instructions and questions of the agents
 │   ├── Models/
 │   │   └── Restaurant.cs       <-- The structured output type
 │   ├── RestaurantConsole.cs    <-- Display helpers (provided)
@@ -81,13 +82,18 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 
 ### Step 2: Look at the provided files
 
+- `LabPrompts.cs` — the names, the instructions and the questions of the agents (see Step 3). Compare the instructions of `Agents.RestaurantInfoJsonFormat` (scenario 1, the JSON format written in the text) with those of `Agents.RestaurantInfo` (scenarios 2 to 4, no format at all).
 - `Models/Restaurant.cs` — the type the agent must fill. Each property has a `[Description]` attribute: it is copied into the JSON schema generated from the type and tells the model what to put there (for example, the price is in euros).
 - `RestaurantConsole.cs` — `WriteRestaurant(restaurant)` and `WriteTokenUsage(response)` display the results. `Program.cs` imports them with `using static`, so you can call them directly.
 - `Program.cs` — the setup region already contains `jsonOptions`, the `JsonSerializerOptions` used to generate the schema (scenarios 3 and 4) and to deserialize the JSON text yourself: web defaults (camelCase, case-insensitive property names) and enums as strings (`"French"`).
 
 ### Step 3: Complete the Program.cs
 
-Open `Start/Program.cs` and complete the TODOs. Keep the labels of the hints (`Successfully parsed structured response:`, `Structured response:`, `JSON response:`, `Deserialized response:`): they are those of the [Expected Output](#expected-output), and the checks of the optional Lab Bench dashboard look for them.
+Open `Start/Program.cs` and complete the TODOs.
+
+The names, the instructions and the questions of the agents are **provided** in `Start/LabPrompts.cs`: use its constants (`Agents.RestaurantInfo.Name`, `Agents.RestaurantInfo.Instructions`, `Questions.LeBernardin`...) instead of writing your own texts. Everyone works with the same agents and gets comparable answers, and you can focus on the Agent Framework code.
+
+Keep the labels of the hints (`Successfully parsed structured response:`, `Structured response:`, `JSON response:`, `Deserialized response:`): they are those of the [Expected Output](#expected-output), and the checks of the optional Lab Bench dashboard look for them.
 
 ---
 
@@ -109,8 +115,8 @@ You describe the JSON format in the instructions and parse the answer yourself. 
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 4** | Create an agent with JSON format instructions | • `chatClient.AsAIAgent(instructions: "...", name: "RestaurantInfoAgent")` <br> • Use a raw string literal (`"""..."""`) for the instructions: <br> `You are a culinary expert assistant. When asked about a restaurant, always respond with valid JSON in this exact format: { "Name": "restaurant name", "ChefName": "head chef name", "Cuisine": "French\|Italian\|Japanese\|Chinese\|Mexican\|Indian\|Spanish\|American\|Mediterranean\|Thai\|Korean\|Vietnamese\|Other", "MichelinStars": number (0-3), "AveragePricePerPerson": number (in euros), "City": "city name", "Country": "country name", "YearEstablished": number } Only respond with the JSON, no other text.` |
-| **TODO 5** | Run the agent | • `await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York. Respond only with JSON.")` <br> • Returns: `AgentResponse` <br> • Optional: chain `.WithSpinner("Running agent")` |
+| **TODO 4** | Create an agent with JSON format instructions | • `chatClient.AsAIAgent(instructions: Agents.RestaurantInfoJsonFormat.Instructions, name: Agents.RestaurantInfoJsonFormat.Name)` <br> • Read `Agents.RestaurantInfoJsonFormat.Instructions` in `LabPrompts.cs`: the instructions describe the JSON format property by property (`Name`, `ChefName`, `Cuisine`, `MichelinStars`...) and ask for the JSON only |
+| **TODO 5** | Run the agent | • `await restaurantAgent.RunAsync(Questions.LeBernardinAsJson)` (the question also asks for JSON only) <br> • Returns: `AgentResponse` <br> • Optional: chain `.WithSpinner("Running agent")` |
 | **TODO 6** | Parse the JSON and display the restaurant | • `Restaurant? restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions);` <br> • Wrap it in `try { ... } catch (JsonException ex) { ... }` and display `$"Failed to parse JSON: {ex.Message}"` with `ColoredConsole.WriteErrorLine` <br> • If `restaurant is not null`: `ColoredConsole.WritePrimaryLogLine("Successfully parsed structured response:")`, then `WriteRestaurant(restaurant)` |
 | **TODO 7** | Display token usage | • `WriteTokenUsage(response)` (it reads `response.Usage?.InputTokenCount`, `OutputTokenCount`, `TotalTokenCount`) |
 
@@ -122,8 +128,8 @@ You describe the JSON format in the instructions and parse the answer yourself. 
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 8** | Create an agent with simple instructions | • `chatClient.AsAIAgent(instructions: "You are a culinary expert assistant that answers questions about restaurants.", name: "RestaurantInfoAgent")` |
-| **TODO 9** | Run the agent with `RunAsync<Restaurant>` | • `AgentResponse<Restaurant> response = await restaurantAgent.RunAsync<Restaurant>("Tell me about the restaurant 'Le Bernardin' in New York.");` <br> • Optional: chain `.WithSpinner("Running agent")` |
+| **TODO 8** | Create an agent with simple instructions | • `chatClient.AsAIAgent(instructions: Agents.RestaurantInfo.Instructions, name: Agents.RestaurantInfo.Name)` <br> • Same name as in scenario 1, but the instructions say nothing about JSON |
+| **TODO 9** | Run the agent with `RunAsync<Restaurant>` | • `AgentResponse<Restaurant> response = await restaurantAgent.RunAsync<Restaurant>(Questions.LeBernardin);` <br> • Optional: chain `.WithSpinner("Running agent")` |
 | **TODO 10** | Display the strongly-typed result | • `ColoredConsole.WritePrimaryLogLine("Structured response:")` <br> • `response.Result` is already a `Restaurant`: `WriteRestaurant(response.Result)` |
 | **TODO 11** | Display token usage | • `AgentResponse<T>` derives from `AgentResponse`: `WriteTokenUsage(response)` |
 
@@ -135,8 +141,8 @@ The response format is part of the agent configuration: every run returns JSON t
 
 | TODO | Description | Hints |
 |------|-------------|-------|
-| **TODO 12** | Create an agent with `ChatClientAgentOptions` | • `chatClient.AsAIAgent(new ChatClientAgentOptions { Name = "RestaurantInfoAgent", ChatOptions = new AIExtensions.ChatOptions { ... } })` <br> • `Instructions`: `"You are a culinary expert assistant that answers questions about restaurants."` <br> • `ResponseFormat`: `AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")` <br> • The schema description comes from the `[Description]` of the `Restaurant` class <br> • `AdditionalProperties = new() { ["strict"] = true }`: **strict mode**, an option of the OpenAI provider. The service enforces the schema (exact property names, no extra property); see the note under [Expected Output](#expected-output) |
-| **TODO 13** | Run the agent | • Non-generic `await restaurantAgent.RunAsync("Tell me about the restaurant 'Le Bernardin' in New York.")` |
+| **TODO 12** | Create an agent with `ChatClientAgentOptions` | • `chatClient.AsAIAgent(new ChatClientAgentOptions { Name = Agents.RestaurantInfo.Name, ChatOptions = new AIExtensions.ChatOptions { ... } })` <br> • `Instructions = Agents.RestaurantInfo.Instructions` <br> • `ResponseFormat`: `AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo")` <br> • The schema description comes from the `[Description]` of the `Restaurant` class <br> • `AdditionalProperties = new() { ["strict"] = true }`: **strict mode**, an option of the OpenAI provider. The service enforces the schema (exact property names, no extra property); see the note under [Expected Output](#expected-output) |
+| **TODO 13** | Run the agent | • Non-generic `await restaurantAgent.RunAsync(Questions.LeBernardin)` |
 | **TODO 14** | Display the JSON, then the deserialized restaurant | • `ColoredConsole.WritePrimaryLogLine("JSON response:")`, then `ColoredConsole.WriteSecondaryLogLine(response.Text)` <br> • `Restaurant restaurant = JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!;` <br> • `ColoredConsole.WritePrimaryLogLine("Deserialized response:")`, then `WriteRestaurant(restaurant)` |
 | **TODO 15** | Display token usage | • `WriteTokenUsage(response)` |
 
@@ -150,7 +156,7 @@ The response format can also be given **for one run only**, with `AgentRunOption
 |------|-------------|-------|
 | **TODO 16** | Create an agent with simple instructions | • Same as TODO 8 |
 | **TODO 17** | Define the response format for this run | • `AgentRunOptions runOptions = new() { ResponseFormat = AIExtensions.ChatResponseFormat.ForJsonSchema<Restaurant>(jsonOptions, schemaName: "RestaurantInfo"), AdditionalProperties = new() { ["strict"] = true } };` <br> • Same strict mode as TODO 12: the `AdditionalProperties` of the run options reach the model call |
-| **TODO 18** | Stream the answer | • `await foreach (AgentResponseUpdate update in restaurantAgent.RunStreamingAsync("Tell me about the restaurant 'Le Bernardin' in New York.", options: runOptions)) { Console.Write(update.Text); updates.Add(update); }` <br> • Declare `List<AgentResponseUpdate> updates = [];` before the loop, and write a new line after it <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
+| **TODO 18** | Stream the answer | • `await foreach (AgentResponseUpdate update in restaurantAgent.RunStreamingAsync(Questions.LeBernardin, options: runOptions)) { Console.Write(update.Text); updates.Add(update); }` <br> • Declare `List<AgentResponseUpdate> updates = [];` before the loop, and write a new line after it <br> • Don't use `.WithSpinner()` here: the spinner would overwrite the streamed text |
 | **TODO 19** | Deserialize the complete answer | • `AgentResponse response = updates.ToAgentResponse();` combines the updates (text, usage) <br> • `JsonSerializer.Deserialize<Restaurant>(response.Text, jsonOptions)!`, then `ColoredConsole.WritePrimaryLogLine("Deserialized response:")`, `WriteRestaurant(...)` and `WriteTokenUsage(response)` |
 
 ---
@@ -302,6 +308,7 @@ Answers vary from one run to another (the average price in particular).
 
 The following files are provided and should not be modified:
 
+- `LabPrompts.cs` - Names, instructions and questions of the agents, the same for everyone
 - `AIAgentWithSO.csproj` - Project file with all required dependencies
 - `ConfigurationHelper.cs` - Loads and validates the configuration
 - `AzureOpenAISettings.cs` - Settings class for Azure OpenAI
