@@ -319,7 +319,7 @@
       "number": "04",
       "track": "Azure OpenAI",
       "title": "AI Agent With MCP Client",
-      "summary": "Connect to the remote Hugging Face MCP server, discover its tools, let an agent search the Hub with them and return a typed result, then give the agent only the tool it needs.",
+      "summary": "Connect to the remote Hugging Face MCP server, discover its tools, let an agent search the Hub with them and return a typed result, then give the agent only the tool it needs. Bonus on the Responses API: use the same MCP client, then let the service call the MCP server itself (hosted MCP).",
       "level": "Intermediate",
       "objectives": [
         "Connect to a remote MCP server with McpClient.CreateAsync() and the Streamable HTTP transport",
@@ -327,12 +327,15 @@
         "List the tools of an MCP server and give them to an agent (an McpClientTool is an AIFunction)",
         "Configure an agent with ChatClientAgentOptions (instructions, tools, MaxOutputTokens, Temperature)",
         "Combine MCP tools and structured output with RunAsync<T>() and list the tools the agent called",
-        "Reduce the token usage by giving the agent only the tools it needs"
+        "Reduce the token usage by giving the agent only the tools it needs",
+        "Bonus: use the same MCP client and tools on the Responses API",
+        "Bonus: let the service call an MCP server with HostedMcpServerTool, and tell who ran each tool call (application or service)"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab04-AIAgentWithMCPClient",
       "startProject": "Start/AIAgentWithMCPClient.csproj",
       "solutionProject": "Solution/AIAgentWithMCPClient.csproj",
-      "timeoutSeconds": 180,
+      "timeoutSeconds": 300,
+      "bonusScenarios": [4, 5],
       "expectations": [
         {
           "id": "config",
@@ -378,6 +381,46 @@
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
           "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4",
+          "description": "Scenario 4 - on the Responses API, models of the Hub found with the local MCP tool",
+          "pattern": "(?<![\\w./:])[A-Za-z0-9][\\w.-]*/[\\w.-]+, [A-Za-z0-9][\\w.-]*/[\\w.-]+"
+        },
+        {
+          "id": "scenario4-local-tool",
+          "description": "Scenario 4 - the MCP tool was run by the application, through its MCP client",
+          "pattern": "^- hub_repo_search\\([^\\n]*\\bquery\\b[^\\n]*\\) - run by this application"
+        },
+        {
+          "id": "scenario4-response-id",
+          "description": "Scenario 4 - the agent ran on the Responses API (resp_... id)",
+          "pattern": "\\bresp_[0-9A-Za-z]{10,}\\b"
+        },
+        {
+          "id": "scenario4-usage",
+          "description": "Scenario 4 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario5",
+          "description": "Scenario 5 - models of the Hub found with the hosted MCP server",
+          "pattern": "(?<![\\w./:])[A-Za-z0-9][\\w.-]*/[\\w.-]+, [A-Za-z0-9][\\w.-]*/[\\w.-]+"
+        },
+        {
+          "id": "scenario5-listed",
+          "description": "Scenario 5 - the service listed the tools of the hosted MCP server",
+          "pattern": "^- MCP tools listed by the service \\(huggingface\\): [^\\n]*\\bhub_repo_search\\b"
+        },
+        {
+          "id": "scenario5-hosted-tool",
+          "description": "Scenario 5 - the MCP tool was run by the service (hosted MCP)",
+          "pattern": "^- huggingface/hub_repo_search\\([^\\n]*\\bquery\\b[^\\n]*\\) - run by the service \\(hosted MCP\\)"
+        },
+        {
+          "id": "scenario5-usage",
+          "description": "Scenario 5 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -385,14 +428,16 @@
           "track": "Azure OpenAI",
           "title": "Agent IA avec client MCP",
           "level": "Intermédiaire",
-          "summary": "Connectez-vous au serveur MCP distant de Hugging Face, découvrez ses outils, laissez un agent chercher dans le Hub avec eux et renvoyer un résultat typé, puis ne donnez à l'agent que l'outil dont il a besoin.",
+          "summary": "Connectez-vous au serveur MCP distant de Hugging Face, découvrez ses outils, laissez un agent chercher dans le Hub avec eux et renvoyer un résultat typé, puis ne donnez à l'agent que l'outil dont il a besoin. En bonus, sur l'API Responses : utilisez le même client MCP, puis laissez le service appeler lui-même le serveur MCP (MCP hébergé).",
           "objectives": [
             "Se connecter à un serveur MCP distant avec McpClient.CreateAsync() et le transport Streamable HTTP",
             "Envoyer un jeton d'accès facultatif à un serveur MCP (AdditionalHeaders)",
             "Lister les outils d'un serveur MCP et les donner à un agent (un McpClientTool est une AIFunction)",
             "Configurer un agent avec ChatClientAgentOptions (instructions, outils, MaxOutputTokens, Temperature)",
             "Combiner outils MCP et sortie structurée avec RunAsync<T>() et lister les outils appelés par l'agent",
-            "Réduire la consommation de tokens en ne donnant à l'agent que les outils utiles"
+            "Réduire la consommation de tokens en ne donnant à l'agent que les outils utiles",
+            "Bonus : utiliser le même client MCP et les mêmes outils sur l'API Responses",
+            "Bonus : laisser le service appeler un serveur MCP avec HostedMcpServerTool, et savoir qui a exécuté chaque appel d'outil (application ou service)"
           ],
           "checks": {
             "config": "Configuration chargée (Azure OpenAI et serveur MCP)",
@@ -403,7 +448,15 @@
             "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
             "scenario3-tools": "Scénario 3 - seul hub_repo_search a été donné à l'agent",
             "scenario3": "Scénario 3 - modèles trouvés avec l'outil sélectionné",
-            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
+            "scenario4": "Scénario 4 - sur l'API Responses, modèles du Hub trouvés avec l'outil MCP local",
+            "scenario4-local-tool": "Scénario 4 - l'outil MCP a été exécuté par l'application, via son client MCP",
+            "scenario4-response-id": "Scénario 4 - l'agent a tourné sur l'API Responses (id resp_...)",
+            "scenario4-usage": "Scénario 4 - consommation de tokens affichée",
+            "scenario5": "Scénario 5 - modèles du Hub trouvés avec le serveur MCP hébergé",
+            "scenario5-listed": "Scénario 5 - le service a listé les outils du serveur MCP hébergé",
+            "scenario5-hosted-tool": "Scénario 5 - l'outil MCP a été exécuté par le service (MCP hébergé)",
+            "scenario5-usage": "Scénario 5 - consommation de tokens affichée"
           }
         }
       }
@@ -413,7 +466,7 @@
       "number": "05",
       "track": "Azure OpenAI",
       "title": "AI Agent with Sessions",
-      "summary": "Hold multi-turn conversations in an AgentSession, save them and resume them later: chat history in the session, bounded by a chat reducer, then outside of the application with a custom ChatHistoryProvider. Scenario 3 needs a storage, chosen with Storage:Mode: the lab's MongoDB container (docker compose up -d), MongoDB started by the lab without Docker (EmbeddedMongoDb) or a JSON file (JsonFile).",
+      "summary": "Hold multi-turn conversations in an AgentSession, save them and resume them later: chat history in the session, bounded by a chat reducer, then outside of the application with a custom ChatHistoryProvider. Bonus on the Responses API: let the service keep the conversation (previous_response_id), or keep it in your own storage with store = false. Scenarios 3 and 5 need a storage, chosen with Storage:Mode: the lab's MongoDB container (docker compose up -d), MongoDB started by the lab without Docker (EmbeddedMongoDb) or a JSON file (JsonFile).",
       "level": "Intermediate",
       "objectives": [
         "Create a session with CreateSessionAsync() and run the agent in it",
@@ -421,13 +474,16 @@
         "Read the chat history kept by the default InMemoryChatHistoryProvider",
         "Plug a custom ChatHistoryProvider with ChatClientAgentOptions.ChatHistoryProvider",
         "Keep the per-session state of a provider in AgentSession.StateBag (ProviderSessionState<T>)",
-        "Bound the chat history with a chat reducer, and store it outside of the application (MongoDB or a JSON file)"
+        "Bound the chat history with a chat reducer, and store it outside of the application (MongoDB or a JSON file)",
+        "Bonus: on the Responses API, let the service keep the conversation (ChatClientAgentSession.ConversationId, previous_response_id), check it and delete it",
+        "Bonus: keep the Responses API and your own persistence with AsIChatClientWithStoredOutputDisabled, and tell apart your business id, the session and the ids of the service"
       ],
-      "path": "LearningLabs/AzureOpenAI/Lab05-AIAgentWithThreads",
-      "startProject": "Start/AIAgentWithThreads.csproj",
-      "solutionProject": "Solution/AIAgentWithThreads.csproj",
-      "timeoutSeconds": 180,
+      "path": "LearningLabs/AzureOpenAI/Lab05-AIAgentWithSessions",
+      "startProject": "Start/AIAgentWithSessions.csproj",
+      "solutionProject": "Solution/AIAgentWithSessions.csproj",
+      "timeoutSeconds": 300,
       "storage": true,
+      "bonusScenarios": [4, 5],
       "expectations": [
         {
           "id": "config",
@@ -483,6 +539,56 @@
           "id": "scenario3-usage",
           "description": "Scenario 3 - token usage displayed",
           "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario4-serialized",
+          "description": "Scenario 4 - the serialized session holds the conversation id (resp_...)",
+          "pattern": "(?s)^Serialized session:\\s*\\{\\s*\\\"conversationId\\\":\\s*\\\"resp_[0-9A-Za-z]{10,}\\\""
+        },
+        {
+          "id": "scenario4-followup",
+          "description": "Scenario 4 - after the restore, the follow-up answer knows Paris and Ada (history kept by the service)",
+          "pattern": "(?im)^(?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)(?=[^\\n]*(?:million|\\d))"
+        },
+        {
+          "id": "scenario4-chained",
+          "description": "Scenario 4 - after the follow-up, the session points to a new response, kept by the service (previous_response_id)",
+          "pattern": "(?s)\\\"conversationId\\\":\\s*\\\"(resp_[0-9A-Za-z]+)\\\".*?^Response (?!\\1\\b)resp_[0-9A-Za-z]{10,} stored by the service: yes\\b"
+        },
+        {
+          "id": "scenario4-usage",
+          "description": "Scenario 4 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario5-not-stored",
+          "description": "Scenario 5 - with store = false, the service kept nothing (404)",
+          "pattern": "^Response resp_[0-9A-Za-z]{10,} stored by the service: no \\(404\\)"
+        },
+        {
+          "id": "scenario5-serialized",
+          "description": "Scenario 5 - the serialized session holds the key of your storage, no conversation id",
+          "pattern": "(?s)^Serialized session:\\s*\\{\\s*\\\"stateBag\\\":\\s*\\{\\s*\\\"PersistentChatHistoryProvider\\\":\\s*\\{\\s*\\\"sessionDbKey\\\":\\s*\\\"[0-9a-f]{32}\\\""
+        },
+        {
+          "id": "scenario5-restart",
+          "description": "Scenario 5 - a new agent restored the saved session, with the same chat history key",
+          "pattern": "(?s)\\\"sessionDbKey\\\":\\s*\\\"([0-9a-f]{32})\\\".*?^\\s*Chat history key \\([^\\n]*\\):\\s*\\1\\s*$"
+        },
+        {
+          "id": "scenario5-followup",
+          "description": "Scenario 5 - the new agent, with the history from your storage, knows Paris and Ada",
+          "pattern": "(?im)^(?=[^\\n]*\\bParis\\b)(?=[^\\n]*\\bAda\\b)(?=[^\\n]*(?:million|\\d))"
+        },
+        {
+          "id": "scenario5-identifiers",
+          "description": "Scenario 5 - the business id is yours, and the service keeps no conversation id",
+          "pattern": "(?s)^\\s*Business conversation id \\(your application\\): support-case-1042\\s*$.*^\\s*Service conversation id \\(ChatClientAgentSession\\.ConversationId\\): \\(none\\)\\s*$"
+        },
+        {
+          "id": "scenario5-usage",
+          "description": "Scenario 5 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -490,14 +596,16 @@
           "track": "Azure OpenAI",
           "title": "Agent IA avec sessions",
           "level": "Intermédiaire",
-          "summary": "Menez des conversations multi-tours dans une AgentSession, sauvegardez-les et reprenez-les plus tard : historique dans la session, borné par un réducteur, puis hors de l'application avec un ChatHistoryProvider personnalisé. Le scénario 3 nécessite un stockage, choisi avec Storage:Mode : le conteneur MongoDB du lab (docker compose up -d), MongoDB démarré par le lab sans Docker (EmbeddedMongoDb) ou un fichier JSON (JsonFile).",
+          "summary": "Menez des conversations multi-tours dans une AgentSession, sauvegardez-les et reprenez-les plus tard : historique dans la session, borné par un réducteur, puis hors de l'application avec un ChatHistoryProvider personnalisé. En bonus, sur l'API Responses : laissez le service conserver la conversation (previous_response_id), ou gardez-la dans votre propre stockage avec store = false. Les scénarios 3 et 5 nécessitent un stockage, choisi avec Storage:Mode : le conteneur MongoDB du lab (docker compose up -d), MongoDB démarré par le lab sans Docker (EmbeddedMongoDb) ou un fichier JSON (JsonFile).",
           "objectives": [
             "Créer une session avec CreateSessionAsync() et y exécuter l'agent",
             "Sauvegarder et reprendre une session avec SerializeSessionAsync() et DeserializeSessionAsync()",
             "Lire l'historique conservé par l'InMemoryChatHistoryProvider par défaut",
             "Brancher un ChatHistoryProvider personnalisé avec ChatClientAgentOptions.ChatHistoryProvider",
             "Conserver l'état par session d'un provider dans AgentSession.StateBag (ProviderSessionState<T>)",
-            "Borner l'historique avec un réducteur, et le stocker hors de l'application (MongoDB ou un fichier JSON)"
+            "Borner l'historique avec un réducteur, et le stocker hors de l'application (MongoDB ou un fichier JSON)",
+            "Bonus : sur l'API Responses, laisser le service conserver la conversation (ChatClientAgentSession.ConversationId, previous_response_id), le vérifier et la supprimer",
+            "Bonus : garder l'API Responses et votre propre persistance avec AsIChatClientWithStoredOutputDisabled, et distinguer votre id métier, la session et les ids du service"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -510,7 +618,17 @@
             "scenario2-usage": "Scénario 2 - consommation de tokens affichée",
             "scenario3-restart": "Scénario 3 - un nouvel agent a restauré la session avec la clé enregistrée dans la session sérialisée",
             "scenario3-followup": "Scénario 3 - le nouvel agent, avec l'historique venu du stockage, connaît Paris et Ada",
-            "scenario3-usage": "Scénario 3 - consommation de tokens affichée"
+            "scenario3-usage": "Scénario 3 - consommation de tokens affichée",
+            "scenario4-serialized": "Scénario 4 - la session sérialisée contient l'id de conversation (resp_...)",
+            "scenario4-followup": "Scénario 4 - après la restauration, la réponse de suivi connaît Paris et Ada (historique conservé par le service)",
+            "scenario4-chained": "Scénario 4 - après la question de suivi, la session pointe vers une nouvelle réponse, conservée par le service (previous_response_id)",
+            "scenario4-usage": "Scénario 4 - consommation de tokens affichée",
+            "scenario5-not-stored": "Scénario 5 - avec store = false, le service n'a rien conservé (404)",
+            "scenario5-serialized": "Scénario 5 - la session sérialisée contient la clé de votre stockage, sans id de conversation",
+            "scenario5-restart": "Scénario 5 - un nouvel agent a restauré la session enregistrée, avec la même clé d'historique",
+            "scenario5-followup": "Scénario 5 - le nouvel agent, avec l'historique venu de votre stockage, connaît Paris et Ada",
+            "scenario5-identifiers": "Scénario 5 - l'id métier vous appartient, et le service ne conserve aucun id de conversation",
+            "scenario5-usage": "Scénario 5 - consommation de tokens affichée"
           }
         }
       }
@@ -639,7 +757,7 @@
       "number": "07",
       "track": "Azure OpenAI",
       "title": "Agentic RAG with a Vector Store",
-      "summary": "Answer customer questions from a FAQ instead of the model's knowledge: embed the FAQ into an in-memory vector store, search it by meaning, then give the search to an agent as a function tool (agentic RAG) and as a TextSearchProvider that runs before every model call.",
+      "summary": "Answer customer questions from a FAQ instead of the model's knowledge: embed the FAQ into an in-memory vector store, search it by meaning, then give the search to an agent as a function tool (agentic RAG) and as a TextSearchProvider that runs before every model call. Bonus on the Responses API: keep your RAG with nothing stored by the service, then compare it with the hosted file search of the service.",
       "level": "Intermediate",
       "objectives": [
         "Get an IEmbeddingGenerator from an Azure OpenAI embedding deployment",
@@ -648,12 +766,15 @@
         "Expose a semantic search as a function tool of an agent (agentic RAG)",
         "Add RAG to an agent with TextSearchProvider and ChatClientAgentOptions.AIContextProviders",
         "Compare both approaches: tool calls, injected context, token usage",
-        "Treat the retrieved content as untrusted data (indirect prompt injection)"
+        "Treat the retrieved content as untrusted data (indirect prompt injection)",
+        "Bonus: keep your own vector store and search tool on the Responses API, without storage at the provider (store = false)",
+        "Bonus: use the hosted file search (files, vector store of the service, HostedFileSearchTool, citations) and compare it with your own RAG"
       ],
       "path": "LearningLabs/AzureOpenAI/Lab07-AgenticRAG-VectorStore",
       "startProject": "Start/AgenticRAG.csproj",
       "solutionProject": "Solution/AgenticRAG.csproj",
-      "timeoutSeconds": 180,
+      "timeoutSeconds": 300,
+      "bonusScenarios": [5, 6],
       "expectations": [
         {
           "id": "config",
@@ -714,6 +835,51 @@
           "id": "scenario4-usage",
           "description": "Scenario 4 - token usage displayed",
           "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario5-tool",
+          "description": "Scenario 5 - on the Responses API, the agent called your search_faq tool",
+          "pattern": "^Tool called: search_faq\\(question: \\S"
+        },
+        {
+          "id": "scenario5-answer",
+          "description": "Scenario 5 - the answer comes from the FAQ (48 hours)",
+          "pattern": "(?i)\\b48\\s*hours\\b"
+        },
+        {
+          "id": "scenario5-not-stored",
+          "description": "Scenario 5 - with store = false, the service kept nothing (404)",
+          "pattern": "^Response resp_[0-9A-Za-z]{10,} stored by the service: no \\(404\\)"
+        },
+        {
+          "id": "scenario5-usage",
+          "description": "Scenario 5 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
+        },
+        {
+          "id": "scenario6-indexed",
+          "description": "Scenario 6 - the 20 FAQ documents were indexed in a vector store of the service",
+          "pattern": "^Vector store of the service ready: vs_[0-9A-Za-z]+, 20 files"
+        },
+        {
+          "id": "scenario6-search",
+          "description": "Scenario 6 - the hosted file search ran and found faq-005",
+          "pattern": "(?s)^File search queries \\(written by the model\\): \\S.*?^\\d+\\. faq-005\\.md \\(score "
+        },
+        {
+          "id": "scenario6-citation",
+          "description": "Scenario 6 - the answer cites faq-005",
+          "pattern": "^Files cited in the answer: [^\\n]*\\bfaq-005\\.md\\b"
+        },
+        {
+          "id": "scenario6-answer",
+          "description": "Scenario 6 - the answer comes from the FAQ (48 hours)",
+          "pattern": "(?i)\\b48\\s*hours\\b"
+        },
+        {
+          "id": "scenario6-usage",
+          "description": "Scenario 6 - token usage displayed",
+          "pattern": "(?is)input tokens:?\\s*\\d+"
         }
       ],
       "translations": {
@@ -721,7 +887,7 @@
           "track": "Azure OpenAI",
           "title": "RAG agentique avec un vector store",
           "level": "Intermédiaire",
-          "summary": "Répondez aux questions des clients à partir d'une FAQ plutôt que des connaissances du modèle : vectorisez la FAQ dans un vector store en mémoire, cherchez-y par le sens, puis donnez la recherche à un agent comme function tool (RAG agentique) et comme TextSearchProvider exécuté avant chaque appel du modèle.",
+          "summary": "Répondez aux questions des clients à partir d'une FAQ plutôt que des connaissances du modèle : vectorisez la FAQ dans un vector store en mémoire, cherchez-y par le sens, puis donnez la recherche à un agent comme function tool (RAG agentique) et comme TextSearchProvider exécuté avant chaque appel du modèle. En bonus, sur l'API Responses : gardez votre RAG sans stockage chez le fournisseur, puis comparez-le à la recherche de fichiers hébergée par le service.",
           "objectives": [
             "Obtenir un IEmbeddingGenerator à partir d'un déploiement d'embedding Azure OpenAI",
             "Décrire les enregistrements d'un vector store avec [VectorStoreKey], [VectorStoreData] et [VectorStoreVector], et laisser le store les vectoriser",
@@ -729,7 +895,9 @@
             "Exposer une recherche sémantique comme function tool d'un agent (RAG agentique)",
             "Ajouter du RAG à un agent avec TextSearchProvider et ChatClientAgentOptions.AIContextProviders",
             "Comparer les deux approches : appels d'outil, contexte injecté, consommation de tokens",
-            "Traiter le contenu récupéré comme une donnée non fiable (injection de prompt indirecte)"
+            "Traiter le contenu récupéré comme une donnée non fiable (injection de prompt indirecte)",
+            "Bonus : garder votre propre vector store et votre outil de recherche sur l'API Responses, sans stockage chez le fournisseur (store = false)",
+            "Bonus : utiliser la recherche de fichiers hébergée (fichiers, vector store du service, HostedFileSearchTool, citations) et la comparer à votre propre RAG"
           ],
           "checks": {
             "config": "Configuration chargée",
@@ -743,7 +911,16 @@
             "scenario4-answer": "Scénario 4 - la première réponse donne le délai de retour de 30 jours que seule faq-001 contient",
             "scenario4-followup-search": "Scénario 4 - la question de suivi a été cherchée avec la première (RecentMessageMemoryLimit) et a trouvé l'entrée sur le remboursement (faq-002)",
             "scenario4-followup-answer": "Scénario 4 - la réponse de suivi donne les 5 à 7 jours ouvrés de faq-002",
-            "scenario4-usage": "Scénario 4 - consommation de tokens affichée"
+            "scenario4-usage": "Scénario 4 - consommation de tokens affichée",
+            "scenario5-tool": "Scénario 5 - sur l'API Responses, l'agent a appelé votre outil search_faq",
+            "scenario5-answer": "Scénario 5 - la réponse vient de la FAQ (48 heures)",
+            "scenario5-not-stored": "Scénario 5 - avec store = false, le service n'a rien conservé (404)",
+            "scenario5-usage": "Scénario 5 - consommation de tokens affichée",
+            "scenario6-indexed": "Scénario 6 - les 20 documents de la FAQ ont été indexés dans un vector store du service",
+            "scenario6-search": "Scénario 6 - la recherche de fichiers hébergée a tourné et trouvé faq-005",
+            "scenario6-citation": "Scénario 6 - la réponse cite faq-005",
+            "scenario6-answer": "Scénario 6 - la réponse vient de la FAQ (48 heures)",
+            "scenario6-usage": "Scénario 6 - consommation de tokens affichée"
           }
         }
       }

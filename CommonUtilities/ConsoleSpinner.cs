@@ -11,6 +11,9 @@ public class ConsoleSpinner : IDisposable
     private static readonly string[] SpinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     private bool _disposed;
 
+    // The width of the console is 0 when the output is redirected (dashboard, CI, pipe): never pad to a negative width.
+    private static int LineWidth => Math.Max(0, Console.WindowWidth - 1);
+
     public ConsoleSpinner(string message = "Processing")
     {
         _message = message;
@@ -40,7 +43,7 @@ public class ConsoleSpinner : IDisposable
             
             // Pad with spaces to clear any previous longer message
             var output = $"\r{SpinnerFrames[frameIndex]} {_message}... [{elapsedStr}]";
-            Console.Write(output.PadRight(Console.WindowWidth - 1));
+            Console.Write(output.PadRight(LineWidth));
             
             frameIndex = (frameIndex + 1) % SpinnerFrames.Length;
             
@@ -65,7 +68,7 @@ public class ConsoleSpinner : IDisposable
         _cts.Dispose();
 
         // Clear the spinner line
-        Console.Write("\r" + new string(' ', Console.WindowWidth - 1) + "\r");
+        Console.Write("\r" + new string(' ', LineWidth) + "\r");
         Console.CursorVisible = true;
     }
 }

@@ -8,6 +8,7 @@ namespace CommonUtilities;
 /// <summary>
 /// One scenario of a lab: a <c>#region Scenario N: Title</c> block of its Program.cs.
 /// A <c>// Requires scenario N</c> comment in the block declares a scenario it needs in the same run.
+/// A <c>// Bonus scenario</c> comment declares an optional scenario (<see cref="Bonus"/>): the lab is completed without it.
 /// <see cref="Fingerprint"/> identifies the code of the block, comments and white space ignored: the scenario is not implemented
 /// while that code, or the code before the first scenario (the setup), is still the code of the exercise as delivered
 /// (<see cref="DeliveredExercise"/>). Comments never count: removing or keeping a TODO changes nothing.
@@ -23,6 +24,12 @@ public sealed record LabScenario(int Number, string Title, IReadOnlyList<int> Re
     public bool CodeImplemented { get; init; } = true;
 
     public bool Implemented => SetupImplemented && CodeImplemented;
+
+    /// <summary>
+    /// An optional scenario (<c>// Bonus scenario</c> in its block): the exercise is completed without it, and completed with its bonus
+    /// when it passes too. The Lab Bench dashboard takes the bonus scenarios of a lab from its catalog (labs.json), checked against this comment.
+    /// </summary>
+    public bool Bonus { get; init; }
 }
 
 /// <summary>What a run asks for: scenario numbers, or none: the implemented scenarios.</summary>
@@ -87,6 +94,9 @@ public static partial class LabScenarios
 
     [GeneratedRegex(@"^\s*//\s*Requires scenarios?\s+(?<numbers>\d+(?:\s*(?:,|and)\s*\d+)*)", RegexOptions.IgnoreCase)]
     private static partial Regex RequiresComment();
+
+    [GeneratedRegex(@"^\s*//\s*Bonus scenario\b", RegexOptions.IgnoreCase)]
+    private static partial Regex BonusComment();
 
     [GeneratedRegex(@"^>>> Running scenario (?<number>\d+)\b")]
     private static partial Regex Marker();
@@ -167,6 +177,7 @@ public static partial class LabScenarios
 
             List<string> body = [];
             List<int> requires = [];
+            bool bonus = false;
             int depth = 0;
             for (i++; i < lines.Length; i++)
             {
@@ -183,6 +194,7 @@ public static partial class LabScenarios
                 }
 
                 body.Add(lines[i]);
+                bonus |= BonusComment().IsMatch(lines[i]);
                 if (RequiresComment().Match(lines[i]) is { Success: true } comment)
                 {
                     requires.AddRange(Regex.Matches(comment.Groups["numbers"].Value, @"\d+").Select(m => int.Parse(m.Value)));
@@ -194,6 +206,7 @@ public static partial class LabScenarios
                 scenarios.Add(new LabScenario(number, region.Groups["title"].Value, requires.Where(r => r != number).Distinct().Order().ToList())
                 {
                     Fingerprint = Fingerprint(body),
+                    Bonus = bonus,
                 });
             }
         }
@@ -408,7 +421,14 @@ public static partial class LabScenarios
                 : scenario.CodeImplemented ? "not implemented (setup to write)"
                 : "not implemented (code unchanged since delivered)";
             string requires = scenario.Requires.Count > 0 ? $", requires {string.Join(", ", scenario.Requires)}" : "";
-            lines.Add($"  {scenario.Number,2}  {scenario.Title.PadRight(width)}  {state}{requires}");
+            string bonus = scenario.Bonus ? "  [bonus]" : "";
+            lines.Add($"  {scenario.Number,2}  {scenario.Title.PadRight(width)}  {state}{requires}{bonus}");
+        }
+
+        if (scenarios.Any(s => s.Bonus))
+        {
+            lines.Add("");
+            lines.Add("  [bonus] optional scenario: the lab is completed without it, and completed with its bonus (Done+) when it passes too.");
         }
 
         lines.Add("");

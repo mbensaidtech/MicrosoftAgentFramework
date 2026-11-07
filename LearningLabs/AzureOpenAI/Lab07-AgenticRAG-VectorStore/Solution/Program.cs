@@ -7,7 +7,11 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using OpenAI;
 using OpenAI.Chat;
+using OpenAI.Files;
+using OpenAI.Responses;
 using CommonUtilities;
+// The vector stores of the service (scenario 6), aliased: Microsoft.Extensions.VectorData also has a VectorStore (your own store)
+using ServiceVectorStores = OpenAI.VectorStores;
 
 using AgenticRAG;
 using AgenticRAG.Models;
@@ -21,6 +25,7 @@ using static AgenticRAG.RagConsole;
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+// Scenarios 5 and 6 use the Responses API: the deployment must support it.
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
@@ -217,6 +222,144 @@ if (ShouldRunScenario(4))
     AgentResponse followUpResponse = await ragAgent.RunAsync(followUpQuestion, session);
     ColoredConsole.WritePrimaryLogLine($"Agent: {followUpResponse.Text}");
     WriteTokenUsage(followUpResponse, "Token Usage (follow-up):");
+}
+
+#endregion
+
+#region Scenario 5: Responses API with your own vector store - nothing stored by the service
+// Requires scenario 1: it fills the vector store, which is in memory and starts empty at each run.
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(5))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 5: Responses API with your own vector store - nothing stored by the service ===");
+
+    // Step 1: The same search_faq function tool as scenario 3, on the same vector store: your RAG does not depend on the API of the model
+    FaqSearchTool faqSearchTool = new(faqCollection);
+    AITool searchFaqTool = AIFunctionFactory.Create(faqSearchTool.SearchFaqAsync, "search_faq");
+
+    // Step 2: A chat client on the Responses API that asks the service not to store anything (store = false).
+    // By default the service keeps each response 30 days, with its inputs: here, the FAQ entries returned by your tool.
+    // ResponsesClient is flagged [Experimental] by the OpenAI SDK (OPENAI001), AsIChatClientWithStoredOutputDisabled by Agent Framework (MAAI001).
+#pragma warning disable OPENAI001, MAAI001
+    ResponsesClient responsesClient = client.GetResponsesClient();
+    IChatClient statelessResponsesClient = responsesClient.AsIChatClientWithStoredOutputDisabled(settings.ChatDeploymentName);
+#pragma warning restore OPENAI001, MAAI001
+
+    // Step 3: Create the agent of scenario 3 on this client: same instructions, same tool
+    AIAgent faqAgent = statelessResponsesClient.AsAIAgent(
+        instructions: Agents.Faq.Instructions,
+        name: Agents.Faq.Name,
+        tools: [searchFaqTool]);
+
+    // Step 4: Run the same question as scenario 3: the search runs in this application, on your vector store
+    string question = Questions.BrokenItem;
+    ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
+    AgentResponse response = await faqAgent.RunAsync(question).WithSpinner("Running agent");
+
+    // Step 5: Display the tool calls (run by this application), the answer, and check that the service kept nothing
+    WriteToolCalls(response);
+    ColoredConsole.WritePrimaryLogLine($"Agent: {response.Text}");
+    bool stored;
+    try
+    {
+#pragma warning disable OPENAI001
+        await responsesClient.GetResponseAsync(response.ResponseId);
+#pragma warning restore OPENAI001
+        stored = true;
+    }
+    catch (ClientResultException exception) when (exception.Status == 404)
+    {
+        stored = false;
+    }
+    ColoredConsole.WriteInfoLine($"Response {response.ResponseId} stored by the service: {(stored ? "yes" : "no (404)")}");
+
+    // Step 6: Display token usage: compare with scenario 3 (same tool, same FAQ entries)
+    WriteTokenUsage(response);
+}
+
+#endregion
+
+#region Scenario 6: Hosted file search - the service stores, chunks, embeds and searches the FAQ
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(6))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 6: Hosted file search - the service stores, chunks, embeds and searches the FAQ ===");
+
+    // Step 1: Get the clients of the files and of the vector stores of the service (the same Azure OpenAI resource as the chat model).
+    // Your InMemoryVectorStore and your embedding deployment are not used here: the service embeds and searches with its own.
+    // These clients are still flagged [Experimental] (OPENAI001) by the OpenAI SDK.
+#pragma warning disable OPENAI001
+    OpenAIFileClient fileClient = client.GetOpenAIFileClient();
+    ServiceVectorStores.VectorStoreClient vectorStoreClient = client.GetVectorStoreClient();
+
+    List<FaqRecord> faqEntries = await FaqData.LoadAsync();
+    List<string> fileIds = [];
+    string? serviceVectorStoreId = null;
+    try
+    {
+        // Step 2: Upload the FAQ to the service, one small document per entry (faq-005.md...): this is how you choose the unit of the search
+        foreach (FaqRecord entry in faqEntries)
+        {
+            OpenAIFile file = await fileClient.UploadFileAsync(BinaryData.FromString(FaqData.ToDocument(entry)), $"{entry.Id}.md", FileUploadPurpose.Assistants);
+            fileIds.Add(file.Id);
+        }
+        ColoredConsole.WritePrimaryLogLine($"Uploaded {fileIds.Count} FAQ documents to the service");
+
+        // Step 3: Create a vector store of the service with these files. It expires 1 day after its last use: a safety net,
+        // in case the program stops before the clean-up of step 7 (a vector store is billed per GB and per day).
+        ServiceVectorStores.VectorStoreCreationOptions creationOptions = new()
+        {
+            Name = "lab07-sav-faq",
+            ExpirationPolicy = new ServiceVectorStores.VectorStoreExpirationPolicy(ServiceVectorStores.VectorStoreExpirationAnchor.LastActiveAt, 1)
+        };
+        fileIds.ForEach(creationOptions.FileIds.Add);
+        ServiceVectorStores.VectorStore serviceVectorStore = await vectorStoreClient.CreateVectorStoreAsync(creationOptions);
+        serviceVectorStoreId = serviceVectorStore.Id;
+
+        // Step 4: Wait until the service has chunked and embedded the files (asynchronous on its side)
+        serviceVectorStore = await HostedFileSearch.WaitUntilIndexedAsync(vectorStoreClient, serviceVectorStoreId).WithSpinner("Indexing the FAQ in the vector store of the service");
+        WriteServiceVectorStore(serviceVectorStore);
+
+        // Step 5: Create the agent with the hosted file search tool, on the vector store of the service.
+        // There is no function to write: the service runs the search between two model steps, in the same request.
+        AIAgent hostedFaqAgent = client.GetResponsesClient().AsAIAgent(
+            model: settings.ChatDeploymentName,
+            instructions: Agents.HostedFaq.Instructions,
+            name: Agents.HostedFaq.Name,
+            tools: [new HostedFileSearchTool { Inputs = [new HostedVectorStoreContent(serviceVectorStoreId)], MaximumResultCount = 3 }]);
+
+        // Step 6: Run the same question as scenarios 3 and 5. By default, the service does not return the chunks it found:
+        // ask for them (include = file_search_call.results) through the raw options of the Responses API.
+        string question = Questions.BrokenItem;
+        ColoredConsole.WriteSecondaryLogLine($"Question: {question}");
+        ChatClientAgentRunOptions runOptions = new(new ChatOptions
+        {
+            RawRepresentationFactory = _ => new CreateResponseOptions { IncludedProperties = { IncludedResponseProperty.FileSearchCallResults } }
+        });
+        AgentResponse response = await hostedFaqAgent.RunAsync(question, options: runOptions).WithSpinner("Running agent with the hosted file search");
+
+        WriteFileSearch(response);
+        ColoredConsole.WritePrimaryLogLine($"Agent: {response.Text}");
+        WriteTokenUsage(response);
+    }
+    finally
+    {
+        // Step 7: Clean up: the documents and the vector store live in the service until you delete them
+        if (serviceVectorStoreId is not null)
+        {
+            await vectorStoreClient.DeleteVectorStoreAsync(serviceVectorStoreId);
+        }
+        foreach (string fileId in fileIds)
+        {
+            await fileClient.DeleteFileAsync(fileId);
+        }
+        ColoredConsole.WriteInfoLine($"Deleted the vector store and the {fileIds.Count} documents from the service");
+    }
+#pragma warning restore OPENAI001
 }
 
 #endregion

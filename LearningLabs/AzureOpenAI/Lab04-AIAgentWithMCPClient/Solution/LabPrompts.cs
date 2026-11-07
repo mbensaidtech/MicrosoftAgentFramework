@@ -10,7 +10,10 @@ namespace AIAgentWithMCPClient;
 /// <summary>The agents of the lab: the name and the instructions to give to <c>AsAIAgent(...)</c>.</summary>
 public static class Agents
 {
-    /// <summary>Scenarios 2 and 3: the agent that searches the Hugging Face Hub with the tools of the MCP server.</summary>
+    /// <summary>
+    /// Scenarios 2 to 5: the agent that searches the Hugging Face Hub with the tools of the MCP server
+    /// (on Chat Completions in scenarios 2 and 3, on the Responses API in scenarios 4 and 5).
+    /// </summary>
     public static class HuggingFaceAssistant
     {
         public const string Name = "HuggingFaceAssistant";
@@ -24,6 +27,9 @@ public static class Agents
 /// <summary>The questions to ask the agents.</summary>
 public static class Questions
 {
-    /// <summary>Scenarios 2 and 3: the same request, with all the MCP tools then with the search tool only.</summary>
+    /// <summary>
+    /// Scenarios 2 to 5: the same request, with all the MCP tools, then with the search tool only, then on the Responses API
+    /// with the tool run by the application (scenario 4) or by the service (scenario 5).
+    /// </summary>
     public const string TextEmbeddingModels = "Search 4 Hugging Face models for text embedding.";
 }

@@ -1,6 +1,6 @@
 {
   "setup": {
-    "fingerprint": "26ba08f7fb297150",
+    "fingerprint": "8b2b135ac77bfeb3",
     "provided": false
   },
   "scenarios": {
@@ -18,6 +18,14 @@
     },
     "4": {
       "fingerprint": "ec3360eac1683694",
+      "provided": false
+    },
+    "5": {
+      "fingerprint": "a88891c49e437b58",
+      "provided": false
+    },
+    "6": {
+      "fingerprint": "68dc9e48303a036b",
       "provided": false
     }
   },

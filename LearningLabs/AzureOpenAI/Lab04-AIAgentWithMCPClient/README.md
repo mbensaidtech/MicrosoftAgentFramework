@@ -6,6 +6,18 @@ In this lab, you will give an AI Agent the tools of a remote **Model Context Pro
 
 MCP is an open standard that defines how applications expose tools and data to language models. An MCP server publishes tools; an MCP **client** (your program) connects to it, lists its tools and calls them. Here, the server is the public **Hugging Face MCP server** (`https://huggingface.co/mcp`): you connect to it, discover its tools, let an agent search the Hugging Face Hub with them and return a typed result, then give the agent only the tool it needs.
 
+The lab has two parts, on the same server and with the same request:
+
+| Part | Scenarios | API of the model | Who connects to the MCP server and runs its tools? |
+|------|-----------|------------------|-----------------------------------------------------|
+| **A — Chat Completions** | 1 to 3 | `GetChatClient()` | Your application (its `McpClient`) |
+| **B — Responses API (bonus)** | 4 | `GetResponsesClient()` | Your application, **still** (the same `McpClient`): local MCP works with both APIs |
+| | 5 | `GetResponsesClient()` | **The service** (Azure OpenAI): *hosted MCP*, a capability of the Responses API only |
+
+Part B is a **bonus**, and it is not "the same code with another client": scenario 4 shows what does **not** change (MCP stays orchestrated by your application), scenario 5 shows what really changes when the provider orchestrates MCP for you.
+
+> **Bonus — the Responses API scenarios (4 and 5) are optional.** The lab is **completed** once scenarios 1 to 3 pass. Pass the bonus scenarios too and it is **completed with its bonus** (*Completed+* in the Lab Bench dashboard and for the trainer, +50 XP). A failed bonus scenario never undoes a completed lab, and `dotnet run` leaves a bonus scenario out until you write it. `dotnet run -- --list-scenarios` marks them `[bonus]`.
+
 ## What You Will Learn
 
 - How to connect to a remote MCP server with `McpClient.CreateAsync()` and the Streamable HTTP transport (`HttpClientTransport`)
@@ -15,11 +27,15 @@ MCP is an open standard that defines how applications expose tools and data to l
 - How to combine MCP tools and structured output with `RunAsync<T>()`
 - How to see which tools the agent called (`FunctionCallContent` in `response.Messages`)
 - Why giving an agent fewer tools reduces the token usage
+- That the same MCP client and the same tools work on the **Responses API** (`GetResponsesClient().AsAIAgent(options, model: ...)`)
+- How to let the **service** connect to an MCP server and run its tools with a hosted tool (`HostedMcpServerTool`, `AllowedTools`, `ApprovalMode`)
+- How to tell, in a response, who ran a tool: `FunctionCallContent` (your application) or `McpServerToolCallContent` (the service)
+- How to choose between MCP orchestrated by your application and hosted MCP orchestrated by the provider
 
 ## Prerequisites
 
 - .NET 10 SDK or later
-- An Azure OpenAI (or Microsoft Foundry) resource with a chat model deployment that supports function calling and structured output (for example `gpt-4o-mini` or `gpt-5.4-mini`)
+- An Azure OpenAI (or Microsoft Foundry) resource with a chat model deployment that supports function calling and structured output (for example `gpt-4o-mini` or `gpt-5.4-mini`). Scenarios 4 and 5 also need the **Responses API** for this deployment (the model and the region must support it, see Lab 01 scenario 6)
 - One of the following for authentication:
   - the resource **API key**, or
   - Azure CLI logged in (`az login`) with the **Cognitive Services OpenAI User** role on the resource
@@ -102,7 +118,7 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 - `LabPrompts.cs` — the name, the instructions and the question of the agent (see Step 3).
 - `Models/HuggingFaceModel.cs` — `HuggingFaceSearchResult` (a list of `HuggingFaceModel`: `Name`, `Task`, `Library`, `Link`), the structured output of scenarios 2 and 3. As in Lab 02, the `[Description]` attributes are copied into the JSON schema sent to the model.
 - `MCPServerSettings.cs` — the `Endpoint` of an MCP server and its optional `BearerToken`. `ConfigurationHelper.GetMCPServerSettings("HuggingFace")` reads the `MCPServers:HuggingFace` section and checks that the endpoint is an `https://` URL.
-- `AgentConsole.cs` — `WriteTokenUsage(response)` displays the token usage of a run (same helper as Lab 03). `Program.cs` imports it with `using static`.
+- `AgentConsole.cs` — `WriteTokenUsage(response)` displays the token usage of a run (same helper as Lab 03). `WriteToolCalls(response)` (scenarios 4 and 5) displays the tool calls of a run and **who ran them**: a `FunctionCallContent` was run by your application, a `McpServerToolCallContent` by the service; it also shows the tools listed by the service for a hosted MCP server (`mcp_list_tools` item). `Program.cs` imports them with `using static`.
 
 ### Step 3: Complete the Program.cs
 
@@ -166,6 +182,35 @@ The definition of **every** tool given to an agent (name, description, JSON sche
 
 ---
 
+#### Scenario 4 (bonus): Responses API — the same MCP client, the tools still run in your application
+
+The agent of scenario 3, on the Responses API. Nothing changes on the MCP side: the `McpClient`, `ListToolsAsync()` and the `McpClientTool` objects are the same, because MCP tools are given to the agent as `AIFunction`s, whatever the API of the model. What changes is the protocol between the agent and the model: the model asks for the tool with a `function_call` **item**, the agent runs it from your process and sends a `function_call_output` item. With the default `store = true`, the service keeps the response, and the second request of the tool loop only sends the tool result and the id of the previous response (`previous_response_id`) instead of the whole conversation.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 19** | Get the tools and keep `hub_repo_search` | • Same code as TODO 14 <br> • `ColoredConsole.WriteSecondaryLogLine($"Tools given to the agent: {string.Join(", ", selectedTools.Select(tool => tool.Name))} (MCP client of this application)");` |
+| **TODO 20** | Create the agent of scenario 3 on the Responses API | • `AIAgent agent = client.GetResponsesClient().AsAIAgent(new ChatClientAgentOptions { ... }, model: settings.ChatDeploymentName);` with the same `Name` and `ChatOptions` as TODO 15 <br> • With Responses, the deployment is the `model` of each request (with Chat Completions, it is chosen by `GetChatClient(...)`) <br> • `GetResponsesClient()` is flagged experimental (`OPENAI001`): keep the `#pragma` |
+| **TODO 21** | Run the same request | • `AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent on the Responses API with the local MCP tool");` <br> • Structured output and tools work together on Responses too |
+| **TODO 22** | Display the models and the tool calls | • Same code as TODO 17 <br> • `WriteToolCalls(response);` shows `hub_repo_search(...) - run by this application, through its MCP client` |
+| **TODO 23** | Display the response id and the usage | • `ColoredConsole.WriteSecondaryLogLine($"Response id: {response.ResponseId}");` (`resp_...`) <br> • `WriteTokenUsage(response);` — close to scenario 3: the same tool definition and the same tool result reach the model |
+
+---
+
+#### Scenario 5 (bonus): Hosted MCP — the service connects to the MCP server and runs its tools
+
+With a **hosted tool**, you do not run the tool: you describe it, and the service runs it. `HostedMcpServerTool` gives the address of the MCP server to the Responses API: during the request, the service lists the tools of the server (`mcp_list_tools`), the model chooses one, **the service** calls it (`mcp_call`) and gives the result to the model, then the model answers. Your application makes **one** request and never talks to Hugging Face: there is no `McpClient` in this scenario.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 24** | Describe the MCP server as a hosted tool | • `HostedMcpServerTool hostedMcpServer = new(serverName: "huggingface", serverAddress: huggingFaceMcpSettings.Endpoint) { ... };` <br> • `AllowedTools = ["hub_repo_search"]`: the tools the model may use (the same choice as scenario 3, and the same token savings) <br> • `ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire`: the service calls the tool without asking you first. **The default asks for an approval** (see [Approve the calls of a hosted MCP server](#approve-the-calls-of-a-hosted-mcp-server)) <br> • `Headers = hasToken ? new Dictionary<string, string> { ["Authorization"] = $"Bearer {huggingFaceMcpSettings.BearerToken}" } : null`: the service sends them to the MCP server, so the token is given to the service <br> • Display it: `ColoredConsole.WriteSecondaryLogLine($"Hosted MCP server given to the agent: {hostedMcpServer.ServerName} ({hostedMcpServer.ServerAddress}), allowed tools: {string.Join(", ", hostedMcpServer.AllowedTools)}");` |
+| **TODO 25** | Create the agent with the hosted tool | • Same code as TODO 20, with `Tools = [hostedMcpServer]` |
+| **TODO 26** | Run the same request | • `.WithSpinner("Running agent with the hosted MCP server")` |
+| **TODO 27** | Display the models, the tool calls and the usage | • `WriteToolCalls(response);` now shows `MCP tools listed by the service (huggingface): hub_repo_search` and `huggingface/hub_repo_search(...) - run by the service (hosted MCP)` <br> • The tool results are in `McpServerToolResultContent`, the calls in `McpServerToolCallContent`: they are not `FunctionCallContent`, because your agent did not run them <br> • `WriteTokenUsage(response);` |
+
+> **Beware with Chat Completions:** an agent on `GetChatClient()` does not refuse a hosted tool, it **silently leaves it out** of the request. The model then answers from its own knowledge (with models that may not exist), and no error tells you why. Hosted tools need the Responses API.
+
+---
+
 ### Step 4: Run and Test
 
 **Run the Start project (your implementation):**
@@ -190,7 +235,57 @@ To run only some scenarios: `dotnet run -- --scenarios 1` ([Choose the scenarios
 4. **Execution** — for each call, the `McpClientTool` sends `tools/call` to the MCP server **from your program** and gives the result back to the model. Steps 3–4 repeat until the model answers.
 5. **Answer** — with `RunAsync<T>()`, the final answer is JSON that matches the schema of `T`, deserialized in `response.Result`.
 
-The model never talks to the MCP server: your agent does. This is a **local** MCP client (the tools run from your process). The Responses API can instead call a remote MCP server from the service side (*hosted MCP tool*, see *Going further*).
+The model never talks to the MCP server: your agent does. This is a **local** MCP client (the tools run from your process), and it works the same on Chat Completions (scenarios 2, 3) and on the Responses API (scenario 4).
+
+## Local MCP or hosted MCP?
+
+With **hosted MCP** (scenario 5), steps 1 to 4 move to the service: it connects to the server, lists the tools, calls them and gives the results to the model, inside **one** request of your application.
+
+```
+Local MCP (scenarios 2 to 4)                         Hosted MCP (scenario 5)
+
+ your app ──tools/list, tools/call──► MCP server      your app ──1 request──► Azure OpenAI ──tools/list, tools/call──► MCP server
+    │  ▲                                                   ▲                       │
+    ▼  │ function_call / function_call_output              └────── answer ─────────┘
+ Azure OpenAI (Chat Completions or Responses)
+```
+
+| | MCP orchestrated by your application (`McpClient`) | Hosted MCP (`HostedMcpServerTool`) |
+|---|---|---|
+| APIs | Chat Completions **and** Responses | Responses only (silently ignored by Chat Completions) |
+| Who calls the MCP server | Your process | The service (Azure OpenAI / OpenAI) |
+| Where the server must be | Anywhere your application reaches: localhost, private network, a local process (`stdio`) | **Publicly reachable from the service**, over HTTPS (TLS 1.2+; on Azure, no mTLS and no service tags for this traffic) |
+| Credentials of the server | Stay in your application | Sent to the service with each request (`Headers`), which forwards them |
+| Control of each call | Full: the function calling middleware (Lab 03), approval (Lab 09), logs, retries, timeouts, filtering of the results | What the service offers: `AllowedTools`, `ApprovalMode` (approve or reject before the call) |
+| Round trips of your application | One model call per step of the tool loop | One request for the whole run |
+| Tool results | In your process before going to the model: you can check, trim or redact them | Go straight from the server to the model; you see them afterwards (`McpServerToolResultContent`) |
+| Observability | Your traces (OpenTelemetry, Lab 11) | The items of the response (`mcp_list_tools`, `mcp_call`) |
+| Dependency on the provider | None: change model provider, keep your MCP code | Tied to the providers that host MCP calls |
+
+When to use which:
+
+- **Local MCP** when the server is internal or local, when the credentials must not leave your infrastructure, or when you need to control, log or transform each call. It is the default choice, and it does not depend on the API of the model.
+- **Hosted MCP** for public MCP servers when you want fewer round trips and less code (no MCP client, no tool loop in your process), and accept that the provider sees the calls and their results.
+
+Token usage: in a run of this lab, scenario 5 used fewer input tokens than scenario 4 (about 1,350 against 1,850) for the same answer, because the service formats the tool list and the result itself. Measure it for your own server: it depends on the size of the tool definitions and of the results, not on the kind of MCP.
+
+### Approve the calls of a hosted MCP server
+
+By default (`ApprovalMode` not set, or `HostedMcpServerToolApprovalMode.AlwaysRequire`), the service does **not** call the tool: it stops and returns a `ToolApprovalRequestContent` whose `ToolCall` is the `McpServerToolCallContent` it wants to run. You answer in the same session:
+
+```csharp
+AgentSession session = await agent.CreateSessionAsync();
+AgentResponse response = await agent.RunAsync(Questions.TextEmbeddingModels, session);
+foreach (ToolApprovalRequestContent request in response.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>())
+{
+    var call = (McpServerToolCallContent)request.ToolCall;   // ServerName, Name, Arguments
+    bool approved = call.Name == "hub_repo_search";            // your policy, or ask a human (Lab 09)
+    // Microsoft.Extensions.AI.ChatMessage: OpenAI.Chat (imported by this lab) has a ChatMessage too
+    response = await agent.RunAsync(new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, [request.CreateResponse(approved)]), session);
+}
+```
+
+`HostedMcpServerToolApprovalMode.RequireSpecific(alwaysRequireApprovalToolNames, neverRequireApprovalToolNames)` sets it tool by tool. Same flow as the official sample `ResponseAgent_Hosted_MCP`.
 
 ## Key Concepts
 
@@ -205,7 +300,13 @@ The model never talks to the MCP server: your agent does. This is a **local** MC
 | `McpClientTool` | An MCP tool, as an `AIFunction`: give it to an agent like any function tool |
 | `ChatClientAgentOptions` | Complete agent configuration: `Name`, `Description`, `ChatOptions` (`Instructions`, `Tools`, `MaxOutputTokens`, `Temperature`...) |
 | `RunAsync<T>()` / `AgentResponse<T>` | Run with structured output; `Result` is the deserialized `T` (Lab 02) |
-| `FunctionCallContent` | A function call requested by the model (`Name`, `Arguments`), kept in `response.Messages` |
+| `FunctionCallContent` | A function call requested by the model (`Name`, `Arguments`), kept in `response.Messages`; run by your application |
+| `GetResponsesClient()` / `ResponsesClient` | Client of the **Responses API**; `AsAIAgent(options, model: deployment)` creates the same kind of `ChatClientAgent` on it |
+| Hosted tool | A tool described to the service and **run by the service** (Responses API only): hosted MCP, file search (Lab 07), code interpreter, web search |
+| `HostedMcpServerTool` | Hosted MCP server: `ServerName`, `ServerAddress`, `AllowedTools`, `ApprovalMode`, `Headers` |
+| `HostedMcpServerToolApprovalMode` | `AlwaysRequire` (the default of the service), `NeverRequire`, `RequireSpecific(...)` |
+| `McpServerToolCallContent` / `McpServerToolResultContent` | A call to a hosted MCP server (`ServerName`, `Name`, `Arguments`) and its result (`Outputs`), run by the service |
+| `ToolApprovalRequestContent` | The service asks your approval before calling a hosted MCP tool; answer with `CreateResponse(approved)` |
 
 ## Namespaces Reference
 
@@ -213,11 +314,12 @@ The model never talks to the MCP server: your agent does. This is a **local** MC
 |-----------|---------|
 | `OpenAI` | `OpenAIClient`, `OpenAIClientOptions` |
 | `OpenAI.Chat` | `ChatClient` and the `AsAIAgent()` extension method |
+| `OpenAI.Responses` | `ResponsesClient` and its `AsAIAgent(options, model: ...)` extension method (scenarios 4 and 5) |
 | `System.ClientModel` | `ApiKeyCredential` |
 | `System.ClientModel.Primitives` | `BearerTokenPolicy` |
 | `Azure.Identity` | `DefaultAzureCredential` |
 | `Microsoft.Agents.AI` | `AIAgent`, `ChatClientAgentOptions`, `AgentResponse`, `AgentResponse<T>` |
-| `Microsoft.Extensions.AI` | `AITool`, `ChatOptions`, `FunctionCallContent` |
+| `Microsoft.Extensions.AI` | `AITool`, `ChatOptions`, `FunctionCallContent`, `HostedMcpServerTool`, `HostedMcpServerToolApprovalMode`, `McpServerToolCallContent` |
 | `ModelContextProtocol.Client` | `McpClient`, `HttpClientTransport`, `HttpClientTransportOptions`, `HttpTransportMode`, `McpClientTool` |
 | `System.ComponentModel` | `[Description]` (in `Models/`) |
 | `CommonUtilities` | `ColoredConsole`, `WithSpinner()`, `AzureOpenAIEndpoint` |
@@ -257,6 +359,30 @@ Token Usage:
   Input tokens: 1927
   Output tokens: 240
   Total tokens: 2167
+----------------------------------------
+=== Scenario 4: Responses API - the same MCP client, the tools still run in your application ===
+Tools given to the agent: hub_repo_search (MCP client of this application)
+Found 4 models: jinaai/jina-embeddings-v5-text-nano, jinaai/jina-embeddings-v5-text-small, ...
+Tool calls of the run:
+- hub_repo_search(query: text embedding, repo_types: ["model"], limit: 4) - run by this application, through its MCP client
+Response id: resp_0b7f4dde665b923f006aef3744b20c8195a4529aaddfe327ac
+----------------------------------------
+Token Usage:
+  Input tokens: 1847
+  Output tokens: 262
+  Total tokens: 2109
+----------------------------------------
+=== Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools ===
+Hosted MCP server given to the agent: huggingface (https://huggingface.co/mcp), allowed tools: hub_repo_search
+Found 4 models: jinaai/jina-embeddings-v5-text-nano, jinaai/jina-embeddings-v5-text-small, ...
+Tool calls of the run:
+- MCP tools listed by the service (huggingface): hub_repo_search
+- huggingface/hub_repo_search(query: text embedding, repo_types: ["model"], author: , filters: [], sort: trendingScore, limit: 4) - run by the service (hosted MCP)
+----------------------------------------
+Token Usage:
+  Input tokens: 1344
+  Output tokens: 277
+  Total tokens: 1621
 ```
 
 The models found, the server version and the list of tools depend on the Hugging Face Hub and server at the time you run the lab (a token can unlock more tools). The input tokens of scenario 3 are much lower than in scenario 2 for the same answer: the difference is the definitions of the tools that were not needed.
@@ -276,6 +402,10 @@ The models found, the server version and the list of tools depend on the Hugging
 | Scenario 3: `Tools given to the agent:` is empty | The server renamed its tools: run scenario 1 and use the name of the search tool |
 | `JsonException` when reading `response.Result` | The answer was cut: increase `MaxOutputTokens`, or ask for fewer models |
 | The agent answers from its own knowledge (no line under `MCP tools called by the agent:`) | Check `Tools` in `ChatOptions` and the instructions; the model decides from the tool names and descriptions |
+| Scenarios 4 and 5 fail with `404` or *"unsupported"* | The deployment (model or region) does not support the Responses API: use one that does, or run `dotnet run -- --scenarios 1,2,3` |
+| Scenario 5: no model found, `(no tool called)`, or an answer with models that do not exist | The agent runs on Chat Completions (`GetChatClient()`): a hosted tool is silently left out. Use `GetResponsesClient()` |
+| Scenario 5: no answer, the response only holds a `ToolApprovalRequestContent` | `ApprovalMode` is not set: the service waits for your approval. Set `NeverRequire`, or approve the call ([Approve the calls](#approve-the-calls-of-a-hosted-mcp-server)) |
+| Scenario 5: an error from the service about the MCP server (it could not list or call its tools) | The **service** could not reach the server: it must be public, over HTTPS. A `localhost` or private server works with a local MCP client only (scenario 4) |
 
 ## Security: third-party MCP servers
 
@@ -283,7 +413,9 @@ Remote MCP servers are third-party services: your prompts and the tool arguments
 
 - use servers hosted by the service provider itself (here, Hugging Face), not proxies, and review what you connect to;
 - keep tokens out of `appsettings.json` and of the logs; send them only to the server they belong to;
-- give an agent only the tools it needs (scenario 3).
+- give an agent only the tools it needs (scenario 3, and `AllowedTools` in scenario 5).
+
+With **hosted MCP**, add the provider to this list: the service sees your tool arguments and their results, and receives the credentials of the MCP server in `Headers`. Approve the calls (`AlwaysRequire` / `RequireSpecific`) for servers that can act on your data, and use a token with the smallest scope.
 
 ## Provided Files
 
@@ -317,7 +449,8 @@ The following files should be modified:
 - **Servers protected with OAuth**: `HttpClientTransportOptions.OAuth` runs the authorization flow for you (official sample `Agent_MCP_Server_Auth`).
 - **Per-run tokens**: a custom `HttpClient` with a `DelegatingHandler` can attach a fresh token to each request, only for the server's origin (official sample `Agent_MCP_PerRun_AuthHeaders`).
 - **Trace or wrap MCP tool calls**: the function calling middleware of Lab 03 works with MCP tools too; a `DelegatingAIFunction` can also wrap each `McpClientTool` (official sample `Agent_Step23_LocalMCP`, Foundry).
-- **Hosted MCP tool**: with the Responses API, the service itself calls the MCP server (official sample `ResponseAgent_Hosted_MCP`).
+- **Hosted MCP with approvals**: scenario 5 with `ApprovalMode` left to its default, and the approval loop of [Approve the calls](#approve-the-calls-of-a-hosted-mcp-server) (official sample `ResponseAgent_Hosted_MCP`).
+- **Chat Completions or Responses for the whole course**: [Chat Completions and Responses API](../ChatCompletions-vs-Responses.md) compares the two APIs in Labs 04, 05 and 07.
 - **Long-running MCP tools** (MCP Tasks extension): official sample `Agent_MCP_LongRunningTask_Client`.
 - **Expose your own agent as an MCP server**: this is the topic of Lab 10.
 
@@ -332,10 +465,14 @@ The following files should be modified:
 | Hugging Face token in `appsettings.json` (required, `Bearer ` header always sent) | Optional token in user secrets or environment variables; header sent only when a token is set |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
 | One scenario | Scenario 1: discover the tools; scenario 2: the original agent + the list of tools called; scenario 3: only the tools needed |
+| — | Scenarios 4 and 5 (2026-11): the same MCP client on the Responses API, then hosted MCP (`HostedMcpServerTool`) |
 
 ## Useful Links
 
-- [Using MCP tools with Agent Framework](https://learn.microsoft.com/agent-framework/agents/tools/local-mcp-tools?pivots=programming-language-csharp)
+- [Using MCP tools with Agent Framework](https://learn.microsoft.com/agent-framework/agents/tools/local-mcp-tools?pivots=programming-language-csharp) and [hosted MCP tools](https://learn.microsoft.com/agent-framework/agents/tools/hosted-mcp-tools)
+- [Official sample `ResponseAgent_Hosted_MCP`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/ModelContextProtocol/ResponseAgent_Hosted_MCP)
+- [Azure OpenAI Responses API — remote MCP servers](https://learn.microsoft.com/azure/ai-foundry/openai/how-to/responses)
+- [Azure OpenAI provider in Agent Framework (Responses or Chat Completions, hosted tools)](https://learn.microsoft.com/agent-framework/agents/providers/azure-openai)
 - [Microsoft Agent Framework documentation](https://learn.microsoft.com/agent-framework/overview/?pivots=programming-language-csharp)
 - [Official sample `Agent_MCP_Server`](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/ModelContextProtocol/Agent_MCP_Server) and the other [MCP samples](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/ModelContextProtocol)
 - [Official MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk)

@@ -3,7 +3,7 @@
 An optional, local web UI to follow the labs and run them without typing `dotnet` commands.
 It is a convenience layer: **every lab keeps working exactly the same with the CLI**, and no lab depends on the dashboard.
 
-> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithThreads`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison`, `Lab09-AIAgentWithFunctionToolsHumanApproval`, `Lab10_ExposeAIAgentAsMCPTool`, `Lab11-AIAgentWithCustomHttpTransport` and `Lab12-AIAgentWithAIContextProvider` (the migrated labs).
+> Prototype: registered labs are `Lab01-FirstBasicAIAgent`, `Lab02-AIAgentWithSO`, `Lab03-AIAgentWithFunctionTools`, `Lab04-AIAgentWithMCPClient`, `Lab05-AIAgentWithSessions`, `Lab06_A2AServer`, `Lab06_A2AClient`, `Lab07-AgenticRAG-VectorStore`, `Lab08-DataFormatComparison`, `Lab09-AIAgentWithFunctionToolsHumanApproval`, `Lab10_ExposeAIAgentAsMCPTool`, `Lab11-AIAgentWithCustomHttpTransport` and `Lab12-AIAgentWithAIContextProvider` (the migrated labs).
 > The two Lab06 labs are run in pairs: each run of one starts the reference solution of the other as its **companion** (see [Labs run in pairs](#labs-run-in-pairs-companion)), on port 5071.
 > Scenario 3 of Lab05 needs its MongoDB container (`docker compose up -d` in the lab's `MongoDB/` folder): without it, the Solution run fails with *"MongoDB is not reachable"*. Without Docker, choose *MongoDB without Docker* or *JSON file* in **Settings → Lab storage** (or the **Change** button of the Run tab): it saves `Storage:Mode` in the user secrets, see the lab README.
 > Lab07 needs an **embedding** deployment (`AzureOpenAI:EmbeddingDeploymentName`, not part of the settings form): without it, the run stops with *"'AzureOpenAI:EmbeddingDeploymentName' is not configured"*.
@@ -86,7 +86,7 @@ dotnet build / dotnet run  →  LearningLabs/.../Start|Solution
 | `GET /api/labs` | catalog with progress and last runs |
 | `GET /api/labs/{id}?lang=fr` | details: README (HTML, `README.fr.md` when present), objectives, packages, commands, checks, history |
 | `GET /api/labs/{id}/solution` | solution files that differ from the exercise |
-| `GET /api/journey` | the journey: per lab `state` (`notStarted` / `inProgress` / `completed` / `toResume`), `running`, attempts, best checks, XP and XP still within reach; totals, `rank` (and next rank), `milestones`, `badges`, `next` mission. Read-only, recomputed on every call |
+| `GET /api/journey` | the journey: per lab `state` (`notStarted` / `inProgress` / `completed` / `toResume`), `bonusScenarios`, `bonusCompleted` / `bonusCompletedAt` (*Completed+*), `running`, attempts, best checks, XP and XP still within reach; totals, `rank` (and next rank), `milestones`, `badges`, `next` mission. Read-only, recomputed on every call |
 | `GET /api/labs/{id}/scenarios` | per project (`start`, `solution`), the scenarios read now from its `Program.cs`: `number`, `title`, `implemented` (its code and the setup are no longer the delivered ones), `runnable` (implemented, and so are the scenarios it requires), `setupImplemented`, `requires`, and `last` (`status` `passed` / `failed`, `runId`, `startedAt`) when it already ran |
 | `POST /api/labs/{id}/runs` `{ "target": "start" \| "solution", "scenarios"?: [1, 3] }` | start a run (409 if one is in progress) of the given scenarios and the scenarios they require; without `scenarios`, the implemented ones. A scenario that cannot run (not implemented, or requiring one that is not) is left out: `notImplemented` in the answer, `notImplemented: true` on its result (status `skipped`). 400 `scenarios`: `unknown` (a number the program does not have), `notImplemented` (none of the scenarios asked for can run), `required` (empty list), `noneImplemented` (no `scenarios` and nothing implemented). Answers `runId`, the `scenarios` that run and the `notImplemented` ones left out |
 | `GET /api/runs/{runId}/events` | Server-Sent Events: `phase`, `output` (streams `stdout`, `stderr`, `system`, `stdin`), `progress`, `input-request`, `input-sent`, `input-closed`, `result` (replayed from the start on reconnection) |
@@ -351,8 +351,8 @@ The top bar shows a status pill: green *Reporting* (connected), amber *offline, 
 
 | Sent (`POST /api/v1/events`, `userId` + `username` in every request) | Never sent |
 |---|---|
-| `catalog.synced` (the labs of `labs.json`), `progress.snapshot` (state of each lab computed from the local history: not started / in progress / completed, run counts, last result, tokens reported) | source files, the solution, the run output |
-| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, the scenarios run and their result, tokens reported; a run limited to some scenarios does not complete the exercise on the admin dashboard, the `progress.snapshot` that follows does), `solution.viewed` | the AI models (endpoints, deployments, **API keys**, trainer configurations, access code); the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
+| `catalog.synced` (the labs of `labs.json`, with their `bonusScenarios`), `progress.snapshot` (state of each lab computed from the local history: not started / in progress / completed, run counts, last result, tokens reported; `bonusCompletedAt` once the bonus scenarios passed too — the state stays `completed`) | source files, the solution, the run output |
+| `lab.opened` (once per lab per 5 min), `run.started`, `run.finished` (status, failure stage, summary, durations, exit code, checks passed/failed, the scenarios run and their result — `bonus: true` on an optional scenario —, tokens reported; a run limited to some scenarios does not complete the exercise on the admin dashboard, the `progress.snapshot` that follows does), `solution.viewed` | the AI models (endpoints, deployments, **API keys**, trainer configurations, access code); the workshop key (only as a header at registration); the admin API key (only as the `X-API-Key` header) |
 | `settings.changed` (`authMode` only: `apiKey` / `entraId` / `notConfigured`), `heartbeat` every 60 s (`browserConnected`, `activeRunId`) | real name, e-mail, machine name, paths (only the platform, e.g. `macOS`, and the dashboard version) |
 | help requests (`POST /api/v1/help-requests`: lab, optional message) and their cancellation | typed input of interactive labs |
 
@@ -458,6 +458,11 @@ The rules are in **one file**, `CommonUtilities/LabScenarios.cs`, compiled by th
   fails, every scenario that ran fails.
 - **Progress**: an exercise is *Completed* once every scenario passed in a Start run (`ExerciseProgress`), in one run or across several — the lab list, the journey
   and the progress sent to the admin dashboard use this rule. A run recorded before the scenario selection completes it when it passed, as before.
+- **Bonus scenarios** (`"bonusScenarios": [4, 5]` in `labs.json`, marked `// Bonus scenario` in both `Program.cs`, checked by `BonusScenariosTests`): optional.
+  The exercise is *Completed* once every **other** scenario passed, and *Completed+* (`completedPlus` in `GET /api/labs`, `bonusCompleted` in the journey,
+  +50 XP) once the bonus scenarios passed too. An attempt whose only failures are bonus scenarios still passed the exercise: it never puts a lab back to
+  *To resume*, nor costs *first try*. The default selection ticks a bonus scenario only once it is written. A run recorded before the scenario selection never
+  completes a bonus. Labs with a bonus: Lab04 (4, 5), Lab05 (4, 5), Lab07 (5, 6) — the Responses API scenarios.
 
 ## Add a lab
 

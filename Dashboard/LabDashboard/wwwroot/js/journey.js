@@ -90,6 +90,7 @@ function stateText(lab) {
   let text = lab.state === "inProgress" && lab.totalChecks && lab.bestChecks
     ? `${t("journey.state.inProgress")} · ${checksText(lab)}`
     : t(`journey.state.${lab.state}`);
+  if (lab.bonusCompleted) text += ` · ${t("journey.state.bonus")}`;
   if (done(lab)) text += ` · ${t("journey.xp", { xp: fmt(lab.xp) })}`;
   if (lab.running) text += ` · ${t("journey.state.running")}`;
   return text;
@@ -376,7 +377,8 @@ function renderLegend(model) {
   const legend = el("ul", "jr-tile-foot jr-legend");
   legend.setAttribute("aria-hidden", "true"); // each chip already states its exercise and its state
   const states = ["completed", "inProgress", "notStarted"];
-  if (model.labs.some((lab) => lab.state === "toResume")) states.splice(2, 0, "toResume");
+  if (model.labs.some((lab) => lab.bonusCompleted)) states.splice(1, 0, "plus");
+  if (model.labs.some((lab) => lab.state === "toResume")) states.splice(states.indexOf("inProgress"), 0, "toResume");
   for (const state of states) {
     const item = el("li");
     item.append(el("i", `jr-key ${state}`), el("span", null, t(`journey.legend.${state}`)));
@@ -392,7 +394,7 @@ function stepOf(lab, model) {
 }
 
 function renderChip(lab, model) {
-  const chip = el("button", `jr-chip ${lab.state}${lab.running ? " running" : ""}`);
+  const chip = el("button", `jr-chip ${lab.state}${lab.bonusCompleted ? " plus" : ""}${lab.running ? " running" : ""}`);
   chip.type = "button";
   chip.dataset.journeyOpen = lab.id;
   chip.dataset.focusKey = `lab:${lab.id}`;
@@ -500,6 +502,7 @@ function changes(previous, next) {
     if (!done(old) && done(lab)) events.push({ kind: "completed", lab, xp: lab.xp - old.xp });
     else if (old.state === "toResume" && lab.state === "completed") events.push({ kind: "fixed", lab });
     else if (!done(lab) && lab.xp > old.xp) events.push({ kind: "checks", lab, xp: lab.xp - old.xp });
+    if (lab.bonusCompleted && !old.bonusCompleted) events.push({ kind: "bonus", lab });
   }
   if (next.rank.index > previous.rank.index) events.push({ kind: "rank", rank: next.rank });
   for (const milestone of next.milestones) {
@@ -516,6 +519,7 @@ function eventTexts(event) {
   switch (event.kind) {
     case "completed": return [t("journey.kicker.completed"), t("journey.event.completed", { xp: fmt(event.xp), lab: labTitle(event.lab.id) })];
     case "fixed": return [t("journey.kicker.fixed"), t("journey.event.fixed", { lab: labTitle(event.lab.id) })];
+    case "bonus": return [t("journey.kicker.bonus"), t("journey.event.bonus", { lab: labTitle(event.lab.id) })];
     case "checks": return [t("journey.kicker.checks"), t("journey.event.checks", { xp: fmt(event.xp), lab: labTitle(event.lab.id), checks: checksText(event.lab) })];
     case "rank": return [t("journey.kicker.rank"), t("journey.event.rank", { roman: romanOf(event.rank.index), rank: rankName(event.rank) })];
     case "milestone": return [t("journey.kicker.milestone"), t("journey.event.milestone", { level: milestoneName(event.milestone) })];
@@ -527,7 +531,7 @@ function celebrate(events) {
   if (!events.length) return;
   document.getElementById("journey-live").textContent = events.map((event) => eventTexts(event).join(" — ")).join(". ");
   for (const event of events) {
-    if (event.kind === "completed" || event.kind === "fixed") {
+    if (event.kind === "completed" || event.kind === "fixed" || event.kind === "bonus") {
       pulse(`[data-lab="${CSS.escape(event.lab.id)}"]`);
       pulse(".jr-rings");
     }
@@ -547,7 +551,7 @@ function pulse(selector) {
   }
 }
 
-const TOAST_ICONS = { completed: "check", fixed: "reset", checks: "check" };
+const TOAST_ICONS = { completed: "check", fixed: "reset", checks: "check", bonus: "check" };
 
 function toastIcon(event) {
   const holder = el("span", "jr-toast-ico");

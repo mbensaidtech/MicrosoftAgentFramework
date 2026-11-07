@@ -30,20 +30,27 @@ public static class ProgressSnapshot
             level = lab.Level,
             interactive = lab.Interactive,
             sortOrder = index,
+            // Optional scenarios: completed without them, "Done+" with them (absent: the lab has no bonus)
+            bonusScenarios = lab.BonusScenarios.Count > 0 ? lab.BonusScenarios : null,
         }),
     }, JsonOptions)!;
 
     public static JsonNode Progress(LabCatalog catalog, RunHistoryStore history) => JsonSerializer.SerializeToNode(new
     {
-        labs = catalog.Labs.Select(lab => ForLab(lab.Id, history.ForLab(lab.Id))),
+        labs = catalog.Labs.Select(lab => ForLab(lab.Id, history.ForLab(lab.Id), lab.BonusScenarios)),
     }, JsonOptions)!;
 
-    /// <summary>Same completion rule as the local UI (<see cref="ExerciseProgress"/>): completed once every scenario passed.</summary>
-    public static LabProgressSnapshot ForLab(string labId, IReadOnlyList<RunRecord> runs)
+    /// <summary>
+    /// Same completion rule as the local UI (<see cref="ExerciseProgress"/>): <c>completed</c> once every scenario but the bonus ones
+    /// passed; <see cref="LabProgressSnapshot.BonusCompletedAt"/> once the bonus scenarios passed too ("Done+"). The state stays
+    /// <c>completed</c> with the bonus, so that a server that does not know the bonus still counts the lab as completed.
+    /// </summary>
+    public static LabProgressSnapshot ForLab(string labId, IReadOnlyList<RunRecord> runs, IReadOnlyCollection<int>? bonusScenarios = null)
     {
         // History is newest first.
         RunRecord[] startRuns = runs.Where(r => r.Target == RunTarget.Start).ToArray();
-        RunRecord? firstPassed = ExerciseProgress.CompletingRun(runs);
+        RunRecord? firstPassed = ExerciseProgress.CompletingRun(runs, bonusScenarios);
+        RunRecord? bonusPassed = ExerciseProgress.BonusCompletingRun(runs, bonusScenarios);
         RunRecord? last = runs.FirstOrDefault();
 
         string state = firstPassed is not null ? "completed" : startRuns.Length > 0 ? "inProgress" : "notStarted";
@@ -57,7 +64,8 @@ public static class ProgressSnapshot
             last?.Target,
             firstPassed?.StartedAt,
             startRuns.LastOrDefault()?.StartedAt,
-            startRuns.Sum(r => r.TokenUsage?.Total ?? 0));
+            startRuns.Sum(r => r.TokenUsage?.Total ?? 0),
+            bonusPassed?.StartedAt);
     }
 }
 
@@ -71,4 +79,5 @@ public sealed record LabProgressSnapshot(
     RunTarget? LastRunTarget,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? FirstRunAt,
-    long TotalTokens);
+    long TotalTokens,
+    DateTimeOffset? BonusCompletedAt = null);

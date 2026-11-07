@@ -554,6 +554,38 @@ public class OutputAnalyzerTests
         "  Input tokens: 1927",
         "  Output tokens: 240",
         "  Total tokens: 2167",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Responses API - the same MCP client, the tools still run in your application ===",
+        "Tools given to the agent: hub_repo_search (MCP client of this application)",
+        "Found 4 models: jinaai/jina-embeddings-v5-text-nano, jinaai/jina-embeddings-v5-text-small, univec/convert-snowflake_arctic_embed_l_v2.0-to-openai_text_embedding_ada_002, litert-community/embeddinggemma-2-text-270m-litert-lm",
+        "Tool calls of the run:",
+        "- hub_repo_search(query: text embedding, repo_types: [\"model\"], limit: 4) - run by this application, through its MCP client",
+        "Response id: resp_0aaf1082934d4541006aef384ac92081949ed6d0dde0a98853",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 1847",
+        "  Output tokens: 262",
+        "  Total tokens: 2109",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools ===",
+        "Hosted MCP server given to the agent: huggingface (https://huggingface.co/mcp), allowed tools: hub_repo_search",
+        "Found 4 models: jinaai/jina-embeddings-v5-text-nano, jinaai/jina-embeddings-v5-text-small, univec/convert-snowflake_arctic_embed_l_v2.0-to-openai_text_embedding_ada_002, litert-community/embeddinggemma-2-text-270m-litert-lm",
+        "Tool calls of the run:",
+        "- MCP tools listed by the service (huggingface): hub_repo_search",
+        "- huggingface/hub_repo_search(query: text embedding, repo_types: [\"model\"], author: , filters: [], sort: trendingScore, limit: 4) - run by the service (hosted MCP)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 1344",
+        "  Output tokens: 271",
+        "  Total tokens: 1615",
     ];
 
     // Standard output of the Lab04 exercise as delivered (TODOs not done yet).
@@ -574,6 +606,14 @@ public class OutputAnalyzerTests
         "-------------------------------------------------------------------------------",
         "",
         "=== Scenario 3: Give the agent only the MCP tools it needs ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Responses API - the same MCP client, the tools still run in your application ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools ===",
     ];
 
     [Fact]
@@ -612,12 +652,12 @@ public class OutputAnalyzerTests
     }
 
     [Fact]
-    public void Labels_the_two_lab04_token_usage_blocks_with_their_scenario()
+    public void Labels_the_four_lab04_token_usage_blocks_with_their_scenario()
     {
         TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab04SolutionOutput));
 
-        Assert.Equal(["Scenario 2 · Token Usage", "Scenario 3 · Token Usage"], usage.Reports.Select(r => r.Label));
-        Assert.Equal(6842L, usage.Total!.Value); // 4675 + 2167
+        Assert.Equal(["Scenario 2 · Token Usage", "Scenario 3 · Token Usage", "Scenario 4 · Token Usage", "Scenario 5 · Token Usage"], usage.Reports.Select(r => r.Label));
+        Assert.Equal(10566L, usage.Total!.Value); // 4675 + 2167 + 2109 + 1615
     }
 
     // Standard output of the Lab05 solution (real run), as decoded by the dashboard (spinner lines removed).
@@ -738,6 +778,77 @@ public class OutputAnalyzerTests
         "  Output tokens: 17",
         "  Total tokens: 96",
         "",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Responses API - the service keeps the conversation ===",
+        "User: Hello, my name is Ada. What is the capital of France?",
+        "Agent: The capital of France is Paris.",
+        "Conversation id kept in the session: resp_0914aa511c3b54b1006aef385a84f48194a9ab58ebff1c5a31",
+        "Serialized session:",
+        "{",
+        "  \"conversationId\": \"resp_0914aa511c3b54b1006aef385a84f48194a9ab58ebff1c5a31\",",
+        "  \"stateBag\": {",
+        "    \"InMemoryChatHistoryProvider\": {",
+        "      \"messages\": []",
+        "    }",
+        "  }",
+        "}",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Restoring the session from the saved JSON...",
+        "User: What is the population of that city? And what is my name?",
+        "Agent: The population of Paris is approximately 2.1 million. Your name is Ada.",
+        "Conversation id kept in the session after the follow-up: resp_0914aa511c3b54b1006aef385bc0ac81949e0ceb9b30d4c71a",
+        "Response resp_0914aa511c3b54b1006aef385bc0ac81949e0ceb9b30d4c71a stored by the service: yes",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (follow-up):",
+        "  Input tokens: 76",
+        "  Output tokens: 18",
+        "  Total tokens: 94",
+        "Deleted the 2 responses stored by the service for this conversation",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Responses API without storage - the conversation stays in your application ===",
+        "Chat history storage: JSON file /home/user/.local/share/MicrosoftAgentFrameworkLabs/AIAgentSessions/chat_history.json (Storage:Mode = JsonFile)",
+        "User: Hello, my name is Ada. What is the capital of France?",
+        "Agent: The capital of France is Paris.",
+        "Response resp_03449687619d22cf016aef385db7fc81938ac78fc2376e38e9 stored by the service: no (404)",
+        "Serialized session:",
+        "{",
+        "  \"stateBag\": {",
+        "    \"PersistentChatHistoryProvider\": {",
+        "      \"sessionDbKey\": \"9858aadb414e4bb5aa196db677946fce\"",
+        "    }",
+        "  }",
+        "}",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Simulating a restart: new agent, new connection to the storage, session of 'support-case-1042' restored...",
+        "Chat history storage: JSON file /home/user/.local/share/MicrosoftAgentFrameworkLabs/AIAgentSessions/chat_history.json (Storage:Mode = JsonFile)",
+        "User: What is the population of that city? And what is my name?",
+        "Agent: The population of Paris is approximately 2.1 million. Your name is Ada.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Identifiers of this conversation:",
+        "  Business conversation id (your application): support-case-1042",
+        "  Agent Framework session: the serialized AgentSession, saved under support-case-1042 (a session has no id of its own)",
+        "  Chat history key (PersistentChatHistoryProvider, inside the session): 9858aadb414e4bb5aa196db677946fce",
+        "  Last response id (Responses API, not stored): resp_0c05d67066392eee016aef385f1828819697883abef3130b08",
+        "  Service conversation id (ChatClientAgentSession.ConversationId): (none)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage (follow-up):",
+        "  Input tokens: 76",
+        "  Output tokens: 18",
+        "  Total tokens: 94",
     ];
 
     // Standard output of the Lab05 exercise as delivered (TODOs not done yet).
@@ -757,6 +868,14 @@ public class OutputAnalyzerTests
         "-------------------------------------------------------------------------------",
         "",
         "=== Scenario 3: Custom ChatHistoryProvider - chat history outside of the application ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 4: Responses API - the service keeps the conversation ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Responses API without storage - the conversation stays in your application ===",
     ];
 
     [Fact]
@@ -815,14 +934,15 @@ public class OutputAnalyzerTests
     }
 
     [Fact]
-    public void Labels_the_three_lab05_token_usage_blocks_with_their_scenario()
+    public void Labels_the_five_lab05_token_usage_blocks_with_their_scenario()
     {
         TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab05SolutionOutput));
 
         Assert.Equal(
-            ["Scenario 1 · Token Usage (follow-up)", "Scenario 2 · Token Usage (follow-up)", "Scenario 3 · Token Usage (follow-up)"],
+            ["Scenario 1 · Token Usage (follow-up)", "Scenario 2 · Token Usage (follow-up)", "Scenario 3 · Token Usage (follow-up)",
+             "Scenario 4 · Token Usage (follow-up)", "Scenario 5 · Token Usage (follow-up)"],
             usage.Reports.Select(r => r.Label));
-        Assert.Equal(294L, usage.Total!.Value); // 102 + 96 + 96
+        Assert.Equal(482L, usage.Total!.Value); // 102 + 96 + 96 + 94 + 94
     }
 
     [Fact]
@@ -1196,6 +1316,43 @@ public class OutputAnalyzerTests
         "  Input tokens: 402",
         "  Output tokens: 38",
         "  Total tokens: 440",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Responses API with your own vector store - nothing stored by the service ===",
+        "Question: I received a broken item yesterday. What should I do?",
+        "Tool called: search_faq(question: I received a broken item yesterday. What should I do?)",
+        "Agent: If you received a broken item, please contact our customer service within 48 hours of delivery and provide photos of the damage. We will arrange a free return pickup and send you a replacement or process a full refund, including shipping costs. ",
+        "You can refer to entry [faq-005] for more details.",
+        "Response resp_0e63af0b3fff4214016aef386a25e08195a7b6611e69d70eba stored by the service: no (404)",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 566",
+        "  Output tokens: 91",
+        "  Total tokens: 657",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 6: Hosted file search - the service stores, chunks, embeds and searches the FAQ ===",
+        "Uploaded 20 FAQ documents to the service",
+        "Vector store of the service ready: vs_FVr1unmZVYZ3CuCvUavA4phV, 20 files, 26823 bytes",
+        "Question: I received a broken item yesterday. What should I do?",
+        "File search queries (written by the model): I received a broken item yesterday. What should I do? | broken item return policy | received damaged product",
+        "1. faq-005.md (score 0.0333)",
+        "2. faq-002.md (score 0.0328)",
+        "3. faq-016.md (score 0.0328)",
+        "Files cited in the answer: faq-005.md",
+        "Agent: If you received a damaged product, please contact our customer service within 48 hours of delivery and provide photos of the damage. We will arrange for a free return pickup and either send you a replacement or process a full refund, including shipping costs.",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "Token Usage:",
+        "  Input tokens: 1674",
+        "  Output tokens: 94",
+        "  Total tokens: 1768",
+        "Deleted the vector store and the 20 documents from the service",
     ];
 
     // Standard output of the Lab07 exercise as delivered (TODOs not done yet).
@@ -1220,6 +1377,14 @@ public class OutputAnalyzerTests
         "-------------------------------------------------------------------------------",
         "",
         "=== Scenario 4: RAG with TextSearchProvider - the FAQ is searched before every model call ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 5: Responses API with your own vector store - nothing stored by the service ===",
+        "",
+        "-------------------------------------------------------------------------------",
+        "",
+        "=== Scenario 6: Hosted file search - the service stores, chunks, embeds and searches the FAQ ===",
     ];
 
     [Fact]
@@ -1263,14 +1428,15 @@ public class OutputAnalyzerTests
     }
 
     [Fact]
-    public void Labels_the_three_lab07_token_usage_blocks_with_their_scenario()
+    public void Labels_the_five_lab07_token_usage_blocks_with_their_scenario()
     {
         TokenUsageSummary usage = Assert.IsType<TokenUsageSummary>(OutputAnalyzer.ParseTokenUsage(Lab07SolutionOutput));
 
         Assert.Equal(
-            ["Scenario 3 · Token Usage", "Scenario 4 · Token Usage (first question)", "Scenario 4 · Token Usage (follow-up)"],
+            ["Scenario 3 · Token Usage", "Scenario 4 · Token Usage (first question)", "Scenario 4 · Token Usage (follow-up)",
+             "Scenario 5 · Token Usage", "Scenario 6 · Token Usage"],
             usage.Reports.Select(r => r.Label));
-        Assert.Equal(1506L, usage.Total!.Value); // 683 + 383 + 440
+        Assert.Equal(3931L, usage.Total!.Value); // 683 + 383 + 440 + 657 + 1768
     }
 
     // Standard output of the Lab08 solution, as decoded by the dashboard (spinner lines removed).

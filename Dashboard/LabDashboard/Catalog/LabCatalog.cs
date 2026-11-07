@@ -103,6 +103,13 @@ public sealed record LabDefinition
     /// <summary>Optional second project of the run (see <see cref="LabCompanion"/>).</summary>
     public LabCompanion? Companion { get; init; }
     public IReadOnlyList<LabExpectation> Expectations { get; init; } = [];
+
+    /// <summary>
+    /// Optional scenarios (a bonus): the exercise is completed without them, and completed with its bonus ("Done+") when they pass too
+    /// (see <c>ExerciseProgress</c>). Their blocks carry a <c>// Bonus scenario</c> comment in Program.cs.
+    /// </summary>
+    public IReadOnlyList<int> BonusScenarios { get; init; } = [];
+
     public IReadOnlyDictionary<string, LabTranslation> Translations { get; init; } = new Dictionary<string, LabTranslation>();
 
     public string ProjectFor(RunTarget target) => target == RunTarget.Start ? StartProject : SolutionProject;
@@ -204,6 +211,25 @@ public sealed partial class LabCatalog
         if (lab.Companion is { } companion)
         {
             ValidateCompanion(lab, companion);
+        }
+
+        if (lab.BonusScenarios.Any(number => number <= 0) || lab.BonusScenarios.Distinct().Count() != lab.BonusScenarios.Count)
+        {
+            throw new InvalidOperationException($"Lab '{lab.Id}': bonus scenarios must be distinct positive scenario numbers.");
+        }
+
+        if (lab.BonusScenarios.Count > 0)
+        {
+            HashSet<int> declared = [.. LabScenarios.ReadFile(ProgramPath(lab, RunTarget.Solution)).Select(scenario => scenario.Number)];
+            if (lab.BonusScenarios.FirstOrDefault(number => !declared.Contains(number)) is int unknown and > 0)
+            {
+                throw new InvalidOperationException($"Lab '{lab.Id}': bonus scenario {unknown} is not a scenario of the solution.");
+            }
+
+            if (declared.Count > 0 && declared.All(lab.BonusScenarios.Contains))
+            {
+                throw new InvalidOperationException($"Lab '{lab.Id}': at least one scenario must not be a bonus.");
+            }
         }
 
         foreach (LabExpectation expectation in lab.Expectations)

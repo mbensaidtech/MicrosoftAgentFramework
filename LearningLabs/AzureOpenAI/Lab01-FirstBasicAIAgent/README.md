@@ -208,7 +208,13 @@ Microsoft recommends the **Responses API** for new Azure OpenAI applications: *"
 
 Scenario 6 shows the first row: the follow-up question only sends the new message and the id of the previous response, and the service brings back the history. With Chat Completions, the same follow-up needs the history on the client side: Lab 05 does it with an `AgentSession`.
 
-**The next labs use Chat Completions** on purpose: sessions, persistence and context providers (Labs 05, 07, 12) teach how Agent Framework manages the history, which requires the history to stay on the client side. Everything else you learn works the same with Responses. Lab 05 shows what changes when the service keeps the conversation.
+**The next labs use Chat Completions** on purpose: sessions, persistence and context providers (Labs 05, 07, 12) teach how Agent Framework manages the history, which requires the history to stay on the client side. Everything else you learn works the same with Responses. Three labs end with **Responses API** scenarios, where the two APIs really differ:
+
+- **Lab 04** — MCP: the same MCP client works with both APIs; with *hosted MCP*, the service calls the MCP server itself.
+- **Lab 05** — Sessions: the service keeps the conversation (`previous_response_id`), or you keep it in your own storage with `store = false`.
+- **Lab 07** — RAG: your vector store works with both APIs; the *hosted file search* stores and searches your documents in the service.
+
+[Chat Completions and Responses API](../ChatCompletions-vs-Responses.md) gathers these comparisons.
 
 ## Optional: Using the Console Spinner
 

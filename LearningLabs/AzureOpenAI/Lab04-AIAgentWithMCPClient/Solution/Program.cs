@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using OpenAI;
 using OpenAI.Chat;
+using OpenAI.Responses;
 using CommonUtilities;
 
 using AIAgentWithMCPClient;
@@ -19,6 +20,7 @@ using static AIAgentWithMCPClient.AgentConsole;
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+// Scenarios 4 and 5 use the Responses API: the deployment must support it.
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
@@ -174,6 +176,102 @@ if (ShouldRunScenario(3))
     ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models: {string.Join(", ", response.Result.Models.Select(model => model.Name))}");
 
     // Step 5: Display token usage: compare the input tokens with scenario 2
+    WriteTokenUsage(response);
+}
+
+#endregion
+
+#region Scenario 4: Responses API - the same MCP client, the tools still run in your application
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(4))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 4: Responses API - the same MCP client, the tools still run in your application ===");
+
+    // Step 1: Discover the tools with the MCP client, exactly as with Chat Completions, and keep the search tool.
+    // Discovering MCP tools and giving them to an agent does not depend on the API of the model: an McpClientTool is an AIFunction.
+    IList<McpClientTool> mcpTools = await huggingFaceMcpClient.ListToolsAsync();
+    List<AITool> selectedTools = [.. mcpTools.Where(tool => tool.Name == "hub_repo_search")];
+    ColoredConsole.WriteSecondaryLogLine($"Tools given to the agent: {string.Join(", ", selectedTools.Select(tool => tool.Name))} (MCP client of this application)");
+
+    // Step 2: Create the agent of scenario 3 on the Responses API: same options, the deployment is the model of each request.
+    // GetResponsesClient() is still flagged [Experimental] (OPENAI001) by the OpenAI SDK.
+#pragma warning disable OPENAI001
+    AIAgent agent = client.GetResponsesClient().AsAIAgent(new ChatClientAgentOptions
+    {
+        Name = Agents.HuggingFaceAssistant.Name,
+        ChatOptions = new ChatOptions
+        {
+            Instructions = Agents.HuggingFaceAssistant.Instructions,
+            Tools = selectedTools,
+            MaxOutputTokens = 1000,
+            Temperature = 0.2f
+        }
+    }, model: settings.ChatDeploymentName);
+#pragma warning restore OPENAI001
+
+    // Step 3: Run the same request with structured output. The model asks for hub_repo_search (a function_call item),
+    // the agent runs it from this process through the MCP client, and sends the result back (a function_call_output item).
+    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent on the Responses API with the local MCP tool");
+
+    // Step 4: Display the names of the models found, then the tool calls and who ran them
+    ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models: {string.Join(", ", response.Result.Models.Select(model => model.Name))}");
+    WriteToolCalls(response);
+
+    // Step 5: Display the id of the response (stored by the service by default) and the token usage: compare with scenario 3
+    ColoredConsole.WriteSecondaryLogLine($"Response id: {response.ResponseId}");
+    WriteTokenUsage(response);
+}
+
+#endregion
+
+#region Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(5))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools ===");
+
+    // Step 1: Describe the MCP server instead of connecting to it: no McpClient here, this application never talks to Hugging Face.
+    // The service (Azure OpenAI) lists the tools of the server, calls them, and gives the results to the model, in one request.
+    // - AllowedTools: the tools the model may use (the same choice as scenario 3)
+    // - ApprovalMode: NeverRequire lets the service call them without asking you first (the default asks for an approval)
+    // - Headers: sent by the service to the MCP server; the token, when there is one, is therefore given to the service too
+    HostedMcpServerTool hostedMcpServer = new(serverName: "huggingface", serverAddress: huggingFaceMcpSettings.Endpoint)
+    {
+        AllowedTools = ["hub_repo_search"],
+        ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
+        Headers = hasToken ? new Dictionary<string, string> { ["Authorization"] = $"Bearer {huggingFaceMcpSettings.BearerToken}" } : null
+    };
+    ColoredConsole.WriteSecondaryLogLine($"Hosted MCP server given to the agent: {hostedMcpServer.ServerName} ({hostedMcpServer.ServerAddress}), allowed tools: {string.Join(", ", hostedMcpServer.AllowedTools)}");
+
+    // Step 2: Create the same agent on the Responses API, with the hosted MCP server as its only tool.
+    // A hosted tool only exists on the Responses API. Beware: an agent on Chat Completions does not refuse it, it silently
+    // leaves it out of the request, and the model answers from its own knowledge.
+#pragma warning disable OPENAI001
+    AIAgent agent = client.GetResponsesClient().AsAIAgent(new ChatClientAgentOptions
+    {
+        Name = Agents.HuggingFaceAssistant.Name,
+        ChatOptions = new ChatOptions
+        {
+            Instructions = Agents.HuggingFaceAssistant.Instructions,
+            Tools = [hostedMcpServer],
+            MaxOutputTokens = 1000,
+            Temperature = 0.2f
+        }
+    }, model: settings.ChatDeploymentName);
+#pragma warning restore OPENAI001
+
+    // Step 3: Run the same request: one call to the service, which runs the whole tool loop on its side
+    AgentResponse<HuggingFaceSearchResult> response = await agent.RunAsync<HuggingFaceSearchResult>(Questions.TextEmbeddingModels).WithSpinner("Running agent with the hosted MCP server");
+
+    // Step 4: Display the names of the models found, then the tool calls: this time, the service listed and ran the tools
+    ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models: {string.Join(", ", response.Result.Models.Select(model => model.Name))}");
+    WriteToolCalls(response);
+
+    // Step 5: Display token usage: compare with scenario 4 (same tool, run on the other side)
     WriteTokenUsage(response);
 }
 

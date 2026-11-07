@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using OpenAI;
 using OpenAI.Chat;
+using OpenAI.Responses;
 using CommonUtilities;
 
 using AIAgentWithMCPClient;
@@ -19,6 +20,7 @@ using static AIAgentWithMCPClient.AgentConsole;
 // dotnet run -- --scenarios 2         -> scenario 2 only (and the scenarios it requires)
 // dotnet run -- --scenarios 1,3       -> scenarios 1 and 3
 // dotnet run -- --list-scenarios      -> the scenarios of this lab and their state
+// Scenarios 4 and 5 use the Responses API: the deployment must support it.
 ScenarioSelection scenarioSelection = ScenarioSelection.FromArgs(args);
 // ============================================
 
@@ -138,6 +140,66 @@ if (ShouldRunScenario(3))
     // Hint: ColoredConsole.WritePrimaryLogLine($"Found {response.Result.Models.Count} models: {string.Join(", ", response.Result.Models.Select(model => model.Name))}")
 
     // TODO 18: Display token usage and compare the input tokens with scenario 2
+}
+
+#endregion
+
+#region Scenario 4: Responses API - the same MCP client, the tools still run in your application
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(4))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 4: Responses API - the same MCP client, the tools still run in your application ===");
+
+    // TODO 19: Get the tools with the MCP client and keep only "hub_repo_search" (the same code as TODO 14), then display them
+    // Hint: ColoredConsole.WriteSecondaryLogLine($"Tools given to the agent: {string.Join(", ", selectedTools.Select(tool => tool.Name))} (MCP client of this application)")
+
+    // TODO 20: Create the agent of scenario 3 on the Responses API
+    // Hint: client.GetResponsesClient().AsAIAgent(new ChatClientAgentOptions { ... }, model: settings.ChatDeploymentName)
+    //       with the same Name and ChatOptions as in TODO 15 (Tools = selectedTools)
+    // With Responses, the deployment is the model of each request. GetResponsesClient() is flagged experimental (OPENAI001): keep the pragma.
+#pragma warning disable OPENAI001
+    // AIAgent agent = ...
+#pragma warning restore OPENAI001
+
+    // TODO 21: Run the same request with structured output (Questions.TextEmbeddingModels)
+    // Hint: .WithSpinner("Running agent on the Responses API with the local MCP tool")
+    // AgentResponse<HuggingFaceSearchResult> response = ...
+
+    // TODO 22: Display the names of the models found (the same code as TODO 17), then the tool calls and who ran them
+    // Hint: WriteToolCalls(response) (provided in AgentConsole.cs)
+
+    // TODO 23: Display the id of the response and the token usage
+    // Hint: ColoredConsole.WriteSecondaryLogLine($"Response id: {response.ResponseId}"); then WriteTokenUsage(response);
+}
+
+#endregion
+
+#region Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools
+// Bonus scenario (optional): the lab is completed without it; with every bonus scenario, it is completed with its bonus (Done+).
+
+if (ShouldRunScenario(5))
+{
+    ColoredConsole.WriteDividerLine();
+    ColoredConsole.WriteInfoLine("=== Scenario 5: Hosted MCP - the service connects to the MCP server and runs its tools ===");
+
+    // TODO 24: Describe the MCP server as a hosted tool (no McpClient: the service connects to the server), and display it
+    // Hint: HostedMcpServerTool hostedMcpServer = new(serverName: "huggingface", serverAddress: huggingFaceMcpSettings.Endpoint) { ... };
+    //       with AllowedTools = ["hub_repo_search"], ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
+    //       Headers = hasToken ? new Dictionary<string, string> { ["Authorization"] = $"Bearer {huggingFaceMcpSettings.BearerToken}" } : null
+    //       ColoredConsole.WriteSecondaryLogLine($"Hosted MCP server given to the agent: {hostedMcpServer.ServerName} ({hostedMcpServer.ServerAddress}), allowed tools: {string.Join(", ", hostedMcpServer.AllowedTools)}")
+
+    // TODO 25: Create the same agent as in TODO 20, with Tools = [hostedMcpServer]
+#pragma warning disable OPENAI001
+    // AIAgent agent = ...
+#pragma warning restore OPENAI001
+
+    // TODO 26: Run the same request with structured output
+    // Hint: .WithSpinner("Running agent with the hosted MCP server")
+    // AgentResponse<HuggingFaceSearchResult> response = ...
+
+    // TODO 27: Display the names of the models found, the tool calls (WriteToolCalls) and the token usage: compare with scenario 4
 }
 
 #endregion

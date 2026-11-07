@@ -9,6 +9,19 @@ The FAQ is stored in a **vector store**: each entry is turned into a vector (an 
 1. **Agentic RAG** — the search is a **function tool**: the agent decides when to search, and with which question.
 2. **RAG with `TextSearchProvider`** — the search is an **AI context provider** of Agent Framework: it runs before every model call and injects the results into the context.
 
+Then, as a **bonus**, you compare two architectures on the **Responses API**:
+
+3. **Your RAG on the Responses API** (scenario 5) — the same `search_faq` tool on the same vector store: the Responses API does **not** require the hosted file search. Here the service is also asked to store nothing (`store = false`), so your FAQ entries do not stay at the provider.
+4. **The RAG of the provider** (scenario 6) — the hosted **file search**: you upload the FAQ to the service, which stores, chunks, embeds and searches it during the request (`HostedFileSearchTool`).
+
+| Part | Scenarios | Who stores and searches the FAQ? | API of the model |
+|------|-----------|-----------------------------------|------------------|
+| **A — your RAG** | 1 to 4 | Your application: `InMemoryVectorStore` + your embedding deployment | Chat Completions |
+| **B — Responses API (bonus)** | 5 | Your application, **still** (the same vector store and tool) | Responses |
+| | 6 | **The service**: files + vector store of Azure OpenAI, hosted file search | Responses (hosted tools need it) |
+
+> **Bonus — the Responses API scenarios (5 and 6) are optional.** The lab is **completed** once scenarios 1 to 4 pass. Pass the bonus scenarios too and it is **completed with its bonus** (*Completed+* in the Lab Bench dashboard and for the trainer, +50 XP). A failed bonus scenario never undoes a completed lab, and `dotnet run` leaves a bonus scenario out until you write it. `dotnet run -- --list-scenarios` marks them `[bonus]`.
+
 ## What You Will Learn
 
 - How to get an `IEmbeddingGenerator` from an Azure OpenAI embedding deployment
@@ -18,6 +31,9 @@ The FAQ is stored in a **vector store**: each entry is turned into a vector (an 
 - How to add RAG to an agent with `TextSearchProvider` and `ChatClientAgentOptions.AIContextProviders`
 - How to compare both approaches: tool calls, injected context, token usage
 - Why the retrieved content is **untrusted** (indirect prompt injection), and how to limit the risk
+- That your own vector store and search tool work unchanged on the **Responses API**, and how to keep the retrieved passages out of the storage of the provider (`AsIChatClientWithStoredOutputDisabled`)
+- How to use the **hosted file search** of the Responses API: upload files (`OpenAIFileClient`), create a vector store of the service (`VectorStoreClient`), give it to the agent (`HostedFileSearchTool`, `HostedVectorStoreContent`), read the search and the citations (`CitationAnnotation`), and clean up
+- How to choose between a RAG orchestrated by your application and a RAG hosted by the provider: control, flexibility, persistence, dependency
 
 ## Prerequisites
 
@@ -25,12 +41,13 @@ The FAQ is stored in a **vector store**: each entry is turned into a vector (an 
 - An Azure OpenAI (or Microsoft Foundry) resource with **two deployments**:
   - a chat model (for example `gpt-4o-mini` or `gpt-5.4-mini`)
   - an embedding model (for example `text-embedding-3-small`); it can also be on another resource (optional, see Step 1)
+  - scenarios 5 and 6: the **Responses API** for the chat deployment (see Lab 01 scenario 6). Scenario 6 also uses the **files** and **vector stores** of the chat resource (`/openai/v1/files`, `/openai/v1/vector_stores`); it creates them and deletes them at the end
 - One of the following for authentication:
   - the resource **API key**, or
   - Azure CLI logged in (`az login`) with the **Cognitive Services OpenAI User** role on the resource
 - Lab 01 (client creation, `AsAIAgent()`, `AgentResponse`) and Lab 03 (function tools) completed
 
-No database to install: the vector store of this lab is in memory.
+No database to install: the vector store of this lab is in memory. The vector store of scenario 6 is in the service, and is deleted at the end of the scenario.
 
 ## Project Structure
 
@@ -47,6 +64,7 @@ Lab07-AgenticRAG-VectorStore/
 │   ├── Data/
 │   │   └── sav-faq.json            <-- The 20 FAQ entries
 │   ├── FaqData.cs                  <-- Reads sav-faq.json (provided)
+│   ├── HostedFileSearch.cs         <-- Waits for the vector store of the service (provided)
 │   ├── RagConsole.cs               <-- Display helpers (provided)
 │   ├── EmbeddingResource.cs        <-- Chooses the resource of the embeddings (provided)
 │   ├── ConfigurationHelper.cs
@@ -118,9 +136,10 @@ Settings are read, in this order (last wins): `appsettings.json` → **user secr
 - `LabPrompts.cs` — the names, the instructions and the questions of the agents, and the question of the semantic search (see Step 3).
 - `Models/FaqRecord.cs` — a FAQ entry as the vector store sees it. The attributes define the schema of the collection: `[VectorStoreKey]` on `Id`, `[VectorStoreData]` on `Question` and `Answer`, and `[VectorStoreVector]` on `Embedding`. `Embedding` is a **string** (question + answer): when a record is upserted, the store generates its vector itself with the `EmbeddingGenerator` you give it, and when you search with a string, the store embeds the question the same way. The same class reads `Data/sav-faq.json`.
 - `Tools/FaqSearchTool.cs` — the function tool of scenario 3: `SearchFaqAsync(question, top)` searches the collection and returns the closest entries as text (id, score, question, answer). The `[Description]` attributes are what the model reads to decide when to call it.
-- `FaqData.cs` — `LoadAsync()` reads the 20 entries of `Data/sav-faq.json` (an after-sales FAQ: returns, refunds, delivery, payment, warranty...).
+- `FaqData.cs` — `LoadAsync()` reads the 20 entries of `Data/sav-faq.json` (an after-sales FAQ: returns, refunds, delivery, payment, warranty...). `ToDocument(entry)` turns one entry into a small Markdown document, to upload to the service (scenario 6).
+- `HostedFileSearch.cs` — `WaitUntilIndexedAsync(vectorStoreClient, id)` waits until the vector store of the service has processed its files (scenario 6): the service chunks and embeds them asynchronously.
 - `EmbeddingResource.cs` — `client.ForEmbeddings(settings)` returns the client to get the embedding client from: `client` itself by default, or a client for `AzureOpenAI:EmbeddingEndpoint` when the embedding deployment is on another resource (Step 1). You use it in TODO 4.
-- `RagConsole.cs` — `WriteSearchResult(rank, result)`, `WriteToolCalls(response)` and `WriteTokenUsage(response, heading)`. `Program.cs` imports them with `using static`, so you can call them directly.
+- `RagConsole.cs` — `WriteSearchResult(rank, result)`, `WriteToolCalls(response)`, `WriteTokenUsage(response, heading)` and, for scenario 6, `WriteServiceVectorStore(vectorStore)` (the vector store of the service, once indexed) and `WriteFileSearch(response)`: the queries written by the model, the files found with their score, and the files cited in the answer. `Program.cs` imports them with `using static`, so you can call them directly.
 
 ### Step 3: Complete the Program.cs
 
@@ -192,6 +211,39 @@ The store is in memory: it starts empty at each run, so scenario 1 must run befo
 
 ---
 
+#### Scenario 5 (bonus): Responses API with your own vector store — nothing stored by the service
+
+The agent of scenario 3 on the Responses API: the same `search_faq` tool, the same `InMemoryVectorStore`, the same embedding deployment. Using the Responses API does **not** mean using the hosted file search: your RAG keeps working, and keeps all its control. One thing does change: by default, the Responses API **stores** each response for 30 days, with its inputs — here, the FAQ entries returned by your tool. When the documents are sensitive, ask the service not to store anything.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 20** | Create the `search_faq` tool | • Same code as TODO 11 |
+| **TODO 21** | Get a Responses client that stores nothing | • `ResponsesClient responsesClient = client.GetResponsesClient();` <br> • `IChatClient statelessResponsesClient = responsesClient.AsIChatClientWithStoredOutputDisabled(settings.ChatDeploymentName);` (`store = false`) <br> • Flagged experimental by the OpenAI SDK (`OPENAI001`) and Agent Framework (`MAAI001`): keep the `#pragma` |
+| **TODO 22** | Create the agent of scenario 3 on it | • `AIAgent faqAgent = statelessResponsesClient.AsAIAgent(instructions: Agents.Faq.Instructions, name: Agents.Faq.Name, tools: [searchFaqTool]);` |
+| **TODO 23** | Ask the question of scenario 3 | • Same code as TODO 13 and TODO 14 (`Questions.BrokenItem`, `WriteToolCalls(response)`, the answer) <br> • `Tool called: search_faq(...)`: the tool runs in **your** process, on **your** vector store |
+| **TODO 24** | Check that the service kept nothing, display the usage | • `try { await responsesClient.GetResponseAsync(response.ResponseId); stored = true; } catch (ClientResultException exception) when (exception.Status == 404) { stored = false; }` (inside the `OPENAI001` pragma) <br> • `ColoredConsole.WriteInfoLine($"Response {response.ResponseId} stored by the service: {(stored ? "yes" : "no (404)")}");` <br> • `WriteTokenUsage(response);` close to scenario 3: the same tool, the same entries |
+
+---
+
+#### Scenario 6 (bonus): Hosted file search — the service stores, chunks, embeds and searches the FAQ
+
+The same question, with the RAG of the provider. You **upload** the FAQ to the service, create a **vector store of the service** with the files, and give it to the agent as a **hosted tool**. During the request, the service writes search queries, searches the vector store, and gives the chunks found to the model, which answers and **cites** the files. Your `InMemoryVectorStore`, your embedding deployment and your `search_faq` tool are not used.
+
+Two different things are called *vector store* here: `Microsoft.Extensions.VectorData.VectorStore` (your store, scenarios 1 to 5) and `OpenAI.VectorStores.VectorStore` (the store of the service). `Program.cs` imports the second one with an alias, `ServiceVectorStores`.
+
+| TODO | Description | Hints |
+|------|-------------|-------|
+| **TODO 25** | Get the clients of the service, load the FAQ | • `OpenAIFileClient fileClient = client.GetOpenAIFileClient();` <br> • `ServiceVectorStores.VectorStoreClient vectorStoreClient = client.GetVectorStoreClient();` <br> • `List<FaqRecord> faqEntries = await FaqData.LoadAsync(); List<string> fileIds = []; string? serviceVectorStoreId = null;` <br> • The `OPENAI001` pragma covers the scenario |
+| **TODO 26** | Upload one document per FAQ entry | • In a `try` block: `foreach (FaqRecord entry in faqEntries) { OpenAIFile file = await fileClient.UploadFileAsync(BinaryData.FromString(FaqData.ToDocument(entry)), $"{entry.Id}.md", FileUploadPurpose.Assistants); fileIds.Add(file.Id); }` <br> • `ColoredConsole.WritePrimaryLogLine($"Uploaded {fileIds.Count} FAQ documents to the service");` <br> • One file per entry: the service splits **files** into chunks (about 800 tokens by default), so a single `sav-faq.json` would mix several entries in one chunk, and the citations would all point to the same file. How you cut your documents is the one lever you keep on the chunking |
+| **TODO 27** | Create the vector store of the service and wait for it | • `ServiceVectorStores.VectorStoreCreationOptions creationOptions = new() { Name = "lab07-sav-faq", ExpirationPolicy = new ServiceVectorStores.VectorStoreExpirationPolicy(ServiceVectorStores.VectorStoreExpirationAnchor.LastActiveAt, 1) };` <br> • `fileIds.ForEach(creationOptions.FileIds.Add);` <br> • `ServiceVectorStores.VectorStore serviceVectorStore = await vectorStoreClient.CreateVectorStoreAsync(creationOptions); serviceVectorStoreId = serviceVectorStore.Id;` <br> • `serviceVectorStore = await HostedFileSearch.WaitUntilIndexedAsync(vectorStoreClient, serviceVectorStoreId).WithSpinner("Indexing the FAQ in the vector store of the service");` <br> • `WriteServiceVectorStore(serviceVectorStore);` displays its id, its files and its size <br> • The expiration policy (1 day after the last use) is a safety net if the program stops before the clean-up |
+| **TODO 28** | Create the agent with the hosted file search | • `AIAgent hostedFaqAgent = client.GetResponsesClient().AsAIAgent(model: settings.ChatDeploymentName, instructions: Agents.HostedFaq.Instructions, name: Agents.HostedFaq.Name, tools: [new HostedFileSearchTool { Inputs = [new HostedVectorStoreContent(serviceVectorStoreId)], MaximumResultCount = 3 }]);` <br> • No function to write: the tool is a description, the service runs it |
+| **TODO 29** | Ask the question, see what the service found | • By default the service does not return the chunks it found. Ask for them through the raw options of the Responses API: `ChatClientAgentRunOptions runOptions = new(new ChatOptions { RawRepresentationFactory = _ => new CreateResponseOptions { IncludedProperties = { IncludedResponseProperty.FileSearchCallResults } } });` (`include: ["file_search_call.results"]`) <br> • `AgentResponse response = await hostedFaqAgent.RunAsync(question, options: runOptions).WithSpinner("Running agent with the hosted file search");` <br> • `WriteFileSearch(response);` then the answer and `WriteTokenUsage(response);` |
+| **TODO 30** | Clean up, in a `finally` block | • `if (serviceVectorStoreId is not null) await vectorStoreClient.DeleteVectorStoreAsync(serviceVectorStoreId);` <br> • `foreach (string fileId in fileIds) await fileClient.DeleteFileAsync(fileId);` <br> • `ColoredConsole.WriteInfoLine($"Deleted the vector store and the {fileIds.Count} documents from the service");` <br> • The files and the vector store stay in the service until you delete them (the vector store is billed per GB and per day, beyond a free first GB) |
+
+> **Beware with Chat Completions:** an agent on `GetChatClient()` does not refuse a `HostedFileSearchTool`, it **silently leaves it out**: the model answers from its own knowledge, with a generic return policy. Hosted tools need the Responses API.
+
+---
+
 ### Step 4: Run and Test
 
 **Run the Start project (your implementation):**
@@ -206,7 +258,7 @@ cd Solution
 dotnet run
 ```
 
-To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). Scenario 1, which fills the vector store, runs with it.
+To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios to run](../../../README.md#3-choose-the-scenarios-to-run)). Scenario 1, which fills the vector store, runs with it (scenarios 2 to 5 need it; scenario 6 does not). To compare the three ways to answer the same question: `dotnet run -- --scenarios 3,5,6`.
 
 ## How the two RAG approaches work
 
@@ -235,6 +287,37 @@ To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios
 
 `TextSearchProviderOptions.SearchTime = OnDemandFunctionCalling` turns the provider into the tool of scenario 3 (a function named `Search` by default): the same class covers both approaches.
 
+## Your RAG or the RAG of the provider?
+
+```
+ Scenarios 3 and 5 - your RAG                                Scenario 6 - hosted file search
+
+ your app ──request──► model: "search_faq(question)"         your app ── upload files, create vector store ──► service (once)
+ your app ── search_faq → YOUR vector store + YOUR embeddings your app ──1 request──► service: model → file_search (service vector store)
+ your app ──tool result──► model: answer                                                     → model: answer + citations
+```
+
+| | Your RAG (scenarios 3 to 5) | Hosted file search (scenario 6) |
+|---|---|---|
+| APIs | Chat Completions **and** Responses (scenario 5) | Responses only |
+| Where the documents are | Your vector store (here in memory; in production Azure AI Search, Cosmos DB, PostgreSQL, Qdrant...) | Files and vector store **in the service** (Azure OpenAI / OpenAI), until you delete them |
+| Embeddings | Your embedding deployment, your choice of model and dimensions | The embeddings of the service (not configurable) |
+| Chunking | Yours (here, one record per entry) | By the service (`StaticFileChunkingStrategy`: size and overlap); you control how you cut the files |
+| Search | Yours: vector, filters on your data, hybrid, re-ranking, permissions per user | The service: query rewriting, hybrid search and ranking, `MaximumResultCount`, ranking options, filters on file attributes |
+| Query | Written by the model (tool) or the user message (provider) | Written by the model (several queries per question) |
+| Results you can see | All of them, in your code, before the model | The chunks and scores if you ask for them (`file_search_call.results`), the citations (`CitationAnnotation`) |
+| Code to write | Vector store, embedding, search tool | Upload, vector store creation, indexing wait, clean-up; no search code |
+| Persistence and data residency | Where you decide | Where the provider stores files (your Azure resource and region) |
+| Cost | Your database + embedding calls | Vector store storage (per GB and per day, beyond a free first GB) + file search calls + the chunks read by the model |
+| Dependency on the provider | None: change model provider, keep your RAG | Tied to the provider: the files, the vector store ids and the tool exist only there |
+
+In this lab, for the same question, scenario 6 used about 1,700 input tokens against about 570 for scenarios 3 and 5, where `search_faq` returns 3 short entries: with the hosted tool, what reaches the model is decided by the service, not by you. Measure it on your own documents. The scores of scenario 6 are ranking scores of the service, not cosine similarities: you cannot compare them with the scores of scenario 2.
+
+When to use which:
+
+- **Your RAG** when the knowledge already lives in your systems, changes often, needs permissions per user, filters on your data, a specific embedding model, or must stay in your infrastructure; and whenever you want to stay independent of the model provider. It works with both APIs.
+- **Hosted file search** to give an agent a set of documents quickly (PDF, Markdown, Word...) without building a retrieval pipeline, when storing them at the provider is acceptable.
+
 ## Key Concepts
 
 | Concept | Description |
@@ -252,8 +335,19 @@ To run only some scenarios: `dotnet run -- --scenarios 3` ([Choose the scenarios
 | `TextSearchProviderOptions` | `SearchTime`, `RecentMessageMemoryLimit`, `ContextPrompt`, `CitationsPrompt`, `FunctionToolName`... |
 | `ChatClientAgentOptions.AIContextProviders` | The context providers of an agent (this lab uses one; Lab 12 writes its own) |
 | `AgentRequestMessageSourceType` | Where a message of a run comes from: `External` (the caller), `ChatHistory`, `AIContextProvider`; used to filter what the history stores |
+| `AsIChatClientWithStoredOutputDisabled(model)` | A chat client on the Responses API with `store = false`: the service keeps neither the response nor its inputs (scenario 5, experimental `MAAI001`) |
+| Hosted file search | A hosted tool of the Responses API: the service searches its own vector stores during the request |
+| `OpenAIFileClient` / `UploadFileAsync(..., FileUploadPurpose.Assistants)` | Uploads a file to the service; the `assistants` purpose is the one the file search reads |
+| `VectorStoreClient` (`OpenAI.VectorStores`) | Creates (`CreateVectorStoreAsync`), reads (`GetVectorStoreAsync`: `Status`, `FileCounts`, `UsageBytes`) and deletes the vector stores **of the service** |
+| `VectorStoreExpirationPolicy` | Deletes a vector store of the service after some days without use |
+| `HostedFileSearchTool` / `HostedVectorStoreContent` | The file search tool given to the agent, and the vector store of the service it searches (`MaximumResultCount`) |
+| `IncludedResponseProperty.FileSearchCallResults` | Asks the service to return the chunks it found (`include: ["file_search_call.results"]`), set with `ChatOptions.RawRepresentationFactory` |
+| `CitationAnnotation` | A citation in the answer (`FileId`, `Title` = the file name), in `AIContent.Annotations` |
 
 ## Namespaces Reference
+
+Scenarios 5 and 6 add `OpenAI.Responses` (`ResponsesClient`, `CreateResponseOptions`, `IncludedResponseProperty`), `OpenAI.Files` (`OpenAIFileClient`, `OpenAIFile`, `FileUploadPurpose`) and `OpenAI.VectorStores` (imported as `ServiceVectorStores`: `VectorStoreClient`, `VectorStore`, `VectorStoreCreationOptions`, `VectorStoreExpirationPolicy`); `HostedFileSearchTool`, `HostedVectorStoreContent` and `CitationAnnotation` are in `Microsoft.Extensions.AI`.
+
 
 | Namespace | Purpose |
 |-----------|---------|
@@ -318,6 +412,34 @@ Token Usage (follow-up):
   Input tokens: 4xx
   Output tokens: 4x
   Total tokens: 4xx
+----------------------------------------
+=== Scenario 5: Responses API with your own vector store - nothing stored by the service ===
+Question: I received a broken item yesterday. What should I do?
+Tool called: search_faq(question: I received a broken item yesterday. What should I do?)
+Agent: If you received a damaged product, please contact customer service within 48 hours of delivery and provide photos of the damage. They will arrange a free return pickup and send you a replacement or process a full refund, including shipping costs (faq-005).
+Response resp_045850a235526a42016aef37c948588193a76a686c7082c2d5 stored by the service: no (404)
+----------------------------------------
+Token Usage:
+  Input tokens: 5xx
+  Output tokens: 1xx
+  Total tokens: 6xx
+----------------------------------------
+=== Scenario 6: Hosted file search - the service stores, chunks, embeds and searches the FAQ ===
+Uploaded 20 FAQ documents to the service
+Vector store of the service ready: vs_B9Ukx1ArsQuP5fTGC0B1E7RS, 20 files, 26823 bytes
+Question: I received a broken item yesterday. What should I do?
+File search queries (written by the model): I received a broken item yesterday. What should I do? | broken item | received broken item
+1. faq-005.md (score 0.0333)
+2. faq-012.md (score 0.0331)
+3. faq-002.md (score 0.0320)
+Files cited in the answer: faq-005.md
+Agent: If you received a damaged product, you should contact our customer service within 48 hours of delivery. Be sure to include photos of the damage. We will arrange a free return pickup and either send you a replacement or process a full refund, including shipping costs.
+----------------------------------------
+Token Usage:
+  Input tokens: 1xxx
+  Output tokens: 9x
+  Total tokens: 1xxx
+Deleted the vector store and the 20 documents from the service
 ```
 
 Answers, scores and token counts vary from one run to another and from one embedding model to another (the scores above come from `text-embedding-3-small`).
@@ -338,6 +460,13 @@ When the embedding deployment is on another resource (`EmbeddingEndpoint` set), 
 | Scenario 3: the agent says it *encountered an error* while searching | The tool threw an exception (for example an empty collection): the run does not fail, the error is sent back to the model, which reports it |
 | Scenario 4: no `[TextSearchProvider]` line | The provider is not attached: check `AIContextProviders = [...]` in `ChatClientAgentOptions` (TODO 17) |
 | The `[TextSearchProvider]` lines are garbled | Remove `.WithSpinner()` from the runs of scenario 4 |
+| Scenarios 5 and 6 fail with `404` or *"unsupported"* when running the agent | The deployment (model or region) does not support the Responses API: use one that does, or run `dotnet run -- --scenarios 1,2,3,4` |
+| Scenario 5: `Tool called: (none)` | The agent ran without the tool: check `tools: [searchFaqTool]` (TODO 22) |
+| Scenario 6: `File search: (not called)` and a generic answer | The agent runs on Chat Completions (a hosted tool is silently left out), or the vector store is empty: use `GetResponsesClient()` and wait for the indexing (TODO 27) |
+| Scenario 6: the file search finds nothing | The files were not processed yet: `WaitUntilIndexedAsync` must run before the agent |
+| Scenario 6: `The vector store '...' is failed` / `cancelled` | A file could not be processed: check the content of the uploaded documents (`FaqData.ToDocument`) |
+| Scenario 6: no line under `File search queries` | `include` is not set: pass `runOptions` with `IncludedResponseProperty.FileSearchCallResults` (TODO 29) |
+| Scenario 6 stopped before the clean-up | The vector store `lab07-sav-faq` expires 1 day after its last use, but the files `faq-*.md` stay: list them with `fileClient.GetFilesAsync()` (and the vector stores with `vectorStoreClient.GetVectorStoresAsync()`), and delete them with `DeleteFileAsync` / `DeleteVectorStoreAsync` |
 
 ## Security: the retrieved content is untrusted
 
@@ -399,7 +528,10 @@ The following files should be modified:
 - **Filters**: `SearchAsync(value, top, new VectorSearchOptions<FaqRecord> { Filter = record => ... })` combines the vector search with a filter on the data properties (mark them `[VectorStoreData(IsIndexed = true)]` for stores that need an index).
 - **On-demand search with the provider**: `TextSearchProviderOptions.SearchTime = TextSearchProviderOptions.TextSearchBehavior.OnDemandFunctionCalling` exposes the search as a function tool (`FunctionToolName`, `FunctionToolDescription`) instead of running it before every call.
 - **Custom context format**: `ContextPrompt`, `CitationsPrompt` or `ContextFormatter` control the message that the provider injects.
-- **Foundry RAG**: the official sample `AgentWithRAG_Step04_FoundryServiceRAG` uses the vector store service of Microsoft Foundry instead of a local store.
+- **Foundry RAG**: the official sample `AgentWithRAG_Step04_FoundryServiceRAG` uses the vector store service of Microsoft Foundry instead of a local store (the Foundry counterpart of scenario 6).
+- **Chunking of the hosted file search**: `VectorStoreCreationOptions.ChunkingStrategy = new StaticFileChunkingStrategy(maxTokensPerChunk, overlappingTokenCount)`; **file attributes** (`UpdateVectorStoreFileAttributesAsync`) to filter the search.
+- **Both at once**: an agent can have your `search_faq` tool **and** a hosted file search: for example your product catalog in your database, and the user manuals in the service.
+- **Chat Completions or Responses for the whole course**: [Chat Completions and Responses API](../ChatCompletions-vs-Responses.md) compares the two APIs in Labs 04, 05 and 07.
 - **Your own context provider**: `TextSearchProvider` is one `AIContextProvider`; Lab 12 shows how to write yours.
 
 ## Coming from an older version of the lab?
@@ -417,6 +549,7 @@ The following files should be modified:
 | `<NoWarn>MEAI001</NoWarn>`, `Microsoft.Extensions.Hosting` | Removed; `Microsoft.Extensions.Configuration.*` packages |
 | API key in `appsettings.json` | API key in user secrets or environment variables |
 | — | Scenario 4: RAG with `TextSearchProvider` (new in Agent Framework) |
+| — | Scenarios 5 and 6 (2026-11): your RAG on the Responses API (`store = false`), then the hosted file search of the service |
 
 ## Useful Links
 
@@ -424,6 +557,9 @@ The following files should be modified:
 - [Official RAG samples (`AgentWithRAG_Step01` to `Step05`)](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents/AgentWithRAG)
 - [Microsoft.Extensions.VectorData: vector stores](https://learn.microsoft.com/dotnet/ai/vector-stores/overview)
 - [Azure OpenAI embeddings](https://learn.microsoft.com/azure/ai-services/openai/how-to/embeddings)
+- [Azure OpenAI provider in Agent Framework (Responses or Chat Completions, hosted tools)](https://learn.microsoft.com/agent-framework/agents/providers/azure-openai)
+- [OpenAI — file search](https://platform.openai.com/docs/guides/tools-file-search) and [retrieval / vector stores](https://platform.openai.com/docs/guides/retrieval)
+- [Official sample `Agent_Step16_FileSearch` (Foundry)](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples/02-agents)
 - [Azure OpenAI v1 API](https://learn.microsoft.com/azure/foundry/openai/api-version-lifecycle)
 
 ## Solution

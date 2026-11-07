@@ -158,7 +158,7 @@ Choose the scenarios after `--` (from the project folder, or with `--project` as
 | `dotnet run -- --list-scenarios` | Nothing: lists the scenarios of the lab, implemented or not, and what `dotnet run` would run |
 
 - A scenario that is not implemented **never runs**: when you name one, it is left out (`>>> Scenarios not run: 2 (not implemented yet: …)`) and the other scenarios you named run. An unknown number stops the program with the list of the scenarios (exit code 2).
-- Some scenarios need another one in the same run, declared by a `// Requires scenario N` comment in their block: Lab07 scenarios 2–4 need scenario 1 (it fills the in-memory vector store), Lab13 scenarios 3 and 4 need scenario 2 (same conversation). Naming them adds the scenario they require; a scenario whose required scenario is not implemented is left out too.
+- Some scenarios need another one in the same run, declared by a `// Requires scenario N` comment in their block: Lab07 scenarios 2–5 need scenario 1 (it fills the in-memory vector store), Lab13 scenarios 3 and 4 need scenario 2 (same conversation). Naming them adds the scenario they require; a scenario whose required scenario is not implemented is left out too.
 - The program prints what it runs (`>>> Scenarios to run: 1, 3 (--scenarios 1,3)`) and a line when each scenario starts (`>>> Running scenario 3: …`).
 
 The selection rules live in `CommonUtilities` (`LabScenarios.cs`, `ScenarioSelection.cs`), and the **dashboard runs the lab with the same option** (`dotnet run --no-build -- --scenarios 1,3`): both modes always run the same scenarios.
@@ -249,7 +249,7 @@ Only one run can be in progress at a time.
 | **Token usage** | Input / output / reasoning / total tokens per scenario, as printed by the lab; *Not available* when the lab prints none. No cost estimate. |
 | **History** tab | Past runs and the scenarios they were limited to, stored in `Dashboard/.data/history.json` (git-ignored). |
 
-An exercise is **Completed** once every scenario passed, in one run or across several: you never have to run the scenarios you already validated again.
+An exercise is **Completed** once every scenario passed, in one run or across several: you never have to run the scenarios you already validated again. **Bonus** scenarios (the Responses API scenarios of Labs 04, 05 and 07, marked *Bonus*) are optional: the lab is completed without them, and **Completed+** once they pass too.
 
 **How a scenario is judged.** The checks look at what the scenario does, not at how it presents it: the data only a working implementation can produce (the value a tool returns, an identifier it generates, a fact of the knowledge base, the token counts), and the lines written by the helpers the exercise provides (`WriteRestaurant`, `WriteToolCalls`, `WriteHotels`…: call them as the TODO hints say, they show that the typed object exists). Each check only reads the output of its own scenario, delimited by the line the scenario selection prints when the scenario starts. The scenario header (`=== Scenario 4: … ===`), the separators, the titles and the labels you write yourself are never required: you can rename, move or remove them. The token usage lines keep their wording (`Input tokens: 56`): the dashboard reads them.
 
@@ -284,6 +284,8 @@ The labs are organized into two main parts:
 ### Part 1: AzureOpenAI - Individual AI Agents
 
 This part focuses on building **individual AI agents** with various capabilities. You will learn how to create agents, add tools, handle structured output, connect to external services, and implement human-in-the-loop patterns.
+
+> **Chat Completions and Responses API.** The labs run on Chat Completions, and Lab 01 introduces the Responses API. Labs 04, 05 and 07 end with **bonus** scenarios on the **Responses API** (optional: the lab is completed without them, *Completed+* with them) that compare the two APIs where they really differ: MCP orchestrated by your application or by the service (Lab 04), conversation state kept by your application or by the service (Lab 05), your RAG or the hosted file search (Lab 07). See [Chat Completions and Responses API](LearningLabs/AzureOpenAI/ChatCompletions-vs-Responses.md).
 
 ---
 
@@ -337,6 +339,8 @@ This part focuses on building **individual AI agents** with various capabilities
 | Scenario 1 | Connect to the Hugging Face MCP server (`McpClient.CreateAsync` + `HttpClientTransport`) and discover its tools (`ListToolsAsync`) |
 | Scenario 2 | Agent with the MCP tools (`ChatClientAgentOptions`) and structured output (`RunAsync<T>`), with the list of tools called |
 | Scenario 3 | Give the agent only the MCP tool it needs, and compare the token usage |
+| Scenario 4 (bonus) | **Responses API**: the same MCP client and tools on `GetResponsesClient()` — MCP orchestrated by your application works with both APIs |
+| Scenario 5 (bonus) | **Hosted MCP** (`HostedMcpServerTool`): the service lists and calls the tools of the MCP server; who ran each call, local or hosted |
 
 ---
 
@@ -349,6 +353,8 @@ This part focuses on building **individual AI agents** with various capabilities
 | Scenario 1 | Session with the default in-memory chat history: `CreateSessionAsync`, `SerializeSessionAsync` / `DeserializeSessionAsync`, the messages kept in the session |
 | Scenario 2 | Bound the chat history with a chat reducer (`MessageCountingChatReducer`): the cost of each run stops growing, and the agent forgets the beginning of the conversation |
 | Scenario 3 | Custom `ChatHistoryProvider` storing the chat history in MongoDB: the serialized session only holds a key, a new agent resumes it after a simulated restart (MongoDB container provided) |
+| Scenario 4 (bonus) | **Responses API**, state kept by the service: the session holds a response id (`previous_response_id`), the service keeps the conversation 30 days; check it and delete it |
+| Scenario 5 (bonus) | **Responses API without storage** (`store = false`): the same `ChatHistoryProvider` keeps the conversation in your storage, under your business id; the four identifiers of a conversation |
 
 ---
 
@@ -385,6 +391,8 @@ This lab is split into two parts: start the server, then run the client.
 | Scenario 2 | Semantic search without an agent (`SearchAsync`, `VectorSearchResult<T>` with scores) |
 | Scenario 3 | Agentic RAG: the search is a function tool (`AIFunctionFactory.Create`), the agent decides when to call it; tool calls and token usage displayed |
 | Scenario 4 | RAG with `TextSearchProvider` (`ChatClientAgentOptions.AIContextProviders`): the FAQ is searched before every model call, with a follow-up question in a session |
+| Scenario 5 (bonus) | **Responses API with your own vector store**: the same search tool, and nothing stored by the service (`store = false`) |
+| Scenario 6 (bonus) | **Hosted file search**: upload the FAQ to the service, which stores, chunks, embeds and searches it (`HostedFileSearchTool`); citations, clean-up, and the comparison with your RAG |
 
 ---
 
@@ -667,10 +675,10 @@ The labs keep their numbers, but the **essential path** follows the order below 
 │    Lab01 Agent (+ Responses API) → Lab02 Structured output → Lab03 Tools → Lab04 MCP client  │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 2. Conversations and control                                                                 │
-│    Lab05 Sessions and chat history → Lab09 Human approval and guardrails                     │
+│    Lab05 Sessions (+ Responses API) → Lab09 Human approval and guardrails                    │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 3. Knowledge and memory                                                                      │
-│    Lab07 RAG → Lab12 Memory (context provider) → Lab15 Agent Skills                          │
+│    Lab07 RAG (+ hosted file search) → Lab12 Memory (context provider) → Lab15 Agent Skills   │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 4. Agents working with agents                                                                │
 │    MultiAgentSystem Lab01 Delegate a task to another agent (same process)                    │

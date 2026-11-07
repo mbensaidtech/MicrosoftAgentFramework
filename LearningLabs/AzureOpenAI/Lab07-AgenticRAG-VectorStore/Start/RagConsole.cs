@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
+using OpenAI.Responses;
 using CommonUtilities;
 using AgenticRAG.Models;
 
@@ -56,5 +57,54 @@ public static class RagConsole
         ColoredConsole.WriteSecondaryLogLine($"  Input tokens: {response.Usage?.InputTokenCount}");
         ColoredConsole.WriteSecondaryLogLine($"  Output tokens: {response.Usage?.OutputTokenCount}");
         ColoredConsole.WriteSecondaryLogLine($"  Total tokens: {response.Usage?.TotalTokenCount}");
+    }
+
+    /// <summary>
+    /// Scenario 6: displays a vector store of the service once its files are processed: its id, its files and its size.
+    /// </summary>
+    // VectorStore of OpenAI.VectorStores is still flagged [Experimental] (OPENAI001) by the OpenAI SDK.
+#pragma warning disable OPENAI001
+    public static void WriteServiceVectorStore(OpenAI.VectorStores.VectorStore vectorStore) =>
+        ColoredConsole.WriteInfoLine(
+            $"Vector store of the service ready: {vectorStore.Id}, {vectorStore.FileCounts.Completed} files, {vectorStore.UsageBytes} bytes");
+#pragma warning restore OPENAI001
+
+    /// <summary>
+    /// Scenario 6: displays what the hosted file search did during a run: the queries written by the model, the chunks found
+    /// (file name and score, returned when the run asks for <c>file_search_call.results</c>), and the files cited in the answer.
+    /// The search runs in the service: it is not a function call of the agent, it comes back as a <c>file_search_call</c> item.
+    /// </summary>
+    public static void WriteFileSearch(AgentResponse response)
+    {
+        List<AIContent> contents = [.. response.Messages.SelectMany(message => message.Contents)];
+
+        // The file_search_call item has no Microsoft.Extensions.AI type of its own: read the OpenAI item.
+        // FileSearchCallResponseItem is still flagged [Experimental] (OPENAI001) by the OpenAI SDK.
+#pragma warning disable OPENAI001
+        List<FileSearchCallResponseItem> searches = [.. contents.Select(content => content.RawRepresentation).OfType<FileSearchCallResponseItem>()];
+        if (searches.Count == 0)
+        {
+            ColoredConsole.WriteWarningLine("File search: (not called)");
+        }
+
+        foreach (FileSearchCallResponseItem search in searches)
+        {
+            ColoredConsole.WriteWarningLine($"File search queries (written by the model): {string.Join(" | ", search.Queries)}");
+            int rank = 0;
+            foreach (FileSearchCallResult result in search.Results)
+            {
+                ColoredConsole.WritePrimaryLogLine(string.Create(CultureInfo.InvariantCulture,
+                    $"{++rank}. {result.Filename} (score {result.Score:F4})"));
+            }
+        }
+#pragma warning restore OPENAI001
+
+        // The answer cites the files it used: CitationAnnotation (FileId, Title = the file name)
+        List<string> citedFiles = [.. contents
+            .SelectMany(content => content.Annotations ?? [])
+            .OfType<CitationAnnotation>()
+            .Select(citation => citation.Title ?? citation.FileId ?? "?")
+            .Distinct()];
+        ColoredConsole.WriteWarningLine($"Files cited in the answer: {(citedFiles.Count > 0 ? string.Join(", ", citedFiles) : "(none)")}");
     }
 }

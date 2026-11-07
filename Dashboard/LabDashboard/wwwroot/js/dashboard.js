@@ -458,10 +458,10 @@ function withRequiredIfRunnable(numbers, scenarios) {
  * The default selection: what is left to do, never a scenario already passed (unless a ticked one requires it).
  * - the runnable scenarios not passed yet (failed, or never run: a scenario just written is ticked);
  * - the next step of the exercise: the first scenario and each scenario that follows a passed one, when not passed yet, ticked even
- *   when not implemented (it runs once written).
+ *   when not implemented (it runs once written) — except a bonus scenario: it is optional, ticked only once written.
  */
 function defaultSelection(scenarios) {
-  const picks = scenarios.filter((s, i) => !passed(s) && (s.runnable || i === 0 || passed(scenarios[i - 1])));
+  const picks = scenarios.filter((s, i) => !passed(s) && (s.runnable || (!s.bonus && (i === 0 || passed(scenarios[i - 1])))));
   return withRequiredIfRunnable(picks.map((s) => s.number), scenarios);
 }
 
@@ -512,7 +512,7 @@ function renderScenarios() {
   const known = byNumber(scenarios);
   const selectedNumbers = scenarios.filter((s) => set.has(s.number) && s.runnable).map((s) => s.number);
   $(main, "scenarioList").replaceChildren(...scenarios.map((s) => {
-    const item = el("li", `scenario${s.runnable ? "" : " todo"}${set.has(s.number) ? " selected" : ""}`);
+    const item = el("li", `scenario${s.runnable ? "" : " todo"}${s.bonus ? " bonus" : ""}${set.has(s.number) ? " selected" : ""}`);
     const label = el("label");
     const check = el("input");
     check.type = "checkbox";
@@ -522,6 +522,11 @@ function renderScenarios() {
     label.append(check, el("span", "mono scenario-num", String(s.number)), el("span", "scenario-title", s.title));
 
     const badges = el("span", "scenario-badges");
+    if (s.bonus) {
+      const bonus = pill("bonus", t("scenarios.bonus"));
+      bonus.title = t("scenarios.bonusTitle");
+      badges.append(bonus);
+    }
     if (!s.implemented) {
       const todo = pill("todo", t(s.setupImplemented ? "scenarios.notImplemented" : "scenarios.setupNotDone"));
       todo.title = t("scenarios.notImplementedTitle");

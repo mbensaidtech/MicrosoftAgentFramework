@@ -98,6 +98,9 @@
 .jr-chip:focus-visible { outline-offset: 3px; }
 .jr-chip.completed { --in: inset 0 0 0 0 transparent; background: var(--ok); color: var(--jr-ok-ink); }
 .jr-chip.completed:hover { --in: inset 0 0 0 0 transparent; color: var(--jr-ok-ink); }
+/* Completed with the bonus scenarios: a ring and a "+" mark */
+.jr-chip.completed.plus, .jr-chip.toResume.plus { --out: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--ok); }
+.jr-chip.plus::after { content: "+"; position: absolute; top: -6px; right: -6px; min-width: 14px; height: 14px; border-radius: 7px; background: var(--acc); color: var(--panel); font: 700 11px/14px system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px var(--panel); }
 .jr-chip.inProgress {
   --in: inset 0 0 0 0 transparent; color: var(--warn);
   background:
@@ -115,6 +118,7 @@
 .jr-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .jr-key { width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--txt4); }
 .jr-key.completed { box-shadow: none; background: var(--ok); }
+.jr-key.plus { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--ok); background: var(--ok); }
 .jr-key.inProgress { box-shadow: none; background: radial-gradient(closest-side, var(--panel) calc(100% - 1.5px), transparent calc(100% - 1px)), conic-gradient(var(--warn) 50%, color-mix(in srgb, var(--warn) 25%, transparent) 0); }
 .jr-key.toResume { box-shadow: inset 0 0 0 1.5px var(--bad); background: color-mix(in srgb, var(--bad) 20%, transparent); }
 

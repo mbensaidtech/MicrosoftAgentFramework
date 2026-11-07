@@ -230,6 +230,8 @@ jq -c --argjson source "$source_json" '
           | {id, number, track, title, level, interactive: (.interactive == true)}
             + (if .summary | present then {summary} else {} end)
             + (if $translations == {} then {} else {translations: $translations} end)
+            # Optional scenarios: completed without them, "Done+" with them. Dropped by a server that does not know them yet.
+            + (if (.bonusScenarios | type) == "array" and (.bonusScenarios | length) > 0 then {bonusScenarios} else {} end)
         end
     ]
   }
@@ -277,6 +279,11 @@ issues=$(jq -r '
         (.title | text("\($p).title"; 200; true)),
         (.level | text("\($p).level"; 32; true)),
         (.summary | text("\($p).summary"; 2000; false)),
+        (.bonusScenarios
+          | if . == null then empty
+            elif type != "array" or length > 50 or any(.[]; type != "number" or . < 1 or . != floor) or (unique | length) != length
+            then "\($p).bonusScenarios: must be distinct scenario numbers (1 or more), 50 at most"
+            else empty end),
         (.translations
           | if . == null then empty
             elif type != "object" then "\($p).translations: must be an object"

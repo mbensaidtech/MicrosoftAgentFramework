@@ -199,6 +199,8 @@ api.MapGet("/labs/{id}/scenarios", (string id, LabCatalog catalog, RunHistorySto
                 Runnable = runnable.Contains(scenario.Number),
                 scenario.SetupImplemented,
                 scenario.Requires,
+                // Optional scenario: the exercise is completed without it ("Done"), with it "Done+" (labs.json bonusScenarios)
+                Bonus = lab.BonusScenarios.Contains(scenario.Number),
                 Last = last.TryGetValue(scenario.Number, out var result)
                     ? new { result.Status, result.Run.RunId, result.Run.StartedAt }
                     : null,
@@ -661,6 +663,7 @@ internal sealed record LabSummary(
     LabCompanion? Companion,
     IReadOnlyDictionary<string, LabTranslation> Translations,
     string Progress,
+    IReadOnlyList<int> BonusScenarios,
     bool HasCompletedCopy,
     string FolderName,
     RunRecord? LastStartRun,
@@ -672,14 +675,16 @@ internal sealed record LabSummary(
         RunRecord? lastStart = runs.FirstOrDefault(r => r.Target == RunTarget.Start);
         RunRecord? lastSolution = runs.FirstOrDefault(r => r.Target == RunTarget.Solution);
 
-        // Progress of the exercise itself (Start project): completed once every scenario passed (ExerciseProgress).
-        string progress = ExerciseProgress.CompletingRun(runs) is not null ? "completed"
+        // Progress of the exercise itself (Start project): completed once every scenario but the bonus ones passed, completed with its
+        // bonus ("Done+") once the bonus scenarios passed too (ExerciseProgress).
+        string progress = ExerciseProgress.BonusCompletingRun(runs, lab.BonusScenarios) is not null ? "completedPlus"
+            : ExerciseProgress.CompletingRun(runs, lab.BonusScenarios) is not null ? "completed"
             : lastStart is not null ? "inProgress"
             : "notStarted";
 
         return new LabSummary(
             lab.Id, lab.Number, lab.Track, lab.Title, lab.Summary, lab.Level, lab.TimeoutSeconds,
-            lab.Interactive, lab.Storage, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress, hasCompletedCopy,
+            lab.Interactive, lab.Storage, lab.InputIdleTimeoutSeconds, lab.Companion, lab.Translations, progress, lab.BonusScenarios, hasCompletedCopy,
             LabResetService.FolderName(lab),
             lastStart is null ? null : lastStart with { Log = [] },
             lastSolution is null ? null : lastSolution with { Log = [] },
